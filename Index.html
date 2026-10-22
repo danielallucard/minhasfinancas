@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#17202a">
 <meta name="format-detection" content="telephone=no">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
-<title>Ricas Finanças v63 — Layout responsivo para celular</title>
+<title>Ricas Finanças v64 — Ajustes de alinhamento (web e mobile)</title>
 <style>
 :root{--bg:#f5f7fb;--card:#fff;--text:#17202a;--muted:#6b7280;--primary:#246bfe;--green:#159447;--red:#d92d20;--amber:#d98c00;--border:#e6e9ef;--shadow:0 8px 24px #17202a12}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
@@ -243,6 +243,86 @@ body{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
   table.table.rt .budget-bar{min-width:0}
   table.table.rt input.budget-pct{width:90px}
   .summary-pie-legend table.table.rt tr{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+<style id="layout-fix-style">
+/* ===== v64 — Ajustes de alinhamento (web e mobile) ===== */
+.form input[type=checkbox],.form input[type=radio]{width:auto;flex:0 0 auto;margin:0;accent-color:var(--primary);width:18px;height:18px}
+.form label:has(> input[type=checkbox]){display:flex!important;align-items:center;gap:8px;color:var(--text);font-size:14px}
+/* Campos fora de formulários (filtros de Movimentações e Relatórios) com o mesmo padrão visual */
+#content select,#content input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=file]){
+  border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:#fff;color:var(--text);max-width:100%;min-width:0}
+#content label:has(> select),#content label:has(> input[type=date]),#content label:has(> input[type=number]){
+  display:grid;gap:5px;font-size:12px;color:var(--muted);align-content:start}
+#content label:has(> select)>select,#content label:has(> input[type=date])>input,#content label:has(> input[type=number])>input{width:100%}
+#content .card>h1{font-size:20px;margin:0 0 12px}
+#content .card>.grid.g3 label{min-width:0}
+/* Tabelas: texto quebra linha em vez de cortar colunas; valores ficam inteiros */
+.table td{white-space:normal;vertical-align:middle}
+.table td.red,.table td.blue,.table td:first-child,.table td.confirm-cell{white-space:nowrap}
+.table th{white-space:nowrap}
+.table td .btn{padding:7px 10px}
+.sortable-header th{padding-left:6px;padding-right:6px}
+.budget-bar{min-width:80px}
+.budget-table td:nth-child(2){white-space:nowrap}
+@media(min-width:701px){.table td:not(:first-child):not(.confirm-cell):not(.red):not(.blue):not(:has(button)):not(:has(input))::after{content:'';display:block;width:96px;height:0}}
+.budget-table td:first-child{white-space:normal;min-width:220px}
+/* Categorias: nome | grupo | ordem | ações em uma linha */
+.budget-cat-row{flex-wrap:nowrap;gap:8px;border-bottom:1px solid var(--border)}
+.budget-cat-row:last-child{border-bottom:0}
+.budget-cat-row>.pill{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.budget-cat-row>select{flex:0 0 165px;width:165px}
+.budget-cat-row .order-buttons{margin-left:0}
+.budget-cat-row .btn{flex:0 0 auto;white-space:nowrap}
+.budget-income{align-items:flex-end}
+.budget-income select{max-width:100%}
+/* Contas: cabeçalho do "Lançamentos do mês" alinhado */
+.account-transactions summary{justify-content:flex-start}
+.account-transactions summary>span:first-child{flex:1 1 auto;min-width:0}
+.account-transactions summary>span.muted{white-space:nowrap;font-weight:400}
+/* Legenda da pizza e totais */
+.summary-pie-legend-item>span:nth-child(2){min-width:0}
+.summary-pie-legend-item b,.summary-pie-legend-item .muted{white-space:nowrap}
+.overdue-total{flex-wrap:wrap;align-items:baseline}
+.overdue-total span{white-space:nowrap}
+.metric .value{white-space:nowrap;overflow-wrap:normal}
+/* Gráfico planejado × realizado: rótulo do grupo sem quebra estranha */
+.bgr-row{grid-template-columns:minmax(120px,170px) 1fr}
+@media(max-width:900px){
+  .metric .value,.value{font-size:clamp(15px,4.4vw,19px)!important;white-space:nowrap;overflow-wrap:normal!important}
+  .card .card.metric{padding:10px 11px;box-shadow:none}
+  .metric .muted{font-size:12px;line-height:1.35}
+  .budget-cat-row{flex-wrap:wrap}
+  .budget-cat-row>.pill{flex:1 1 100%;white-space:normal;overflow:visible;font-size:13px;padding:6px 10px}
+  .budget-cat-row>select{order:1!important;flex:1 1 100%!important}
+  .budget-cat-row>.order-buttons,.budget-cat-row>.btn{order:2}
+  .budget-cat-row>.btn{flex:1 1 0}
+  .budget-cat-row>select{width:100%}
+  .budget-income>*{width:100%}
+  #content .card>.grid.g3{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #content label[style*="min-width:220px"]{flex:1 1 calc(50% - 10px)!important}
+  #txClearFilters{flex:1 1 100%}
+  .account-transactions summary{flex-wrap:wrap}
+  .bgr-row{grid-template-columns:1fr}
+}
+@media(max-width:700px){
+  /* Cartões das tabelas em grade de 6 colunas: campos em pares e botões/confirmação em uma única linha */
+  table.table.rt tr{grid-template-columns:repeat(6,minmax(0,1fr))}
+  table.table.rt td{grid-column:span 3}
+  table.table.rt td.rt-wide,table.table.rt td[colspan]{grid-column:1/-1}
+  table.table.rt td.rt-btn,table.table.rt td.confirm-cell{grid-column:span 2;align-self:end}
+  table.table.rt td.confirm-cell{text-align:center}
+  table.table.rt td.confirm-cell::before{text-align:center}
+  table.table.rt td.rt-wide{font-weight:600}
+  table.table.rt td.rt-wide .muted,table.table.rt td.rt-wide span[style*="font-size:12px"]{font-weight:400}
+  table.table.rt td.red,table.table.rt td.blue{white-space:nowrap}
+  .budget-table td:first-child{min-width:0}
+  table.table.rt input.budget-pct{width:80px}
+  .summary-pie-legend table.table.rt tr{grid-template-columns:repeat(6,minmax(0,1fr))}
+}
+@media(max-width:380px){
+  #content .card>.grid.g3{grid-template-columns:1fr}
+  #content label[style*="min-width:220px"]{flex:1 1 100%!important}
 }
 </style>
 </head>
@@ -1007,7 +1087,7 @@ function recurrenceCategoryPickerHtml(selectedId){
       <input type="text" id="recurrenceCategorySearch" autocomplete="off" placeholder="Digite para pesquisar a categoria..." value="${esc(selected?.name||'')}" oninput="filterRecurrenceCategories()" onclick="showRecurrenceCategories()" onfocus="showRecurrenceCategories()">
       <input type="hidden" name="categoryId" id="recurrenceCategoryValue" value="${selectedId??''}">
     </label>
-    <div id="recurrenceCategoryOptions" class="category-options" style="display:block">
+    <div id="recurrenceCategoryOptions" class="category-options" style="display:none">
       ${cats.map(c=>`<button type="button" class="category-option" data-id="${c.id}" data-name="${esc(c.name)}" onclick="selectRecurrenceCategory(${c.id})"><span><span class="category-icon">${esc(c.icon||defaultCategoryIcon(c.name))}</span>${esc(c.name)}</span> <span class="muted">${c.type==='receita'?'Receita':'Despesa'}</span></button>`).join('')}
     </div>
   </div>`;
@@ -1614,7 +1694,7 @@ function transactions(){
           <td>${esc(txAccountLabel(t))}</td>
           <td>${t.virtualCardStatement?'—':'<span class="cat-dot" style="background:'+categoryColor(t.categoryId)+'"></span><span class="category-icon">'+esc(categoryIcon(t.categoryId))+'</span>'+esc(catName(t.categoryId))}</td>
           <td>${t.type==='receita'?'Receita':'Despesa'}</td>
-          <td class="${t.type==='receita'?'blue':'red'}">− ${money(t.value)}</td>
+          <td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td>
           <td>${t.virtualCardStatement?'Automático':'<button class="btn" onclick="openTx('+t.id+')">✎</button>'}</td>
           <td class="confirm-cell">${t.virtualCardStatement?'—':'<input type="checkbox" class="confirm-check" '+(t.confirmed?'checked':'')+' onchange="toggleTxConfirmed('+t.id+')">'}</td>
           <td>${t.virtualCardStatement?'—':'<button class="btn danger" onclick="deleteTransaction('+t.id+')">Excluir</button>'}</td>
@@ -2203,7 +2283,7 @@ function categoryPickerHtml(selectedId){
       <input type="text" id="txCategorySearch" autocomplete="off" placeholder="Digite para pesquisar a categoria..." value="${esc(selected?.name||'')}" oninput="filterTxCategories()" onclick="showTxCategories()" onfocus="showTxCategories()">
       <input type="hidden" name="categoryId" id="txCategoryValue" value="${selectedId??''}">
     </label>
-    <div id="txCategoryOptions" class="category-options" style="display:block">
+    <div id="txCategoryOptions" class="category-options" style="display:none">
       ${cats.map(c=>`<button type="button" class="category-option" data-id="${c.id}" data-name="${esc(c.name)}" onclick="selectTxCategory(${c.id})"><span><span class="category-icon">${esc(c.icon||defaultCategoryIcon(c.name))}</span>${esc(c.name)}</span> <span class="muted">${c.type==='receita'?'Receita':'Despesa'}</span></button>`).join('')}
     </div>
   </div>`;
@@ -2499,7 +2579,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v63',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v64',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
