@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#17202a">
 <meta name="format-detection" content="telephone=no">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
-<title>Ricas Finanças v65 — Orçamento ajustado à tela do celular</title>
+<title>Ricas Finanças</title>
 <style>
 :root{--bg:#f5f7fb;--card:#fff;--text:#17202a;--muted:#6b7280;--primary:#246bfe;--green:#159447;--red:#d92d20;--amber:#d98c00;--border:#e6e9ef;--shadow:0 8px 24px #17202a12}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
@@ -246,7 +246,7 @@ body{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
 }
 </style>
 <style id="layout-fix-style">
-/* ===== v64 — Ajustes de alinhamento (web e mobile) ===== */
+/* ===== v64/v65 — Ajustes de alinhamento (web e mobile) ===== */
 .form input[type=checkbox],.form input[type=radio]{flex:0 0 auto;margin:0;accent-color:var(--primary);width:18px;height:18px}
 .form label:has(> input[type=checkbox]){display:flex!important;align-items:center;gap:8px;color:var(--text);font-size:14px}
 #content select,#content input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=file]){
@@ -297,6 +297,21 @@ body{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
   #txClearFilters{flex:1 1 100%}
   .account-transactions summary{flex-wrap:wrap}
   .bgr-row{grid-template-columns:1fr}
+  html,body{max-width:100%;overflow-x:hidden}
+  .main,#content{min-width:0;max-width:100%}
+  #content>*,.card,.grid>*,form,.table-wrap{min-width:0;max-width:100%}
+  .budget-income{display:grid!important;grid-template-columns:minmax(0,1fr);gap:10px;width:100%}
+  .budget-income>label,.budget-income>div{width:100%;min-width:0!important;max-width:100%}
+  .budget-income label{grid-template-columns:minmax(0,1fr)!important}
+  #content select{width:100%;max-width:100%;min-width:0;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+  .budget-table,table.table.rt{width:100%!important;max-width:100%;table-layout:fixed}
+  table.table.rt tr{width:100%;max-width:100%;box-sizing:border-box}
+  table.table.rt td{max-width:100%}
+  .budget-table td:first-child .muted{white-space:normal!important;overflow-wrap:anywhere}
+  .budget-table .budget-bar{width:100%;min-width:0}
+  .budget-table td:nth-child(2) input.budget-pct{width:72px;display:inline-block}
+  .card form .actions{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+  .card form .actions .btn{width:100%;white-space:normal}
 }
 @media(max-width:700px){
   table.table.rt tr{grid-template-columns:repeat(6,minmax(0,1fr))}
@@ -313,25 +328,15 @@ body{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
   #content .card>.grid.g3{grid-template-columns:1fr}
   #content label[style*="min-width:220px"]{flex:1 1 100%!important}
 }
-/* ===== v65 — Divisão do orçamento contida na largura da tela (Safari/iOS) =====
-   No Safari, um <select> mede a largura pelo texto da opção mais longa e "empurra" o cartão para fora da tela.
-   As regras abaixo travam todos os contêineres na largura disponível. */
-@media(max-width:900px){
-  html,body{max-width:100%;overflow-x:hidden}
-  .main,#content{min-width:0;max-width:100%}
-  #content>*,.card,.grid>*,form,.table-wrap{min-width:0;max-width:100%}
-  .budget-income{display:grid!important;grid-template-columns:minmax(0,1fr);gap:10px;width:100%}
-  .budget-income>label,.budget-income>div{width:100%;min-width:0!important;max-width:100%}
-  .budget-income label{grid-template-columns:minmax(0,1fr)!important}
-  #content select{width:100%;max-width:100%;min-width:0;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
-  .budget-table,table.table.rt{width:100%!important;max-width:100%;table-layout:fixed}
-  table.table.rt tr{width:100%;max-width:100%;box-sizing:border-box}
-  table.table.rt td{max-width:100%}
-  .budget-table td:first-child .muted{white-space:normal!important;overflow-wrap:anywhere}
-  .budget-table .budget-bar{width:100%;min-width:0}
-  .budget-table td:nth-child(2) input.budget-pct{width:72px;display:inline-block}
-  .card form .actions{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
-  .card form .actions .btn{width:100%;white-space:normal}
+</style>
+<style id="recurrence-style">
+.rec-actions{white-space:nowrap}
+.rec-actions .btn{margin:2px 0}
+td .pill{white-space:nowrap}
+@media(max-width:700px){
+  table.table.rt td.rec-actions{grid-column:1/-1!important;display:flex;gap:8px}
+  table.table.rt td.rec-actions::before{display:none}
+  table.table.rt td.rec-actions .btn{flex:1 1 0;width:auto}
 }
 </style>
 </head>
@@ -1062,6 +1067,7 @@ document.getElementById('mobilebar').innerHTML=mobilePrimary.map(k=>navItems.fin
 renderMobileDrawer()}
 
 function render(){
+  try{ensureRecurringTransactions();}catch(e){console.warn('Recorrências:',e);}
   go(page||'dashboard');
 }
 function addMonthsSafe(date,n){
@@ -1075,18 +1081,51 @@ function installmentDescription(description, installment, total){
   const base=String(description||'').trim();
   return `${base} (${installment}/${total})`;
 }
+// Automatizações:
+//  • mode 'installments' (parcelada): gera exatamente r.count lançamentos "Descrição (n/N)".
+//  • mode 'recurring' (recorrente): repete todo mês sem fim definido. Os lançamentos são criados
+//    sempre RECURRING_AHEAD_MONTHS meses à frente (e até o mês que estiver sendo visualizado);
+//    conforme o tempo passa, novos meses são gerados automaticamente.
+//  r.skip = parcelas excluídas individualmente (não são recriadas); r.endIdx = última ocorrência (recorrência encerrada).
+const RECURRING_AHEAD_MONTHS=12;
+function isRecurring(r){return r&&r.mode==='recurring';}
+function recurrenceHorizonIdx(r){
+  const s=new Date(r.start+'T12:00:00');
+  const now=new Date();
+  const ahead=new Date(now.getFullYear(),now.getMonth()+RECURRING_AHEAD_MONTHS,1);
+  const target=selectedMonth>ahead?selectedMonth:ahead;
+  return Math.max(1,(target.getFullYear()-s.getFullYear())*12+(target.getMonth()-s.getMonth())+1);
+}
 function generateRecurrence(r){
-  const existing=new Set(db.transactions.filter(t=>t.recurrenceId===r.id).map(t=>t.date));
-  const start=r.start;
-  for(let i=0;i<r.count;i++){
-    const date=addMonthsSafe(start,i);
-    if(existing.has(date)) continue;
+  if(!r)return 0;
+  const mine=db.transactions.filter(t=>t.recurrenceId===r.id);
+  const existingIdx=new Set(mine.map(t=>Number(t.installment)).filter(Boolean));
+  const existingDates=new Set(mine.map(t=>t.date));
+  const skip=new Set((r.skip||[]).map(Number));
+  const recurring=isRecurring(r);
+  let last=recurring?recurrenceHorizonIdx(r):Number(r.count||0);
+  if(recurring&&r.endIdx)last=Math.min(last,Number(r.endIdx));
+  let added=0;
+  for(let i=0;i<last;i++){
+    const n=i+1;
+    if(existingIdx.has(n)||skip.has(n))continue;
+    const date=addMonthsSafe(r.start,i);
+    if(!recurring&&existingDates.has(date))continue;
     db.transactions.push({
-      id:uid(),type:r.type,date,description:installmentDescription(r.description,i+1,r.count),
+      id:uid(),type:r.type,date,description:recurring?String(r.description||'').trim():installmentDescription(r.description,n,r.count),
       value:+r.value,accountId:+r.accountId,categoryId:+r.categoryId,
-      confirmed:false,recurrenceId:r.id,installment:i+1,totalInstallments:r.count
+      confirmed:false,recurrenceId:r.id,installment:n,totalInstallments:recurring?null:r.count,recurring:recurring||undefined
     });
+    added++;
   }
+  return added;
+}
+// Mantém as recorrências sempre preenchidas à frente; chamado a cada renderização.
+function ensureRecurringTransactions(){
+  if(!Array.isArray(db.recurrences))return;
+  let added=0;
+  db.recurrences.filter(isRecurring).forEach(r=>added+=generateRecurrence(r));
+  if(added&&typeof storageConnected==='function'&&storageConnected())save();
 }
 function recurrenceCategoryPickerHtml(selectedId){
   const cats=[...db.categories].sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR',{sensitivity:'base'}));
@@ -1144,21 +1183,23 @@ function selectRecurrenceCategory(id){
 function openRecurrence(){
   const today=defaultDueDate();
   openModal('Automatizar movimentações futuras',`<form class="form" onsubmit="addRecurrence(event)">
-  <p class="muted">Cadastre uma receita ou despesa que será lançada automaticamente em vários meses. Ex.: financiamento habitacional em 392 parcelas.</p>
+  <p class="muted">Cadastre uma receita ou despesa lançada automaticamente todo mês.<br><b>Parcelada:</b> quantidade definida de parcelas (ex.: financiamento em 392 parcelas).<br><b>Recorrente:</b> repete todo mês sem data para acabar (ex.: salário, aluguel, internet, streaming), até você encerrar.</p>
+  <label>Modalidade<select name="mode" id="recModeSelect" onchange="toggleRecurrenceMode()"><option value="installments">Parcelada — número definido de parcelas</option><option value="recurring">Recorrente — repete todo mês, sem fim</option></select></label>
   <div class="row">
     <label>Tipo<select name="type"><option value="despesa">Despesa</option><option value="receita">Receita</option></select></label>
     <label>Primeiro vencimento<input type="date" name="start" value="${today}" required></label>
   </div>
   <label>Descrição<input name="description" value="${todayDescriptionDate()}" required placeholder="Financiamento habitacional"></label>
   <div class="row">
-    <label>Valor de cada parcela<input type="number" step="0.01" name="value" required></label>
-    <label>Número de parcelas<input type="number" min="1" max="1200" name="count" value="392" required></label>
+    <label><span id="recValueLabel">Valor de cada parcela</span><input type="number" step="0.01" min="0" name="value" required></label>
+    <label id="recCountWrap">Número de parcelas<input type="number" min="1" max="1200" name="count" id="recCountInput" value="392" required></label>
   </div>
   <div class="row">
     <label>Conta<select name="accountId" required>${[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0)).map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select></label>
     ${recurrenceCategoryPickerHtml(db.categories[0]?.id??'')}
   </div>
-  <label><input type="checkbox" name="generateNow" checked> Criar imediatamente todas as movimentações futuras</label>
+  <label id="recGenerateWrap"><input type="checkbox" name="generateNow" checked> Criar imediatamente todas as movimentações futuras</label>
+  <p class="muted" id="recRecurringHint" style="display:none">Os lançamentos recorrentes são criados automaticamente com ${RECURRING_AHEAD_MONTHS} meses de antecedência e continuam sendo gerados enquanto a recorrência estiver ativa. Para parar, use <b>Encerrar</b> na lista de automatizações.</p>
   <button class="btn primary">Criar programação</button>
   </form>`);
   const picker=document.getElementById('recurrenceCategoryPicker');
@@ -1166,16 +1207,49 @@ function openRecurrence(){
     picker.addEventListener('focusout',()=>setTimeout(()=>{const box=document.getElementById('recurrenceCategoryOptions');if(box&&!picker.contains(document.activeElement))box.style.display='none';},150));
   }
 }
+function toggleRecurrenceMode(){
+  const rec=document.getElementById('recModeSelect')?.value==='recurring';
+  const cw=document.getElementById('recCountWrap'),ci=document.getElementById('recCountInput');
+  if(cw)cw.style.display=rec?'none':'';
+  if(ci){ci.required=!rec;ci.disabled=rec;}
+  const vl=document.getElementById('recValueLabel');if(vl)vl.textContent=rec?'Valor mensal':'Valor de cada parcela';
+  const gw=document.getElementById('recGenerateWrap');if(gw){if(rec)gw.style.setProperty('display','none','important');else gw.style.removeProperty('display');}
+  const h=document.getElementById('recRecurringHint');if(h)h.style.display=rec?'':'none';
+}
 function addRecurrence(e){
   e.preventDefault();
   const f=new FormData(e.target);
-  const r={id:uid(),type:f.get('type'),start:f.get('start'),description:f.get('description'),
-    value:+f.get('value'),count:+f.get('count'),accountId:+f.get('accountId')||0,
+  const mode=f.get('mode')==='recurring'?'recurring':'installments';
+  if(!f.get('categoryId'))return toast('Selecione a categoria.');
+  const r={id:uid(),mode,type:f.get('type'),start:f.get('start'),description:String(f.get('description')||'').trim(),
+    value:+f.get('value'),count:mode==='recurring'?null:+f.get('count'),accountId:+f.get('accountId')||0,
     cardId:f.get('cardId')?Number(f.get('cardId')):null,
-    categoryId:+f.get('categoryId'),order:db.recurrences.length};
+    categoryId:+f.get('categoryId'),skip:[],order:db.recurrences.length};
+  if(mode==='installments'&&!(r.count>=1))return toast('Informe o número de parcelas.');
   db.recurrences.push(r);
-  if(f.get('generateNow')==='on')generateRecurrence(r);
-  save();closeModal();toast(`${r.count} movimentações programadas`);render();
+  let n=0;
+  if(mode==='recurring'||f.get('generateNow')==='on')n=generateRecurrence(r);
+  save();closeModal();
+  toast(mode==='recurring'?`Recorrência mensal criada (${n} meses já lançados)`:`${r.count} movimentações programadas`);
+  render();
+}
+function endRecurrence(id){
+  const r=db.recurrences.find(x=>x.id==id);if(!r)return;
+  const todayKey=localDateKey();
+  const pendingFuture=db.transactions.filter(t=>t.recurrenceId===r.id&&t.confirmed!==true&&String(t.date)>todayKey);
+  if(!confirm(`ENCERRAR RECORRÊNCIA\n\n"${r.description}"\n\nNovos meses deixarão de ser gerados. ${pendingFuture.length} lançamento(s) futuro(s) ainda pendente(s) (após hoje) serão removidos.\nLançamentos de hoje para trás e os já confirmados serão mantidos.\n\nDeseja continuar?`))return;
+  const ids=new Set(pendingFuture.map(t=>t.id));
+  db.transactions=db.transactions.filter(t=>!ids.has(t.id));
+  const kept=db.transactions.filter(t=>t.recurrenceId===r.id).map(t=>Number(t.installment)||0);
+  r.endIdx=Math.max(0,...kept);
+  r.endedAt=todayKey;
+  save();toast('Recorrência encerrada');render();
+}
+function reactivateRecurrence(id){
+  const r=db.recurrences.find(x=>x.id==id);if(!r)return;
+  if(!confirm(`Reativar a recorrência "${r.description}"?\n\nOs meses futuros voltarão a ser gerados automaticamente.`))return;
+  delete r.endIdx;delete r.endedAt;
+  generateRecurrence(r);save();toast('Recorrência reativada');render();
 }
 function recurrences(){
   document.getElementById('topActions').innerHTML=`<button class="btn primary" onclick="openRecurrence()">+ Nova automação</button>`;
@@ -1197,13 +1271,22 @@ function recurrences(){
 
   document.getElementById('content').innerHTML=`<div class="card"><h2>Movimentações automatizadas</h2>
   <p class="muted">As parcelas futuras ficam registradas e podem ser consultadas ou excluídas como um conjunto.</p>
-  <div class="table-wrap"><table class="table"><tr><th>Descrição</th><th>Início</th><th>Parcelas</th><th>Valor</th><th>Última</th><th></th></tr>
-  ${[...db.recurrences].sort((a,b)=>(a.order??0)-(b.order??0)).map(r=>`<tr>
-  <td>${esc(r.description)}<br><span class="muted">${esc(r.type)}</span></td>
-  <td>${fmtDate(r.start)}</td><td>${r.count}</td><td>${money(r.value)}</td>
-  <td>${fmtDate(addMonthsSafe(r.start,r.count-1))}</td>
-  <td><button class="btn" onclick="generateRecurrence(db.recurrences.find(x=>x.id==${r.id}));save();toast('Parcelas atualizadas');render()">Gerar/atualizar</button>
-  <button class="btn danger" onclick="deleteRecurrence(${r.id})">Excluir</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nenhuma automação cadastrada.</td></tr>'}</table></div></div>`;
+  <div class="table-wrap"><table class="table"><tr><th>Descrição</th><th>Modalidade</th><th>Início</th><th>Parcelas</th><th>Valor</th><th>Última</th><th>Ações</th></tr>
+  ${[...db.recurrences].sort((a,b)=>(a.order??0)-(b.order??0)).map(r=>{
+    const rec=isRecurring(r), ended=rec&&r.endIdx!=null;
+    const pill=rec?(ended?'<span class="pill" style="background:#f1f5f9;color:#64748b">🔁 Recorrente · encerrada</span>':'<span class="pill" style="background:#ecfdf5;color:#047857">🔁 Recorrente</span>'):'<span class="pill">🔢 Parcelada</span>';
+    const qty=rec?(ended?`${r.endIdx} mês(es)`:'Todo mês'):r.count;
+    const lastTxt=rec?(ended?(r.endIdx?fmtDate(addMonthsSafe(r.start,r.endIdx-1)):'—'):'Sem fim'):fmtDate(addMonthsSafe(r.start,r.count-1));
+    const actions=rec
+      ?(ended?`<button class="btn" onclick="reactivateRecurrence(${r.id})">Reativar</button>`:`<button class="btn" onclick="endRecurrence(${r.id})">Encerrar</button>`)
+      :`<button class="btn" onclick="generateRecurrence(db.recurrences.find(x=>x.id==${r.id}));save();toast('Parcelas atualizadas');render()">Gerar/atualizar</button>`;
+    return `<tr>
+  <td>${esc(r.description)}<br><span class="muted">${r.type==='receita'?'Receita':'Despesa'} · ${esc(catName(r.categoryId))}</span></td>
+  <td>${pill}</td>
+  <td>${fmtDate(r.start)}</td><td>${qty}</td><td class="${r.type==='receita'?'blue':'red'}">${money(r.value)}</td>
+  <td>${lastTxt}</td>
+  <td class="rec-actions">${actions}
+  <button class="btn danger" onclick="deleteRecurrence(${r.id})">Excluir</button></td></tr>`;}).join('')||'<tr><td colspan="7" class="empty">Nenhuma automação cadastrada.</td></tr>'}</table></div></div>`;
 }
 function deleteRecurrence(id){
   if(!confirm('Excluir a automação e suas movimentações futuras?'))return;
@@ -2117,11 +2200,12 @@ function deleteTransaction(id){
   const t=db.transactions.find(x=>x.id==id); if(!t)return;
   const future=relatedFutureTransactions(t);
   let mode='one';
+  const recOf=t.recurrenceId?db.recurrences.find(r=>r.id===t.recurrenceId):null;
   if(future.length){
     const choice=prompt(
       `Esta movimentação possui ${future.length} lançamento(s) posterior(es).\n\n`+
       `Digite 1 para excluir somente este mês.\n`+
-      `Digite 2 para excluir este e todos os posteriores.\n`+
+      `Digite 2 para excluir este e todos os posteriores${isRecurring(recOf)?' (encerra a recorrência)':''}.\n`+
       `Digite 3 para cancelar.`
     );
     if(choice==='3'||choice===null)return;
@@ -2130,8 +2214,11 @@ function deleteTransaction(id){
   if(mode==='future'){
     const ids=new Set([id,...future.map(x=>x.id)]);
     db.transactions=db.transactions.filter(x=>!ids.has(x.id));
+    if(isRecurring(recOf)){recOf.endIdx=Math.max(0,Number(t.installment||1)-1);recOf.endedAt=localDateKey();}
   }else{
     db.transactions=db.transactions.filter(x=>x.id!=id);
+    // Evita que a recorrência recrie automaticamente o mês excluído.
+    if(recOf&&t.installment){recOf.skip=Array.isArray(recOf.skip)?recOf.skip:[];if(!recOf.skip.includes(Number(t.installment)))recOf.skip.push(Number(t.installment));}
   }
   save();toast(mode==='future'?'Movimentação e posteriores excluídas':'Movimentação excluída');render();
 }
@@ -2196,6 +2283,9 @@ function saveTransactionEdit(e,id){
         const offset=Number(x.installment||installment)-installment;
         x.date=addMonthsSafe(newDate,offset);
       });
+      // Recorrente: os próximos meses gerados seguem o novo dia de vencimento.
+      const rr=db.recurrences.find(r=>r.id===t.recurrenceId);
+      if(isRecurring(rr))rr.start=addMonthsSafe(newDate,-(installment-1));
     }
   }else{
     t.date=newDate;
@@ -2227,6 +2317,7 @@ function saveTransactionEdit(e,id){
 
     t[field]=newVal;
     if(apply) future.forEach(x=>x[field]=newVal);
+    if(apply){const rr=db.recurrences.find(r=>r.id===t.recurrenceId);if(isRecurring(rr))rr[field]=newVal;}
   }
 
   if(t.recurrenceId && future.length && (t.cardId!==newCardId || t.cardHolder!==changed.cardHolder)){
@@ -2588,7 +2679,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v65',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v66',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
