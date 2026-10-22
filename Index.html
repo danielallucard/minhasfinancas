@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#17202a">
 <meta name="format-detection" content="telephone=no">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
-<title>Ricas Finanças v64 — Ajustes de alinhamento (web e mobile)</title>
+<title>Ricas Finanças v65 — Orçamento ajustado à tela do celular</title>
 <style>
 :root{--bg:#f5f7fb;--card:#fff;--text:#17202a;--muted:#6b7280;--primary:#246bfe;--green:#159447;--red:#d92d20;--amber:#d98c00;--border:#e6e9ef;--shadow:0 8px 24px #17202a12}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
@@ -247,17 +247,15 @@ body{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
 </style>
 <style id="layout-fix-style">
 /* ===== v64 — Ajustes de alinhamento (web e mobile) ===== */
-.form input[type=checkbox],.form input[type=radio]{width:auto;flex:0 0 auto;margin:0;accent-color:var(--primary);width:18px;height:18px}
+.form input[type=checkbox],.form input[type=radio]{flex:0 0 auto;margin:0;accent-color:var(--primary);width:18px;height:18px}
 .form label:has(> input[type=checkbox]){display:flex!important;align-items:center;gap:8px;color:var(--text);font-size:14px}
-/* Campos fora de formulários (filtros de Movimentações e Relatórios) com o mesmo padrão visual */
 #content select,#content input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=file]){
   border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:#fff;color:var(--text);max-width:100%;min-width:0}
 #content label:has(> select),#content label:has(> input[type=date]),#content label:has(> input[type=number]){
-  display:grid;gap:5px;font-size:12px;color:var(--muted);align-content:start}
+  display:grid;grid-template-columns:minmax(0,1fr);gap:5px;font-size:12px;color:var(--muted);align-content:start;min-width:0}
 #content label:has(> select)>select,#content label:has(> input[type=date])>input,#content label:has(> input[type=number])>input{width:100%}
 #content .card>h1{font-size:20px;margin:0 0 12px}
 #content .card>.grid.g3 label{min-width:0}
-/* Tabelas: texto quebra linha em vez de cortar colunas; valores ficam inteiros */
 .table td{white-space:normal;vertical-align:middle}
 .table td.red,.table td.blue,.table td:first-child,.table td.confirm-cell{white-space:nowrap}
 .table th{white-space:nowrap}
@@ -267,7 +265,6 @@ body{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
 .budget-table td:nth-child(2){white-space:nowrap}
 @media(min-width:701px){.table td:not(:first-child):not(.confirm-cell):not(.red):not(.blue):not(:has(button)):not(:has(input))::after{content:'';display:block;width:96px;height:0}}
 .budget-table td:first-child{white-space:normal;min-width:220px}
-/* Categorias: nome | grupo | ordem | ações em uma linha */
 .budget-cat-row{flex-wrap:nowrap;gap:8px;border-bottom:1px solid var(--border)}
 .budget-cat-row:last-child{border-bottom:0}
 .budget-cat-row>.pill{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -276,17 +273,14 @@ body{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
 .budget-cat-row .btn{flex:0 0 auto;white-space:nowrap}
 .budget-income{align-items:flex-end}
 .budget-income select{max-width:100%}
-/* Contas: cabeçalho do "Lançamentos do mês" alinhado */
 .account-transactions summary{justify-content:flex-start}
 .account-transactions summary>span:first-child{flex:1 1 auto;min-width:0}
 .account-transactions summary>span.muted{white-space:nowrap;font-weight:400}
-/* Legenda da pizza e totais */
 .summary-pie-legend-item>span:nth-child(2){min-width:0}
 .summary-pie-legend-item b,.summary-pie-legend-item .muted{white-space:nowrap}
 .overdue-total{flex-wrap:wrap;align-items:baseline}
 .overdue-total span{white-space:nowrap}
 .metric .value{white-space:nowrap;overflow-wrap:normal}
-/* Gráfico planejado × realizado: rótulo do grupo sem quebra estranha */
 .bgr-row{grid-template-columns:minmax(120px,170px) 1fr}
 @media(max-width:900px){
   .metric .value,.value{font-size:clamp(15px,4.4vw,19px)!important;white-space:nowrap;overflow-wrap:normal!important}
@@ -294,10 +288,9 @@ body{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
   .metric .muted{font-size:12px;line-height:1.35}
   .budget-cat-row{flex-wrap:wrap}
   .budget-cat-row>.pill{flex:1 1 100%;white-space:normal;overflow:visible;font-size:13px;padding:6px 10px}
-  .budget-cat-row>select{order:1!important;flex:1 1 100%!important}
+  .budget-cat-row>select{order:1!important;flex:1 1 100%!important;width:100%}
   .budget-cat-row>.order-buttons,.budget-cat-row>.btn{order:2}
   .budget-cat-row>.btn{flex:1 1 0}
-  .budget-cat-row>select{width:100%}
   .budget-income>*{width:100%}
   #content .card>.grid.g3{grid-template-columns:repeat(2,minmax(0,1fr))}
   #content label[style*="min-width:220px"]{flex:1 1 calc(50% - 10px)!important}
@@ -306,16 +299,12 @@ body{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
   .bgr-row{grid-template-columns:1fr}
 }
 @media(max-width:700px){
-  /* Cartões das tabelas em grade de 6 colunas: campos em pares e botões/confirmação em uma única linha */
   table.table.rt tr{grid-template-columns:repeat(6,minmax(0,1fr))}
   table.table.rt td{grid-column:span 3}
   table.table.rt td.rt-wide,table.table.rt td[colspan]{grid-column:1/-1}
   table.table.rt td.rt-btn,table.table.rt td.confirm-cell{grid-column:span 2;align-self:end}
   table.table.rt td.confirm-cell{text-align:center}
-  table.table.rt td.confirm-cell::before{text-align:center}
-  table.table.rt td.rt-wide{font-weight:600}
   table.table.rt td.rt-wide .muted,table.table.rt td.rt-wide span[style*="font-size:12px"]{font-weight:400}
-  table.table.rt td.red,table.table.rt td.blue{white-space:nowrap}
   .budget-table td:first-child{min-width:0}
   table.table.rt input.budget-pct{width:80px}
   .summary-pie-legend table.table.rt tr{grid-template-columns:repeat(6,minmax(0,1fr))}
@@ -323,6 +312,26 @@ body{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
 @media(max-width:380px){
   #content .card>.grid.g3{grid-template-columns:1fr}
   #content label[style*="min-width:220px"]{flex:1 1 100%!important}
+}
+/* ===== v65 — Divisão do orçamento contida na largura da tela (Safari/iOS) =====
+   No Safari, um <select> mede a largura pelo texto da opção mais longa e "empurra" o cartão para fora da tela.
+   As regras abaixo travam todos os contêineres na largura disponível. */
+@media(max-width:900px){
+  html,body{max-width:100%;overflow-x:hidden}
+  .main,#content{min-width:0;max-width:100%}
+  #content>*,.card,.grid>*,form,.table-wrap{min-width:0;max-width:100%}
+  .budget-income{display:grid!important;grid-template-columns:minmax(0,1fr);gap:10px;width:100%}
+  .budget-income>label,.budget-income>div{width:100%;min-width:0!important;max-width:100%}
+  .budget-income label{grid-template-columns:minmax(0,1fr)!important}
+  #content select{width:100%;max-width:100%;min-width:0;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+  .budget-table,table.table.rt{width:100%!important;max-width:100%;table-layout:fixed}
+  table.table.rt tr{width:100%;max-width:100%;box-sizing:border-box}
+  table.table.rt td{max-width:100%}
+  .budget-table td:first-child .muted{white-space:normal!important;overflow-wrap:anywhere}
+  .budget-table .budget-bar{width:100%;min-width:0}
+  .budget-table td:nth-child(2) input.budget-pct{width:72px;display:inline-block}
+  .card form .actions{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+  .card form .actions .btn{width:100%;white-space:normal}
 }
 </style>
 </head>
@@ -1812,8 +1821,8 @@ function budgetPanelHtml(month){
       <div class="budget-income">
         <label>Receita base do orçamento
           <select id="budgetIncomeMode" onchange="document.getElementById('budgetManualWrap').style.display=this.value==='manual'?'grid':'none'">
-            <option value="expected" ${b.incomeMode==='expected'?'selected':''}>Receitas previstas do mês (confirmadas + pendentes)</option>
-            <option value="confirmed" ${b.incomeMode==='confirmed'?'selected':''}>Somente receitas confirmadas do mês</option>
+            <option value="expected" ${b.incomeMode==='expected'?'selected':''}>Previstas (confirmadas + pendentes)</option>
+            <option value="confirmed" ${b.incomeMode==='confirmed'?'selected':''}>Somente confirmadas</option>
             <option value="manual" ${b.incomeMode==='manual'?'selected':''}>Valor fixo informado</option>
           </select>
         </label>
@@ -2579,7 +2588,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v64',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v65',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
