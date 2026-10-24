@@ -36,7 +36,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{display:fle
 
 .category-icon{display:inline-flex;align-items:center;justify-content:center;min-width:1.45em;margin-right:5px;font-size:1.08em;vertical-align:middle}.category-picker{position:relative;min-width:0}.category-options{position:absolute;z-index:1000;left:0;right:0;top:100%;max-height:240px;overflow:auto;background:var(--card,#fff);border:1px solid var(--border,#d9dee7);border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,.12);padding:4px}.category-option{width:100%;border:0;background:transparent;padding:10px 12px;text-align:left;display:flex;justify-content:space-between;gap:8px;cursor:pointer;border-radius:7px}.category-option:hover{background:rgba(36,107,254,.08)}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
 <style>
 .overdue-card{border-left:4px solid #dc2626}
 .overdue-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
@@ -390,6 +390,11 @@ tr.group-hl td{background:#eef3ff;font-weight:700}
   .group-filter-bar .btn{width:100%}
   .group-panel .grid.g4{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+</style>
+<style id="report-v70-style">
+.report-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:14px}
+.report-actions .muted{font-size:12px;flex:1 1 260px}
+@media(max-width:900px){.report-actions .btn{width:100%;padding:12px}}
 </style>
 </head>
 <body>
@@ -1406,8 +1411,15 @@ function reportRange(){
   return {start,end};
 }
 function reportDateInRange(d,r){const x=new Date(String(d)+'T12:00:00');return x>=r.start&&x<=r.end;}
+function syncReportDates(){
+  const p=document.getElementById('reportPeriod')?.value||'monthly';
+  if(p==='custom')return;
+  const r=reportRange();
+  document.getElementById('reportStart').value=localDateKey(r.start);
+  document.getElementById('reportEnd').value=localDateKey(r.end);
+}
 function report(){
-  document.getElementById('topActions').innerHTML='<button class="btn" onclick="exportReportPDF()">📄 Exportar PDF</button>';
+  document.getElementById('topActions').innerHTML='';
   document.getElementById('content').innerHTML=`${monthNav()}<div class="card"><h1>Relatórios</h1>
   <div class="grid g3">
   <label>Período<select id="reportPeriod"><option value="monthly">Mensal</option><option value="semester">Semestral</option><option value="annual">Anual</option><option value="custom">Personalizado</option></select></label>
@@ -1418,10 +1430,18 @@ function report(){
   <label>Categoria<select id="reportCategory"><option value="all">Todas as categorias</option>${db.categories.map(c=>`<option value="${c.id}">${esc(categoryIcon(c.id))} ${esc(c.name)}</option>`).join('')}</select></label></div>
   <div class="grid g3" style="margin-top:10px">
   <label>Grupo do orçamento<select id="reportGroup">${groupFilterOptions(window.reportGroupFilter||'all')}</select></label></div>
-  <button class="btn primary" id="generateReport" style="margin-top:12px">Gerar relatório</button></div><div id="reportOutput"></div>`;
-  const k=selectedMonthKey();document.getElementById('reportStart').value=k+'-01';
-  const [y,m]=k.split('-').map(Number);document.getElementById('reportEnd').value=`${y}-${String(m).padStart(2,'0')}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
-  document.getElementById('reportPeriod').onchange=()=>{const custom=document.getElementById('reportPeriod').value==='custom';document.getElementById('reportStart').disabled=!custom;document.getElementById('reportEnd').disabled=!custom;};
+  <div class="report-actions"><button class="btn primary" id="generateReport">📄 Gerar relatório em PDF</button><span class="muted">Os filtros são aplicados na tela automaticamente. O PDF traz indicadores, gráficos, divisão do orçamento e todas as movimentações do período.</span></div></div><div id="reportOutput"></div>`;
+  const $=id=>document.getElementById(id);
+  const st=window.reportState||{};
+  $('reportPeriod').value=st.period||'monthly';
+  ['reportAccount','reportType'].forEach(id=>{const v=st[id];if(v&&[...$(id).options].some(o=>o.value===v))$(id).value=v;});
+  if(st.period==='custom'&&st.start&&st.end){$('reportStart').value=st.start;$('reportEnd').value=st.end;}else syncReportDates();
+  const remember=()=>{window.reportState={period:$('reportPeriod').value,start:$('reportStart').value,end:$('reportEnd').value,reportAccount:$('reportAccount').value,reportType:$('reportType').value,reportCategory:$('reportCategory').value};};
+  // Período: atualiza Início/Fim e o relatório na hora.
+  $('reportPeriod').onchange=()=>{syncReportDates();remember();renderReport();};
+  // Editar as datas muda automaticamente para "Personalizado" (antes as datas eram ignoradas fora desse modo).
+  ['reportStart','reportEnd'].forEach(id=>$(id).onchange=()=>{$('reportPeriod').value='custom';remember();renderReport();});
+  ['reportAccount','reportType','reportCategory'].forEach(id=>$(id).addEventListener('change',()=>{remember();renderReport();}));
   document.getElementById('reportGroup').onchange=()=>{window.reportGroupFilter=document.getElementById('reportGroup').value;
     // Limita as categorias às do grupo escolhido
     const gfv=window.reportGroupFilter, cs=document.getElementById('reportCategory'), cur=cs.value;
@@ -1429,10 +1449,14 @@ function report(){
     cs.value=[...cs.options].some(o=>o.value===cur)?cur:'all';
     renderReport();};
   if((window.reportGroupFilter||'all')!=='all')document.getElementById('reportGroup').onchange();
-  document.getElementById('generateReport').onclick=renderReport;renderReport();
+  if(st.reportCategory&&[...$('reportCategory').options].some(o=>o.value===st.reportCategory))$('reportCategory').value=st.reportCategory;
+  document.getElementById('generateReport').onclick=generateReportPDF;renderReport();
 }
 function renderReport(){
-  const r=reportRange(),af=document.getElementById('reportAccount').value,tf=document.getElementById('reportType').value,cf=document.getElementById('reportCategory').value;
+  const r=reportRange();
+  if(isNaN(r.start)||isNaN(r.end)){document.getElementById('reportOutput').innerHTML='<div class="card section empty">Informe as datas de início e fim.</div>';window.currentReportData=null;return;}
+  if(r.start>r.end){document.getElementById('reportOutput').innerHTML='<div class="card section empty">A data de início é posterior à data de fim.</div>';window.currentReportData=null;return;}
+  const af=document.getElementById('reportAccount').value,tf=document.getElementById('reportType').value,cf=document.getElementById('reportCategory').value;
   const gf=document.getElementById('reportGroup')?.value||'all';
   const rows=db.transactions.filter(t=>reportDateInRange(t.date,r)).filter(t=>af==='all'||String(t.accountId)===String(af)).filter(t=>tf==='all'||t.type===tf).filter(t=>cf==='all'||String(t.categoryId)===String(cf)).filter(t=>gf==='all'||matchesGroupFilter(t,gf)).filter(t=>gf!=='all'||!t.transfer);
   const inc=rows.filter(t=>t.type==='receita').reduce((s,t)=>s+Number(t.value||0),0),exp=rows.filter(t=>t.type==='despesa').reduce((s,t)=>s+Number(t.value||0),0);
@@ -1475,7 +1499,7 @@ ${budgetReportHtml(r,af,gf)}
     return `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">${monthLabel(k)}</h3><div class="grid g3" style="margin-bottom:12px"><div class="metric"><div class="label">Receitas</div><div class="value blue">${money(v.r)}</div></div><div class="metric"><div class="label">Despesas</div><div class="value red">${money(v.d)}</div></div><div class="metric"><div class="label">Saldo mensal</div><div class="value ${(v.r-v.d)<0?'red':'blue'}">${(v.r-v.d)<0?'− ':''}${money(Math.abs(v.r-v.d))}</div></div></div>${catHtml?`<div style="margin-bottom:10px"><div class="muted" style="margin-bottom:5px">Despesas por classificação</div>${catHtml}</div>`:''}<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th>Status</th></tr>${monthRows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(txAccountLabel(t))}</td><td><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td>${t.type==='receita'?'Receita':'Despesa'}</td><td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td></tr>`).join('')||'<tr><td colspan="7">Sem movimentações.</td></tr>'}</table></div></div>`;
   }).join('')||'<div class="empty">Sem movimentações no período.</div>'}</div>
   <div class="card section"><h2>Detalhamento das movimentações</h2><div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th>Status</th></tr>${rows.sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(txAccountLabel(t))}</td><td><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td>${t.type==='receita'?'Receita':'Despesa'}</td><td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td></tr>`).join('')||'<tr><td colspan="7">Sem movimentações.</td></tr>'}</table></div></div>`;
-  window.currentReportData={rows,inc,exp,budget:budgetReportData(r,af),group:gf};
+  window.currentReportData={rows,inc,exp,budget:budgetReportData(r,af),group:gf,r,af,tf,cf,gf};
 }
 
 function reportMonthsInRange(r){
@@ -1612,21 +1636,196 @@ function budgetReportHtml(r,af,gf){
     ${evo}
   </div>`;
 }
-function exportReportPDF(){
-  const d=window.currentReportData;if(!d)return renderReport();
-  const js=window.jspdf;if(!js?.jsPDF){alert('A exportação PDF precisa da biblioteca de PDF. Conecte-se à internet e tente novamente.');return;}
-  const doc=new js.jsPDF();doc.setFontSize(18);doc.text('Ricas Finanças — Relatório',14,18);doc.setFontSize(10);doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}${d.group&&d.group!=='all'?' · Grupo: '+groupFilterLabel(d.group).replace(/^\S+\s/,''):''}`,14,25);doc.setFontSize(11);doc.text(`Receitas: ${money(d.inc)}   Despesas: ${money(d.exp)}   Resultado: ${money(d.inc-d.exp)}`,14,34);
-  if(doc.autoTable)doc.autoTable({startY:42,head:[['Data','Descrição','Conta','Categoria','Tipo','Valor','Status']],body:d.rows.map(t=>[fmtDate(t.date),t.description,txAccountLabel(t),catName(t.categoryId),t.type==='receita'?'Receita':'Despesa',money(t.value),t.confirmed?'Confirmada':'Pendente']),styles:{fontSize:7}});
-  if(doc.autoTable&&d.budget){
-    const bd=d.budget;
-    doc.autoTable({startY:(doc.lastAutoTable?.finalY||42)+10,head:[['Grupo do orçamento','% meta','Planejado','Realizado','Comprometido','% real da receita','Uso do planejado']],
-      body:[...bd.groups.map(g=>[g.name,g.pct.toFixed(1)+'%',money(g.planned),money(g.confirmed),money(g.total),(bd.income?g.confirmed/bd.income*100:0).toFixed(1)+'%',(g.planned?g.total/g.planned*100:0).toFixed(1)+'%']),
-            ['Sem grupo','—','—',money(bd.ungrouped.confirmed),money(bd.ungrouped.total),(bd.income?bd.ungrouped.confirmed/bd.income*100:0).toFixed(1)+'%','—']],
-      styles:{fontSize:7}});
-    doc.setFontSize(9);doc.text(`Receita base do orçamento no período: ${money(bd.income)} (${bd.months.length} mês(es))`,14,(doc.lastAutoTable?.finalY||42)+6);
+// ===== Gerador de PDF próprio (sem bibliotecas externas; funciona offline e no iPhone) =====
+// Fontes padrão do PDF (Helvetica / Helvetica-Bold, codificação WinAnsi). Medidas em pontos (A4 = 595 × 842).
+const PDF_W_REG=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584,278,556,0,222,556,333,1000,556,556,333,1000,667,333,1000,0,611,0,0,222,222,333,333,350,556,1000,333,1000,500,333,944,0,500,667,278,333,556,556,556,556,260,556,333,737,370,556,584,333,737,333,400,584,333,333,333,556,537,278,333,333,365,556,834,834,834,611,667,667,667,667,667,667,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,500,556,556,556,556,278,278,278,278,556,556,556,556,556,556,556,584,611,556,556,556,556,500,556,500];
+const PDF_W_BOLD=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584,278,556,0,278,556,500,1000,556,556,333,1000,667,333,1000,0,611,0,0,278,278,500,500,350,556,1000,333,1000,556,333,944,0,500,667,278,333,556,556,556,556,280,556,333,737,370,556,584,333,737,333,400,584,333,333,333,611,556,278,333,333,365,556,834,834,834,611,722,722,722,722,722,722,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,556,556,556,556,556,278,278,278,278,611,611,611,611,611,611,611,584,611,611,611,611,611,556,611,556];
+
+const PDF_CP1252={0x20AC:0x80,0x201A:0x82,0x0192:0x83,0x201E:0x84,0x2026:0x85,0x2020:0x86,0x2021:0x87,0x02C6:0x88,0x2030:0x89,0x0160:0x8A,0x2039:0x8B,0x0152:0x8C,0x017D:0x8E,0x2018:0x91,0x2019:0x92,0x201C:0x93,0x201D:0x94,0x2022:0x95,0x2013:0x96,0x2014:0x97,0x02DC:0x98,0x2122:0x99,0x0161:0x9A,0x203A:0x9B,0x0153:0x9C,0x017E:0x9E,0x0178:0x9F,0x2212:0x2D,0x202F:0xA0};
+function pdfCodes(str){
+  const out=[];
+  for(const ch of String(str??'')){
+    const u=ch.codePointAt(0);
+    if(u>=32&&u<127||u>=0xA0&&u<=0xFF)out.push(u);
+    else if(PDF_CP1252[u])out.push(PDF_CP1252[u]);
+    // demais caracteres (emojis, símbolos) são omitidos
   }
-  doc.save('ricas-financas-relatorio.pdf');
+  // remove espaços duplicados deixados por emojis omitidos
+  return out.filter((c,i,a)=>!(c===32&&(i===0||a[i-1]===32)));
 }
+class MiniPDF{
+  constructor(){this.W=595.28;this.H=841.89;this.pages=[];this.addPage();}
+  addPage(){this.cur=[];this.pages.push(this.cur);return this;}
+  static rgb(hex){const h=String(hex||'#000').replace('#','');const n=h.length===3?h.split('').map(x=>x+x).join(''):h.padEnd(6,'0');return [0,2,4].map(i=>(parseInt(n.slice(i,i+2),16)/255).toFixed(3)).join(' ');}
+  static n(v){return (Math.round(v*100)/100).toString();}
+  rect(x,y,w,h,fill){if(w<=0||h<=0)return;this.cur.push(`${MiniPDF.rgb(fill)} rg ${MiniPDF.n(x)} ${MiniPDF.n(this.H-y-h)} ${MiniPDF.n(w)} ${MiniPDF.n(h)} re f`);}
+  line(x1,y1,x2,y2,color='#e6e9ef',width=0.6,dash){this.cur.push(`${dash?'[3 2] 0 d ':''}${MiniPDF.rgb(color)} RG ${width} w ${MiniPDF.n(x1)} ${MiniPDF.n(this.H-y1)} m ${MiniPDF.n(x2)} ${MiniPDF.n(this.H-y2)} l S${dash?' [] 0 d':''}`);}
+  width(str,size=10,bold=false){const W=bold?PDF_W_BOLD:PDF_W_REG;return pdfCodes(str).reduce((s,c)=>s+(W[c]||556),0)*size/1000;}
+  fit(str,maxW,size=10,bold=false){
+    str=String(str??'');if(this.width(str,size,bold)<=maxW)return str;
+    let s=str;while(s.length>1&&this.width(s+'…',size,bold)>maxW)s=s.slice(0,-1);
+    return s.trimEnd()+'…';
+  }
+  text(str,x,y,{size=10,bold=false,color='#17202a',align='left',maxW}={}){
+    if(maxW)str=this.fit(str,maxW,size,bold);
+    const w=this.width(str,size,bold);
+    if(align==='right')x-=w;else if(align==='center')x-=w/2;
+    const enc=pdfCodes(str).map(c=>c===40||c===41||c===92?'\\'+String.fromCharCode(c):String.fromCharCode(c)).join('');
+    this.cur.push(`BT /${bold?'F2':'F1'} ${size} Tf ${MiniPDF.rgb(color)} rg ${MiniPDF.n(x)} ${MiniPDF.n(this.H-y-size*0.8)} Td (${enc}) Tj ET`);
+    return w;
+  }
+  output(){
+    const objs=[];const add=s=>{objs.push(s);return objs.length;};
+    add('<< /Type /Catalog /Pages 2 0 R >>');
+    add(null); // Pages (preenchido depois)
+    add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+    add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+    const kids=[];
+    this.pages.forEach(p=>{
+      const content=p.join('\n');
+      const c=add(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+      kids.push(add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${this.W} ${this.H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${c} 0 R >>`));
+    });
+    objs[1]=`<< /Type /Pages /Kids [${kids.map(k=>k+' 0 R').join(' ')}] /Count ${kids.length} >>`;
+    let out='%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';const offs=[];
+    objs.forEach((o,i)=>{offs.push(out.length);out+=`${i+1} 0 obj\n${o}\nendobj\n`;});
+    const xref=out.length;
+    out+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`+offs.map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('');
+    out+=`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+    const bytes=new Uint8Array(out.length);for(let i=0;i<out.length;i++)bytes[i]=out.charCodeAt(i)&255;
+    return bytes;
+  }
+}
+function pdfMoney(v){return money(v).replace(/\u00A0/g,' ');}
+function pdfSignedMoney(v){return (v<0?'- ':'')+pdfMoney(Math.abs(v));}
+// ===== Relatório financeiro em PDF =====
+function generateReportPDF(){
+  renderReport();
+  const d=window.currentReportData;if(!d)return toast('Verifique o período do relatório.');
+  const {rows,inc,exp,r,af,tf,cf,gf}=d;
+  if(!rows)return;
+  const bd=d.budget;
+  const pdf=new MiniPDF();const M=40,CW=pdf.W-2*M,BOTTOM=pdf.H-50;
+  const C={text:'#17202a',muted:'#6b7280',blue:'#246bfe',red:'#d92d20',green:'#159447',border:'#e6e9ef',soft:'#f5f7fb',dark:'#17202a'};
+  let y=0;
+  const ensure=h=>{if(y+h>BOTTOM){pdf.addPage();y=M;return true;}return false;};
+  const section=(title,need=60)=>{ensure(need+26);y+=14;pdf.text(title,M,y,{size:12.5,bold:true});y+=18;pdf.line(M,y,M+CW,y,C.border,0.8);y+=10;};
+  const fmtD=x=>x.toLocaleDateString('pt-BR');
+  // Cabeçalho
+  pdf.rect(0,0,pdf.W,78,C.dark);
+  pdf.text('Ricas Finanças',M,20,{size:10,color:'#9fb3c8',bold:true});
+  pdf.text('Relatório financeiro',M,34,{size:20,bold:true,color:'#ffffff'});
+  pdf.text(`Período: ${fmtD(r.start)} a ${fmtD(r.end)}`,M,60,{size:10,color:'#dbe4ee'});
+  pdf.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`,M+CW,60,{size:9,color:'#9fb3c8',align:'right'});
+  y=92;
+  const typeLbl={all:'Receitas e despesas',receita:'Receitas',despesa:'Despesas'}[tf]||'—';
+  const filt=[`Conta: ${af==='all'?'Todas':accountName(af)}`,`Tipo: ${typeLbl}`,`Categoria: ${cf==='all'?'Todas':catName(cf)}`,`Grupo: ${gf==='all'?'Todos':groupFilterLabel(gf)}`].join('   •   ');
+  pdf.rect(M,y,CW,22,C.soft);pdf.text(filt,M+8,y+6.5,{size:8.5,color:C.muted,maxW:CW-16});y+=34;
+  // Indicadores
+  const res=inc-exp;
+  const metrics=[['Receitas',pdfMoney(inc),C.blue],['Despesas',pdfMoney(exp),C.red],['Resultado',pdfSignedMoney(res),res<0?C.red:C.green],['Movimentações',String(rows.length),C.text]];
+  const mw=(CW-3*10)/4;
+  metrics.forEach(([l,v,c],i)=>{const x=M+i*(mw+10);pdf.rect(x,y,mw,48,C.soft);pdf.rect(x,y,3,48,c);pdf.text(l,x+11,y+9,{size:8.5,color:C.muted});pdf.text(v,x+11,y+24,{size:13,bold:true,color:c,maxW:mw-16});});
+  y+=58;
+  // Despesas por categoria (barras horizontais)
+  const byCat={};rows.filter(t=>t.type==='despesa').forEach(t=>{const k=t.transfer?'__inv':t.categoryId;byCat[k]=(byCat[k]||0)+Number(t.value||0);});
+  const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  section('Despesas por categoria',40);
+  if(!cats.length){pdf.text('Sem despesas no período.',M,y,{size:9.5,color:C.muted});y+=18;}
+  else{
+    const tot=cats.reduce((s,x)=>s+x[1],0),max=cats[0][1];
+    const nameW=150,valW=95,pctW=40,barW=CW-nameW-valW-pctW-16;
+    cats.forEach(([id,v])=>{
+      ensure(18);
+      const inv=id==='__inv',col=inv?'#22c55e':categoryColor(id);
+      pdf.rect(M,y+2.5,6,6,col);
+      pdf.text(inv?'Aportes em investimentos':catName(id),M+11,y,{size:9.5,maxW:nameW-14});
+      pdf.rect(M+nameW,y+1.5,barW,8,'#edf0f4');pdf.rect(M+nameW,y+1.5,barW*v/max,8,col);
+      pdf.text(pdfMoney(v),M+nameW+barW+8+valW,y,{size:9.5,bold:true,align:'right'});
+      pdf.text((v/tot*100).toFixed(1)+'%',M+CW,y,{size:8.5,color:C.muted,align:'right'});
+      y+=17;
+    });
+  }
+  // Receitas × despesas por mês (colunas)
+  const byMonth={};rows.forEach(t=>{const k=monthKey(t.date);if(!byMonth[k])byMonth[k]={r:0,d:0};byMonth[k][t.type==='receita'?'r':'d']+=Number(t.value||0);});
+  const months=Object.keys(byMonth).sort();
+  if(months.length){
+    section('Receitas × despesas por mês',170);
+    const H=120,top=y,base=top+H,mx=Math.max(1,...months.map(k=>Math.max(byMonth[k].r,byMonth[k].d)));
+    const GL=62,slot=Math.min(70,(CW-GL-10)/months.length),bw=Math.min(16,slot*0.32);
+    [0,0.5,1].forEach(f=>{const yy=base-H*f;pdf.line(M+GL,yy,M+CW,yy,f?'#eef0f4':'#c9ced8',0.6);pdf.text(pdfMoney(mx*f),M+GL-6,yy-3.5,{size:7,color:C.muted,align:'right'});});
+    months.forEach((k,i)=>{
+      const cx=M+GL+5+slot*i+slot/2,v=byMonth[k];
+      const hr=H*v.r/mx,hd=H*v.d/mx;
+      pdf.rect(cx-bw-1,base-hr,bw,hr,'#3478db');pdf.rect(cx+1,base-hd,bw,hd,'#c93b32');
+      pdf.text(`${k.slice(5)}/${k.slice(2,4)}`,cx,base+5,{size:7.5,color:C.muted,align:'center'});
+    });
+    y=base+20;
+    pdf.rect(M,y+2,8,8,'#3478db');pdf.text('Receitas',M+12,y+1,{size:8.5,color:C.muted});
+    pdf.rect(M+70,y+2,8,8,'#c93b32');pdf.text('Despesas',M+82,y+1,{size:8.5,color:C.muted});
+    y+=18;
+  }
+  // Divisão do orçamento
+  if(bd){
+    const groups=(gf==='all'||gf==='none')?bd.groups:bd.groups.filter(g=>g.key===gf);
+    section(`Divisão do orçamento — planejado × realizado${gf!=='all'&&gf!=='none'?' ('+groupFilterLabel(gf)+')':''}`,40+groups.length*30);
+    pdf.text(`Receita base no período: ${pdfMoney(bd.income)} (${bd.months.length} mês(es)). Realizado = confirmadas; comprometido = confirmadas + pendentes.`,M,y,{size:8.5,color:C.muted,maxW:CW});y+=16;
+    const cols=[['Grupo',120,'left'],['Meta',40,'right'],['Planejado',78,'right'],['Realizado',78,'right'],['Comprometido',82,'right'],['Uso',117,'left']];
+    let x=M;pdf.rect(M,y,CW,16,C.soft);
+    cols.forEach(([t,w,a])=>{pdf.text(t,a==='right'?x+w-4:x+4,y+4.5,{size:8,bold:true,color:C.muted,align:a});x+=w;});y+=20;
+    groups.forEach(g=>{
+      ensure(22);
+      const use=g.planned>0?g.total/g.planned*100:(g.total>0?100:0);
+      const goal=['investimentos','metas','conhecimento'].includes(g.key);
+      const ucol=goal?(use>=100?C.green:use>=70?'#d98c00':C.red):(use>100?C.red:use>85?'#d98c00':C.green);
+      let x=M;
+      pdf.rect(x+4,y+3,6,6,g.color);pdf.text(g.name,x+14,y+1,{size:9,maxW:cols[0][1]-16});x+=cols[0][1];
+      pdf.text(g.pct.toFixed(0)+'%',x+cols[1][1]-4,y+1,{size:9,align:'right'});x+=cols[1][1];
+      pdf.text(pdfMoney(g.planned),x+cols[2][1]-4,y+1,{size:9,align:'right'});x+=cols[2][1];
+      pdf.text(pdfMoney(g.confirmed),x+cols[3][1]-4,y+1,{size:9,align:'right',color:C.red});x+=cols[3][1];
+      pdf.text(pdfMoney(g.total),x+cols[4][1]-4,y+1,{size:9,align:'right'});x+=cols[4][1];
+      const bwid=cols[5][1]-44;pdf.rect(x+6,y+2.5,bwid,7,'#edf0f4');pdf.rect(x+6,y+2.5,bwid*Math.min(100,use)/100,7,ucol);
+      pdf.text(use.toFixed(0)+'%',M+CW,y+1,{size:8.5,bold:true,color:ucol,align:'right'});
+      y+=18;pdf.line(M,y-3,M+CW,y-3,'#f0f2f5',0.5);
+    });
+    if(gf==='all'&&(bd.ungrouped.total>0)){ensure(18);pdf.text(`Sem grupo: realizado ${pdfMoney(bd.ungrouped.confirmed)} · comprometido ${pdfMoney(bd.ungrouped.total)}`,M,y+2,{size:8.5,color:C.muted});y+=16;}
+  }
+  // Tabela genérica com quebra de página e cabeçalho repetido
+  const table=(cols,data,colorFn)=>{
+    const head=()=>{pdf.rect(M,y,CW,17,C.dark);let x=M;cols.forEach(c=>{pdf.text(c.t,c.a==='right'?x+c.w-5:x+5,y+5,{size:8,bold:true,color:'#ffffff',align:c.a||'left'});x+=c.w;});y+=17;};
+    head();
+    data.forEach((row,i)=>{
+      if(y+16>BOTTOM){pdf.addPage();y=M;head();}
+      if(i%2)pdf.rect(M,y,CW,16,'#f7f8fb');
+      let x=M;row.forEach((v,j)=>{const c=cols[j];pdf.text(v,c.a==='right'?x+c.w-5:x+5,y+4.5,{size:8.3,align:c.a||'left',maxW:c.w-10,color:colorFn?colorFn(i,j):C.text,bold:c.b});x+=c.w;});
+      y+=16;
+    });
+    y+=6;
+  };
+  if(months.length){
+    section('Evolução por mês',60);
+    table([{t:'Mês',w:CW-3*120},{t:'Receitas',w:120,a:'right'},{t:'Despesas',w:120,a:'right'},{t:'Resultado',w:120,a:'right',b:true}],
+      months.map(k=>[monthLabel(k),pdfMoney(byMonth[k].r),pdfMoney(byMonth[k].d),pdfSignedMoney(byMonth[k].r-byMonth[k].d)]),
+      (i,j)=>j===1?C.blue:j===2?C.red:j===3?(byMonth[months[i]].r-byMonth[months[i]].d<0?C.red:C.green):C.text);
+  }
+  section('Detalhamento das movimentações',60);
+  const list=[...rows].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  if(!list.length){pdf.text('Sem movimentações no período.',M,y,{size:9.5,color:C.muted});y+=18;}
+  else table([{t:'Data',w:52},{t:'Descrição',w:140},{t:'Conta',w:88},{t:'Categoria',w:88},{t:'Valor',w:82,a:'right',b:true},{t:'Status',w:CW-450}],
+    list.map(t=>[fmtDate(t.date),t.description||'',txAccountLabel(t),t.transfer?'Aporte em investimentos':catName(t.categoryId),(t.type==='receita'?'+ ':'- ')+pdfMoney(t.value),t.confirmed?'Confirmada':'Pendente']),
+    (i,j)=>j===4?(list[i].type==='receita'?C.blue:C.red):j===5&&!list[i].confirmed?'#d98c00':C.text);
+  // Rodapé com numeração
+  const total=pdf.pages.length;
+  pdf.pages.forEach((p,i)=>{pdf.cur=p;pdf.line(M,pdf.H-34,M+CW,pdf.H-34,C.border,0.6);pdf.text('Ricas Finanças — relatório financeiro',M,pdf.H-28,{size:7.5,color:C.muted});pdf.text(`Página ${i+1} de ${total}`,M+CW,pdf.H-28,{size:7.5,color:C.muted,align:'right'});});
+  const bytes=pdf.output();
+  window.lastReportPDF=bytes;
+  const stamp=`${localDateKey(r.start)}_a_${localDateKey(r.end)}`;
+  const blob=new Blob([bytes],{type:'application/pdf'});
+  const name=`ricas-financas-relatorio_${stamp}.pdf`;
+  if(hasFsApi())downloadBlob(blob,name);else deliverFile(blob,name);
+  toast('Relatório em PDF gerado');
+}
+function exportReportPDF(){return generateReportPDF();}
 
 function overdueBillsForSummary(){
   const today=new Date();
@@ -2868,7 +3067,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v69',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v70',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
