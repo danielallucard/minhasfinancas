@@ -340,21 +340,19 @@ td .pill{white-space:nowrap}
 }
 </style>
 <style id="v68-style">
-/* Lista de categorias: nome sempre em uma linha (reticências se não couber), tipo à direita */
 .category-option{align-items:center;flex-wrap:nowrap}
 .category-option>span:first-child{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
 .category-option>span.muted{flex:0 0 auto;white-space:nowrap;font-size:12px}
 .category-option .category-icon{flex:0 0 auto}
 @media(min-width:901px){#modalBody .category-picker .category-options{left:auto!important;right:0!important;width:340px!important;max-width:calc(100vw - 40px)}}
 .table td.rec-actions{white-space:nowrap}
+.table td.rec-actions .btn{padding:6px 9px}
 .rec-table td::after{display:none!important}
 @media(max-width:1250px){.table td.rec-actions{white-space:normal;min-width:0}.rec-table td.rec-actions .btn{display:block;width:100%;margin:3px 0}.rec-table .pill{white-space:normal}.rec-table td,.rec-table th{white-space:normal!important;font-size:14px}.rec-table th{font-size:11px}.rec-table th,.rec-table td{padding-left:6px;padding-right:6px}}
 .rec-table td:first-child{white-space:normal}
-.table td.rec-actions .btn{padding:6px 9px}
 #modalBody select:invalid{color:var(--muted)}
 #modalBody select option{color:var(--text)}
 .rec-actions .btn{margin:2px 2px}
-/* Janelas (modais) travadas na largura do aparelho: sem deslizar para os lados */
 .modal{overflow-x:hidden}
 .modalbox{overflow-x:hidden;overscroll-behavior:contain}
 #modalBody,#modalBody form,#modalBody .row,#modalBody label,#modalBody .category-picker{min-width:0;max-width:100%}
@@ -376,6 +374,21 @@ td .pill{white-space:nowrap}
   #modalBody .rec-intro{font-size:14px;line-height:1.45}
   table.table.rt td.rec-actions{flex-wrap:wrap}
   table.table.rt td.rec-actions .btn{flex:1 1 calc(33% - 8px);min-width:90px}
+}
+</style>
+<style id="group-filter-style">
+.group-filter-bar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 14px;margin-bottom:12px}
+.group-filter-bar label{display:grid;gap:5px;font-size:12px;color:var(--muted);flex:0 1 300px;min-width:0}
+.group-filter-bar select{border:1px solid var(--border);border-radius:8px;padding:9px 10px;background:#fff;width:100%}
+.group-filter-bar .muted{flex:1 1 320px;font-size:12px;min-width:0}
+.group-panel-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.group-panel-head h2{margin:0}
+tr.group-hl td{background:#eef3ff;font-weight:700}
+@media(max-width:900px){
+  .group-filter-bar{display:grid;grid-template-columns:minmax(0,1fr)}
+  .group-filter-bar label{flex:none;width:100%}
+  .group-filter-bar .btn{width:100%}
+  .group-panel .grid.g4{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 </style>
 </head>
@@ -1260,7 +1273,7 @@ function openRecurrence(id){
   }
 }
 function toggleRecurrenceMode(){
-  const rec=document.getElementById('recModeSelect')?.value==='recurring'; // '' (não escolhido) = mostra campos de parcelada
+  const rec=document.getElementById('recModeSelect')?.value==='recurring';
   const cw=document.getElementById('recCountWrap'),ci=document.getElementById('recCountInput');
   if(cw)cw.style.display=rec?'none':'';
   if(ci){ci.required=!rec;ci.disabled=rec;}
@@ -1290,7 +1303,6 @@ function saveRecurrence(e,id){
     toast(mode==='recurring'?`Recorrência mensal criada (${n} meses já lançados)`:`${r.count} movimentações programadas`);
     render();return;
   }
-  // ===== Edição =====
   const r=db.recurrences.find(x=>x.id==id);if(!r)return;
   const pending=db.transactions.filter(t=>t.recurrenceId===r.id&&t.confirmed!==true);
   const confirmedCount=db.transactions.filter(t=>t.recurrenceId===r.id&&t.confirmed===true).length;
@@ -1311,7 +1323,6 @@ function saveRecurrence(e,id){
         description:rec?r.description:installmentDescription(r.description,n,r.count),
         totalInstallments:rec?null:r.count,recurring:rec||undefined});
     });
-    // Parcelada com menos parcelas: remove pendentes que ficaram além do novo total.
     if(!rec){
       const drop=new Set(pending.filter(t=>(Number(t.installment)||1)>r.count).map(t=>t.id));
       if(drop.size)db.transactions=db.transactions.filter(t=>!drop.has(t.id));
@@ -1405,22 +1416,33 @@ function report(){
   <label>Conta<select id="reportAccount"><option value="all">Todas as contas</option>${db.accounts.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select></label>
   <label>Tipo<select id="reportType"><option value="all">Receitas e despesas</option><option value="receita">Receitas</option><option value="despesa">Despesas</option></select></label>
   <label>Categoria<select id="reportCategory"><option value="all">Todas as categorias</option>${db.categories.map(c=>`<option value="${c.id}">${esc(categoryIcon(c.id))} ${esc(c.name)}</option>`).join('')}</select></label></div>
+  <div class="grid g3" style="margin-top:10px">
+  <label>Grupo do orçamento<select id="reportGroup">${groupFilterOptions(window.reportGroupFilter||'all')}</select></label></div>
   <button class="btn primary" id="generateReport" style="margin-top:12px">Gerar relatório</button></div><div id="reportOutput"></div>`;
   const k=selectedMonthKey();document.getElementById('reportStart').value=k+'-01';
   const [y,m]=k.split('-').map(Number);document.getElementById('reportEnd').value=`${y}-${String(m).padStart(2,'0')}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
   document.getElementById('reportPeriod').onchange=()=>{const custom=document.getElementById('reportPeriod').value==='custom';document.getElementById('reportStart').disabled=!custom;document.getElementById('reportEnd').disabled=!custom;};
+  document.getElementById('reportGroup').onchange=()=>{window.reportGroupFilter=document.getElementById('reportGroup').value;
+    // Limita as categorias às do grupo escolhido
+    const gfv=window.reportGroupFilter, cs=document.getElementById('reportCategory'), cur=cs.value;
+    cs.innerHTML='<option value="all">Todas as categorias</option>'+db.categories.filter(c=>categoryInGroup(c,gfv)).map(c=>`<option value="${c.id}">${esc(categoryIcon(c.id))} ${esc(c.name)}</option>`).join('');
+    cs.value=[...cs.options].some(o=>o.value===cur)?cur:'all';
+    renderReport();};
+  if((window.reportGroupFilter||'all')!=='all')document.getElementById('reportGroup').onchange();
   document.getElementById('generateReport').onclick=renderReport;renderReport();
 }
 function renderReport(){
   const r=reportRange(),af=document.getElementById('reportAccount').value,tf=document.getElementById('reportType').value,cf=document.getElementById('reportCategory').value;
-  const rows=db.transactions.filter(t=>reportDateInRange(t.date,r)).filter(t=>af==='all'||String(t.accountId)===String(af)).filter(t=>tf==='all'||t.type===tf).filter(t=>cf==='all'||String(t.categoryId)===String(cf));
+  const gf=document.getElementById('reportGroup')?.value||'all';
+  const rows=db.transactions.filter(t=>reportDateInRange(t.date,r)).filter(t=>af==='all'||String(t.accountId)===String(af)).filter(t=>tf==='all'||t.type===tf).filter(t=>cf==='all'||String(t.categoryId)===String(cf)).filter(t=>gf==='all'||matchesGroupFilter(t,gf)).filter(t=>gf!=='all'||!t.transfer);
   const inc=rows.filter(t=>t.type==='receita').reduce((s,t)=>s+Number(t.value||0),0),exp=rows.filter(t=>t.type==='despesa').reduce((s,t)=>s+Number(t.value||0),0);
-  const byCat={};rows.filter(t=>t.type==='despesa').forEach(t=>byCat[t.categoryId]=(byCat[t.categoryId]||0)+Number(t.value||0));
+  const byCat={};rows.filter(t=>t.type==='despesa').forEach(t=>{const key=t.transfer?'__inv':t.categoryId;byCat[key]=(byCat[key]||0)+Number(t.value||0);});
   const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]),max=Math.max(...cats.map(x=>x[1]),1);
-  const bars=cats.map(([id,v])=>`<div style="margin:9px 0"><div style="display:flex;justify-content:space-between"><span><span class="cat-dot" style="background:${categoryColor(id)}"></span><span class="category-icon">${esc(categoryIcon(id))}</span>${esc(catName(id))}</span><b>${money(v)}</b></div><div class="progress"><i style="width:${v/max*100}%"></i></div></div>`).join('');
+  const bars=cats.map(([id,v])=>`<div style="margin:9px 0"><div style="display:flex;justify-content:space-between"><span><span class="cat-dot" style="background:${id==='__inv'?'#22c55e':categoryColor(id)}"></span><span class="category-icon">${id==='__inv'?'📈':esc(categoryIcon(id))}</span>${id==='__inv'?'Aportes em investimentos':esc(catName(id))}</span><b>${money(v)}</b></div><div class="progress"><i style="width:${v/max*100}%"></i></div></div>`).join('');
   const byMonth={};rows.forEach(t=>{const k=monthKey(t.date);if(!byMonth[k])byMonth[k]={r:0,d:0};byMonth[k][t.type==='receita'?'r':'d']+=Number(t.value||0)});
   const trend=Object.entries(byMonth).sort().map(([k,v])=>`<tr><td>${monthLabel(k)}</td><td class="blue">${money(v.r)}</td><td class="red">${money(v.d)}</td><td>${money(v.r-v.d)}</td></tr>`).join('');
-  document.getElementById('reportOutput').innerHTML=`<div class="grid g4 section">
+  const gfNote=gf!=='all'?`<div class="card section group-filter-note" style="border-left:4px solid ${budgetGroupDef(gf)?.color||'#9ca3af'}"><b>Filtro de grupo ativo: ${esc(groupFilterLabel(gf))}</b><div class="muted">Somente despesas desse grupo${gf==='investimentos'?' (incluindo transferências para contas de investimentos)':''}. Receitas não pertencem a grupos e ficam fora deste filtro.</div></div>`:'';
+  document.getElementById('reportOutput').innerHTML=`${gfNote}<div class="grid g4 section">
   <div class="card metric"><div class="label">Receitas</div><div class="value blue">${money(inc)}</div></div>
   <div class="card metric"><div class="label">Despesas</div><div class="value red">${money(exp)}</div></div>
   <div class="card metric"><div class="label">Resultado</div><div class="value ${(inc-exp)<0?'red':'blue'}">${inc-exp<0?'− ':''}${money(Math.abs(inc-exp))}</div></div>
@@ -1443,7 +1465,7 @@ function renderReport(){
     <div class="muted">Azul = receitas · Vermelho = despesas</div>
   </div>
 </div>
-${budgetReportHtml(r,af)}
+${budgetReportHtml(r,af,gf)}
 <div class="card section"><h2>Evolução por mês</h2><div class="table-wrap"><table class="table"><tr><th>Mês</th><th>Receitas</th><th>Despesas</th><th>Resultado</th></tr>${trend||'<tr><td colspan="4">Sem dados.</td></tr>'}</table></div></div></div>
   <div class="card section"><h2>Movimentação mês a mês</h2><div class="muted" style="margin-bottom:12px">A movimentação é apresentada mês a mês no mesmo formato de acompanhamento do Resumo, respeitando os filtros selecionados acima.</div>${Object.entries(byMonth).sort().map(([k,v])=>{
     const monthRows=rows.filter(t=>monthKey(t.date)===k).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
@@ -1453,7 +1475,7 @@ ${budgetReportHtml(r,af)}
     return `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">${monthLabel(k)}</h3><div class="grid g3" style="margin-bottom:12px"><div class="metric"><div class="label">Receitas</div><div class="value blue">${money(v.r)}</div></div><div class="metric"><div class="label">Despesas</div><div class="value red">${money(v.d)}</div></div><div class="metric"><div class="label">Saldo mensal</div><div class="value ${(v.r-v.d)<0?'red':'blue'}">${(v.r-v.d)<0?'− ':''}${money(Math.abs(v.r-v.d))}</div></div></div>${catHtml?`<div style="margin-bottom:10px"><div class="muted" style="margin-bottom:5px">Despesas por classificação</div>${catHtml}</div>`:''}<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th>Status</th></tr>${monthRows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(txAccountLabel(t))}</td><td><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td>${t.type==='receita'?'Receita':'Despesa'}</td><td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td></tr>`).join('')||'<tr><td colspan="7">Sem movimentações.</td></tr>'}</table></div></div>`;
   }).join('')||'<div class="empty">Sem movimentações no período.</div>'}</div>
   <div class="card section"><h2>Detalhamento das movimentações</h2><div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th>Status</th></tr>${rows.sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(txAccountLabel(t))}</td><td><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td>${t.type==='receita'?'Receita':'Despesa'}</td><td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td></tr>`).join('')||'<tr><td colspan="7">Sem movimentações.</td></tr>'}</table></div></div>`;
-  window.currentReportData={rows,inc,exp,budget:budgetReportData(r,af)};
+  window.currentReportData={rows,inc,exp,budget:budgetReportData(r,af),group:gf};
 }
 
 function reportMonthsInRange(r){
@@ -1461,6 +1483,48 @@ function reportMonthsInRange(r){
   const end=new Date(r.end.getFullYear(),r.end.getMonth(),1);
   while(d<=end&&out.length<240){out.push(monthKeyFromDate(d));d=new Date(d.getFullYear(),d.getMonth()+1,1);}
   return out;
+}
+// Grupo do orçamento de um lançamento para fins de FILTRO:
+//  • despesas → grupo da categoria ('' = sem grupo);
+//  • transferência enviada para conta marcada como "conta de investimentos" → 'investimentos';
+//  • receitas e demais transferências → null (não pertencem a nenhum grupo de gasto).
+function txFilterGroup(t){
+  if(!t)return null;
+  if(t.transfer){
+    if(t.type!=='despesa')return null;
+    const tr=(db.transfers||[]).find(x=>String(x.id)===String(t.transferId));
+    const to=tr&&db.accounts.find(a=>String(a.id)===String(tr.to)),from=tr&&db.accounts.find(a=>String(a.id)===String(tr.from));
+    return to?.investmentAccount&&!from?.investmentAccount?'investimentos':null;
+  }
+  if(t.type!=='despesa')return null;
+  return budgetGroupOfTx(t);
+}
+function matchesGroupFilter(t,gf){
+  if(!gf||gf==='all')return true;
+  const g=txFilterGroup(t);
+  return g!==null&&g===(gf==='none'?'':gf);
+}
+function groupFilterLabel(gf){
+  if(!gf||gf==='all')return 'Todos os grupos';
+  if(gf==='none')return '❔ Sem grupo';
+  const g=budgetGroupDef(gf);return g?`${g.icon} ${g.name}`:'—';
+}
+function groupFilterOptions(gf){
+  return `<option value="all" ${(!gf||gf==='all')?'selected':''}>Todos os grupos</option>`+
+    BUDGET_GROUPS_DEFAULT.map(g=>`<option value="${g.key}" ${gf===g.key?'selected':''}>${g.icon} ${esc(g.name)}</option>`).join('')+
+    `<option value="none" ${gf==='none'?'selected':''}>❔ Sem grupo</option>`;
+}
+function categoryInGroup(c,gf){
+  if(!gf||gf==='all')return true;
+  if(c.type!=='despesa')return false;
+  return (budgetGroupDef(c.budgetGroup)?c.budgetGroup:'')===(gf==='none'?'':gf);
+}
+function setDashboardGroupFilter(v){
+  window.dashboardGroupFilter=v||'all';
+  // Se a categoria escolhida não pertence ao grupo, volta para todas.
+  const sc=String(window.dashboardCategoryFilter||'all');
+  if(sc!=='all'){const c=db.categories.find(x=>String(x.id)===sc);if(!c||!categoryInGroup(c,window.dashboardGroupFilter))window.dashboardCategoryFilter='all';}
+  dashboard();
 }
 function budgetGroupOfTx(t){
   const c=db.categories.find(x=>String(x.id)===String(t.categoryId));
@@ -1494,11 +1558,14 @@ function budgetReportData(r,af){
   const ungrouped={confirmed:months.reduce((s,m)=>s+perMonth[m].g[''].confirmed,0),total:months.reduce((s,m)=>s+perMonth[m].g[''].total,0)};
   return {months,perMonth,income,groups,ungrouped};
 }
-function budgetReportHtml(r,af){
+function budgetReportHtml(r,af,gf){
   const bd=budgetReportData(r,af);
+  gf=gf||'all';
+  // Com filtro de grupo, barras e evolução mostram somente aquele grupo; a pizza mantém todos para comparação.
+  const shownGroups=gf==='all'||gf==='none'?bd.groups:bd.groups.filter(g=>g.key===gf);
   const fmtPct=v=>(Number.isFinite(v)?v:0).toFixed(1)+'%';
-  const maxV=Math.max(1,...bd.groups.map(g=>Math.max(g.planned,g.total)));
-  const bars=bd.groups.map(g=>{
+  const maxV=Math.max(1,...shownGroups.map(g=>Math.max(g.planned,g.total)));
+  const bars=shownGroups.map(g=>{
     const use=g.planned>0?g.total/g.planned*100:(g.total>0?100:0);
     const st=g.key==='investimentos'||g.key==='conhecimento'||g.key==='metas'
       ? (use>=100?'✅ meta atingida':use>=70?'🟡 em andamento':'🔴 abaixo da meta')
@@ -1519,16 +1586,17 @@ function budgetReportHtml(r,af){
   const pie=active.length?`<svg viewBox="0 0 100 100" role="img" aria-label="Distribuição real dos gastos por grupo">${summaryPieGeometry(active).map(g=>`<path d="${g.path}" fill="${g.c.color}" stroke="#fff" stroke-width="1.2"><title>${esc(g.c.name)} — ${money(g.v)} (${g.percent.toFixed(1)}%)</title></path>`).join('')}<circle cx="50" cy="50" r="24" fill="#fff"/><text x="50" y="48" text-anchor="middle" font-size="5" fill="#6b7280">Realizado</text><text x="50" y="55" text-anchor="middle" font-size="5.2" font-weight="700" fill="#17202a">${esc(money(totConf))}</text></svg>`:'<div class="summary-pie-empty">Sem despesas confirmadas no período.</div>';
   const pieLegend=`<table class="table"><tr><th>Grupo</th><th>% real da receita</th><th>% meta</th><th>Desvio</th></tr>${pieItems.map(x=>{
     const real=bd.income?x.v/bd.income*100:0, dev=x.meta==null?null:real-x.meta;
-    return `<tr><td><span class="cat-dot" style="background:${x.c.color}"></span>${x.icon} ${esc(x.c.name)}</td><td>${fmtPct(real)}</td><td>${x.meta==null?'—':fmtPct(x.meta)}</td><td class="${dev==null?'':(dev>0?'red':'blue')}">${dev==null?'—':(dev>0?'+':'')+dev.toFixed(1)+' p.p.'}</td></tr>`;}).join('')}</table>`;
+    const hl=gf!=='all'&&String(x.c.id)===(gf==='none'?'':gf);
+    return `<tr${hl?' class="group-hl"':''}><td><span class="cat-dot" style="background:${x.c.color}"></span>${x.icon} ${esc(x.c.name)}</td><td>${fmtPct(real)}</td><td>${x.meta==null?'—':fmtPct(x.meta)}</td><td class="${dev==null?'':(dev>0?'red':'blue')}">${dev==null?'—':(dev>0?'+':'')+dev.toFixed(1)+' p.p.'}</td></tr>`;}).join('')}</table>`;
   const monthUse=bd.months.map(m=>{
     const pm=bd.perMonth[m];
-    return {m,vals:bd.groups.map(g=>{const pl=pm.income*g.pct/100,v=pm.g[g.key].total;return {g,pl,v,u:pl>0?v/pl*100:(v>0?100:0)};})};
+    return {m,vals:shownGroups.map(g=>{const pl=pm.income*g.pct/100,v=pm.g[g.key].total;return {g,pl,v,u:pl>0?v/pl*100:(v>0?100:0)};})};
   });
   const maxU=Math.max(120,...monthUse.flatMap(x=>x.vals.map(v=>v.u)));
   const H=200, refTop=H-(100/maxU*H);
   const evo=bd.months.length>1?`<div class="card section"><h2>Desempenho mensal por grupo (% do planejado)</h2>
     <div class="muted">Cada barra mostra o comprometido do grupo em relação ao planejado do mês. A linha tracejada marca 100%. Para Custos fixos, Conforto e Prazeres, ficar abaixo da linha é o desejável; para Metas, Investimentos e Conhecimento, o objetivo é alcançá-la.</div>
-    <div class="bgr-legend">${bd.groups.map(g=>`<span><i style="background:${g.color}"></i>${g.icon} ${esc(g.name)}</span>`).join('')}</div>
+    <div class="bgr-legend">${shownGroups.map(g=>`<span><i style="background:${g.color}"></i>${g.icon} ${esc(g.name)}</span>`).join('')}</div>
     <div class="bgr-month">${monthUse.map(x=>`<div class="bgr-col"><div class="bgr-col-bars"><div class="bgr-ref" style="top:${refTop}px"></div>${x.vals.map(v=>`<div onclick="toast(this.title)" title="${esc(v.g.name)} — ${monthLabel(x.m)}: ${money(v.v)} de ${money(v.pl)} (${v.u.toFixed(1)}%)" style="height:${v.u?Math.max(2,v.u/maxU*H):0}px;background:${v.g.color}"></div>`).join('')}</div><small>${esc(monthLabel(x.m))}</small></div>`).join('')}</div>
   </div>`:'';
   const partial=(r.start.getDate()!==1)||(new Date(r.end.getFullYear(),r.end.getMonth()+1,0).getDate()!==r.end.getDate());
@@ -1547,7 +1615,7 @@ function budgetReportHtml(r,af){
 function exportReportPDF(){
   const d=window.currentReportData;if(!d)return renderReport();
   const js=window.jspdf;if(!js?.jsPDF){alert('A exportação PDF precisa da biblioteca de PDF. Conecte-se à internet e tente novamente.');return;}
-  const doc=new js.jsPDF();doc.setFontSize(18);doc.text('Ricas Finanças — Relatório',14,18);doc.setFontSize(10);doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`,14,25);doc.setFontSize(11);doc.text(`Receitas: ${money(d.inc)}   Despesas: ${money(d.exp)}   Resultado: ${money(d.inc-d.exp)}`,14,34);
+  const doc=new js.jsPDF();doc.setFontSize(18);doc.text('Ricas Finanças — Relatório',14,18);doc.setFontSize(10);doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}${d.group&&d.group!=='all'?' · Grupo: '+groupFilterLabel(d.group).replace(/^\S+\s/,''):''}`,14,25);doc.setFontSize(11);doc.text(`Receitas: ${money(d.inc)}   Despesas: ${money(d.exp)}   Resultado: ${money(d.inc-d.exp)}`,14,34);
   if(doc.autoTable)doc.autoTable({startY:42,head:[['Data','Descrição','Conta','Categoria','Tipo','Valor','Status']],body:d.rows.map(t=>[fmtDate(t.date),t.description,txAccountLabel(t),catName(t.categoryId),t.type==='receita'?'Receita':'Despesa',money(t.value),t.confirmed?'Confirmada':'Pendente']),styles:{fontSize:7}});
   if(doc.autoTable&&d.budget){
     const bd=d.budget;
@@ -1659,7 +1727,7 @@ function summaryPieGeometry(items){
     const x2=cx+r*Math.cos(end), y2=cy+r*Math.sin(end);
     const large=slice>Math.PI?1:0;
     const path=slice>=Math.PI*2-1e-8
-      ? `M ${cx} ${cy-r} A ${r} ${r} 0 1 1 ${cx-0.01} ${cy-r} A ${r} ${r} 0 1 1 ${cx} ${cy-r} Z`
+      ? `M ${cx} ${cy-r} A ${r} ${r} 0 1 1 ${cx} ${cy+r} A ${r} ${r} 0 1 1 ${cx} ${cy-r} Z`
       : `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
     return {...x,start,end,path,percent:total?Number(x.v||0)/total*100:0};
   });
@@ -1690,14 +1758,15 @@ function dashboard(){
   const safe=summarySafeToSpend(month);
   const projection=summaryClosingProjection(month);
   const selectedCat=String(window.dashboardCategoryFilter||'all');
-
+  const gf=String(window.dashboardGroupFilter||'all');
   const actualMonth=data.rows;
   let recent=actualMonth
+    .filter(x=>matchesGroupFilter(x,gf))
     .filter(x=>selectedCat==='all'||String(x.categoryId)===selectedCat)
     .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
 
   const cats=[...db.categories]
-    .filter(c=>c.type==='despesa')
+    .filter(c=>c.type==='despesa'&&categoryInGroup(c,gf))
     .sort((a,b)=>(a.order??0)-(b.order??0))
     .map(c=>{
       const movements=actualMonth.filter(x=>x.categoryId==c.id&&x.type==='despesa');
@@ -1705,10 +1774,32 @@ function dashboard(){
     }).sort((a,b)=>b.v-a.v);
   const summaryPie=renderSummaryPie(cats, selectedCat);
 
-  const filterLabel=selectedCat==='all'?'Todas as categorias':`Categoria: ${esc(catName(selectedCat))}`;
+  const filterLabel=selectedCat==='all'?(gf==='all'?'Todas as categorias':esc(groupFilterLabel(gf))):`Categoria: ${esc(catName(selectedCat))}`;
+  // Painel do grupo selecionado (planejado × realizado no mês)
+  let groupPanel='';
+  if(gf!=='all'){
+    const sp=budgetSpending(month)[gf==='none'?'':gf]||{confirmed:0,total:0};
+    const def=budgetGroupDef(gf);
+    const inc=budgetIncome(month);
+    const planned=def?inc*budgetPercent(gf)/100:null;
+    const use=planned?sp.total/planned*100:null;
+    const goal=['investimentos','metas','conhecimento'].includes(gf);
+    const st=use==null?'':(goal?(use>=100?'✅ meta atingida':use>=70?'🟡 em andamento':'🔴 abaixo da meta'):(use>100?'🔴 acima do limite':use>85?'🟡 próximo do limite':'✅ dentro do limite'));
+    const left=planned!=null?planned-sp.total:null;
+    groupPanel=`<div class="card section group-panel" style="border-left:4px solid ${def?.color||'#9ca3af'}">
+      <div class="group-panel-head"><h2>${esc(groupFilterLabel(gf))} — ${monthLabel(month)}</h2>${st?`<span class="pill">${st}</span>`:''}</div>
+      <div class="grid g4">
+        <div class="card metric"><div class="label">Planejado${def?` (${budgetPercent(gf)}% da receita)`:''}</div><div class="value">${planned!=null?money(planned):'—'}</div></div>
+        <div class="card metric"><div class="label">Realizado (confirmado)</div><div class="value red">${money(sp.confirmed)}</div></div>
+        <div class="card metric"><div class="label">Comprometido (+ pendentes)</div><div class="value">${money(sp.total)}</div></div>
+        <div class="card metric"><div class="label">Disponível</div><div class="value ${left!=null&&left<0?'red':'blue'}">${left==null?'—':(left<0?'− ':'')+money(Math.abs(left))}</div></div>
+      </div>
+      ${planned?`<div class="budget-bar" style="margin-top:12px"><i style="width:${Math.min(100,use)}%;background:${use>100?'var(--red)':(def?.color||'var(--primary)')}"></i></div><div class="muted" style="font-size:12px;margin-top:4px">${use.toFixed(1)}% do planejado utilizado</div>`:''}
+    </div>`;
+  }
   const recentHtml=recent.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr>${recent.map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${esc(x.description)}<br><span class="muted"><span class="category-icon">${esc(categoryIcon(x.categoryId))}</span>${esc(catName(x.categoryId))}</span></td><td class="${x.type==='despesa'?'red':'blue'}">${x.type==='despesa'?'−':'+'} ${money(x.value)}</td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhuma movimentação confirmada encontrada para esta categoria neste mês.</div>';
 
-  const overdueBills=overdueBillsForSummary();
+  const overdueBills=overdueBillsForSummary().filter(x=>matchesGroupFilter(x,gf));
   const overdueTotal=overdueBills.reduce((s,x)=>s+Number(x.value||0),0);
   const overdueHtml=overdueBills.length?`<div class="table-wrap"><table class="table"><tr><th>Vencimento</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Valor</th></tr>${overdueBills.map(x=>`<tr><td class="red">${fmtDate(x.date)}${String(x.date)===new Date().toISOString().slice(0,10)?' <span class="pill">Hoje</span>':''}</td><td>${esc(x.description||'Sem descrição')}</td><td>${esc((db.accounts.find(a=>String(a.id)===String(x.accountId))||{}).name||'—')}</td><td><span class="cat-dot" style="background:${categoryColor(x.categoryId)}"></span><span class="category-icon">${esc(categoryIcon(x.categoryId))}</span>${esc(catName(x.categoryId))}</td><td class="red">− ${money(x.value)}</td></tr>`).join('')}</table></div><div class="overdue-total"><b>Total vencido / vence hoje:</b> <span class="red">− ${money(overdueTotal)}</span></div>`:'<div class="empty">Nenhuma conta vencida ou com vencimento hoje e pendente.</div>';
 
@@ -1719,6 +1810,11 @@ function dashboard(){
 
   document.getElementById('content').innerHTML=`<div class="summary-page">
     ${monthNav()}
+    <div class="card group-filter-bar">
+      <label>Filtrar por grupo do orçamento<select id="dashGroupSelect" onchange="setDashboardGroupFilter(this.value)">${groupFilterOptions(gf)}</select></label>
+      ${gf!=='all'?`<button class="btn" onclick="setDashboardGroupFilter('all')">Limpar filtro</button>`:''}
+      <div class="muted">${gf==='all'?'Selecione um grupo para ver o gráfico, as movimentações e as contas vencidas somente daquele grupo. Os indicadores do Resumo Mensal continuam considerando todas as contas do Resumo.':`Mostrando somente despesas do grupo <b>${esc(groupFilterLabel(gf))}</b>${gf==='investimentos'?' (inclui transferências para contas de investimentos)':''}. Os indicadores do Resumo Mensal continuam gerais.`}</div>
+    </div>
     <p class="muted">O Resumo Mensal considera exclusivamente receitas e despesas <b>confirmadas</b>. Transferências entre contas são consideradas nos lançamentos das contas: a transferência recebida entra como receita e a enviada como despesa. Quando ambas as contas aparecem no Resumo, o efeito líquido é zero. O Saldo Geral Acumulado incorpora o resultado dos meses anteriores.</p>
     <div class="card section">
       <h2>Resumo Mensal — ${monthLabel(month)}</h2>
@@ -1734,10 +1830,11 @@ function dashboard(){
       <div class="card metric"><div class="label">Valor seguro para gastar</div><div class="value blue">${money(safe.value)}</div><div class="muted">Após reservar ${money(safe.pendingExpenses)} em despesas pendentes até o fim do mês.</div></div>
       <div class="card metric"><div class="label">Projeção de fechamento</div><div class="value ${projection.projected<0?'red':'blue'}">${projection.projected<0?'− ':''}${money(Math.abs(projection.projected))}</div><div class="muted">Saldo existente + movimentações futuras já conhecidas.</div></div>
     </div>
+    ${groupPanel}
     <div class="card section"><h2>Como você deve fechar o mês</h2><div style="font-size:16px;line-height:1.55">${projectionText}</div><div class="muted" style="margin-top:8px">Projeção calculada a partir do saldo existente e das movimentações já lançadas para o restante do mês. Não há extrapolação por ritmo diário.</div></div>
-    <div class="card section overdue-card"><div class="overdue-head"><div><h2>Contas vencidas</h2><div class="muted">Despesas com vencimento anterior a hoje que ainda não foram confirmadas.</div></div><strong class="red">${overdueBills.length} pendente${overdueBills.length===1?'':'s'}</strong></div>${overdueHtml}</div>
+    <div class="card section overdue-card"><div class="overdue-head"><div><h2>Contas vencidas</h2><div class="muted">Despesas com vencimento anterior a hoje que ainda não foram confirmadas${gf!=='all'?` — somente ${esc(groupFilterLabel(gf))}`:''}.</div></div><strong class="red">${overdueBills.length} pendente${overdueBills.length===1?'':'s'}</strong></div>${overdueHtml}</div>
     <div class="grid g2 section">
-      <div class="card"><h2>Despesas por classificação — ${monthLabel(month)}</h2><div class="muted">Todas as classificações aparecem na legenda. Clique em uma fatia do gráfico ou em uma classificação para ver os gastos detalhados abaixo.</div>${summaryPie}${selectedCat!=='all'?`<button class="btn" style="margin-top:10px" onclick="clearSummaryCategoryFilter()">Mostrar todas as classificações</button>`:''}</div>
+      <div class="card"><h2>Despesas por classificação — ${monthLabel(month)}${gf!=='all'?` · ${esc(groupFilterLabel(gf))}`:''}</h2><div class="muted">Todas as classificações aparecem na legenda. Clique em uma fatia do gráfico ou em uma classificação para ver os gastos detalhados abaixo.</div>${summaryPie}${selectedCat!=='all'?`<button class="btn" style="margin-top:10px" onclick="clearSummaryCategoryFilter()">Mostrar todas as classificações</button>`:''}</div>
       <div class="card"><h2>Movimentações — ${filterLabel}</h2>${recentHtml}</div>
     </div>
     <div class="card section"><h2>Detalhamento dos gastos${selectedCat!=='all'?` — ${esc(catName(selectedCat))}`:''}</h2>${selectedCat==='all'?'<div class="muted">Clique em uma fatia do gráfico ou em uma classificação na legenda para listar os gastos confirmados.</div>':(()=>{const cc=cats.find(x=>String(x.c.id)===selectedCat);const rows=cc?.movements||[];return rows.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Valor</th></tr>${rows.map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${esc(x.description)}</td><td>${esc(txAccountLabel(x))}</td><td class="red">− ${money(x.value)}</td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhum lançamento confirmado nesta categoria para este mês.</div>';})()}</div>
@@ -2771,7 +2868,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v68',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v69',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
