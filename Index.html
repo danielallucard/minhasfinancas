@@ -407,6 +407,14 @@ tr.group-hl td{background:#eef3ff;font-weight:700}
 .report-detail-table td:nth-child(5){font-weight:700;white-space:nowrap}
 @media(max-width:900px){.report-content-grid{grid-template-columns:1fr}.report-content-actions{display:grid;grid-template-columns:1fr}.report-content-actions .btn{width:100%}}
 </style>
+<style id="v72-card-decimal">
+#modalBody [hidden]{display:none!important}
+#recCardWrap{display:grid;gap:10px;min-width:0;max-width:100%}
+#recCardHint{font-size:12px;line-height:1.5;margin:0}
+.rec-payment-label{font-size:12px;overflow-wrap:anywhere}
+input[data-decimal]{font-variant-numeric:tabular-nums}
+@media(max-width:900px){#recCardWrap,#recCardWrap label,#recCardWrap select{width:100%;min-width:0;max-width:100%}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -426,6 +434,49 @@ tr.group-hl td{background:#eef3ff;font-weight:700}
 <div class="modal" id="modal"><div class="modalbox"><div class="modalhead"><h3 id="modalTitle"></h3><button class="close" onclick="closeModal()">×</button></div><div id="modalBody"></div></div></div>
 <div class="toast" id="toast"></div>
 <script>
+
+// Valores decimais: o campo textual permite digitar vírgula no teclado do iOS/Android.
+// Não altera o texto durante a digitação; valida antes de salvar e armazena como Number.
+function parseDecimalBR(raw){
+  if(typeof raw==='number')return Number.isFinite(raw)?raw:NaN;
+  let v=String(raw??'').trim().replace(/^R\$\s*/i,'').replace(/[\s\u00a0\u202f]/g,'');
+  if(!v)return NaN;
+  if(v.includes(',')){
+    if(!/^[+-]?(?:\d+|\d{1,3}(?:\.\d{3})+),\d{0,2}$/.test(v))return NaN;
+    v=v.replace(/\./g,'').replace(',','.');
+  }else if(/^[+-]?\d{1,3}(?:\.\d{3})+$/.test(v))v=v.replace(/\./g,'');
+  else if(!/^[+-]?(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(v))return NaN;
+  const n=Number(v);return Number.isFinite(n)?n:NaN;
+}
+function decimalInputValue(value){
+  if(value==null||value==='')return '';
+  const n=typeof value==='number'?value:parseDecimalBR(value);
+  return Number.isFinite(n)?n.toLocaleString('pt-BR',{useGrouping:false,minimumFractionDigits:2,maximumFractionDigits:2}):'';
+}
+function validateDecimalField(el){
+  el.setCustomValidity('');
+  if(!el.value.trim())return !el.required;
+  const n=parseDecimalBR(el.value);
+  let msg='';
+  if(!Number.isFinite(n))msg='Informe um valor válido, como 123,45 ou 1.234,56.';
+  else if(el.dataset.min!==undefined&&n<Number(el.dataset.min))msg='O valor mínimo é '+decimalInputValue(Number(el.dataset.min))+'.';
+  else if(el.dataset.max!==undefined&&n>Number(el.dataset.max))msg='O valor máximo é '+decimalInputValue(Number(el.dataset.max))+'.';
+  el.setCustomValidity(msg);return !msg;
+}
+document.addEventListener('input',e=>{if(e.target.matches?.('[data-decimal]'))e.target.setCustomValidity('');});
+document.addEventListener('focusout',e=>{
+  const el=e.target;if(!el.matches?.('[data-decimal]')||!el.value.trim())return;
+  if(validateDecimalField(el))el.value=decimalInputValue(parseDecimalBR(el.value));
+});
+document.addEventListener('submit',e=>{
+  for(const el of e.target.querySelectorAll('[data-decimal]')){
+    if(el.disabled)continue;
+    if(!validateDecimalField(el)){
+      e.preventDefault();e.stopImmediatePropagation();el.reportValidity();return;
+    }
+  }
+},true);
+
 const DB_FILE='ricas-financas-db.json';
 const KEY='ricas_financas_web_v1';
 const base={recurrences:[],accounts:[],categories:[
@@ -1015,9 +1066,13 @@ function cardBillingMonth(date,card){
   if(day>Number(card.close)) return monthKeyFromDate(new Date(Number(k.slice(0,4)),Number(k.slice(5,7)),1));
   return k;
 }
+function transactionCardBillingMonth(t,card){
+  if(t.automationBillingMonth&&t.automationBillingDate===t.date&&String(t.automationBillingCardId)===String(t.cardId))return t.automationBillingMonth;
+  return cardBillingMonth(t.date,card);
+}
 function cardTransactions(cardId,statementMonth){
   const card=db.cards.find(c=>c.id==cardId);
-  return db.transactions.filter(t=>t.cardId==cardId && !t.virtualCardStatement && t.type==='despesa' && cardBillingMonth(t.date,card)===statementMonth);
+  return db.transactions.filter(t=>t.cardId==cardId && !t.virtualCardStatement && t.type==='despesa' && transactionCardBillingMonth(t,card)===statementMonth);
 }
 function cardStatementTotal(cardId,statementMonth){
   return cardTransactions(cardId,statementMonth).reduce((s,t)=>s+Number(t.value||0),0);
@@ -1166,13 +1221,15 @@ function recurrenceHorizonIdx(r){
 }
 function generateRecurrence(r){
   if(!r)return 0;
+  const payment=recurrenceCardData(r);
+  if(!payment||(r.cardId&&r.type!=='despesa'))return 0;
   const mine=db.transactions.filter(t=>t.recurrenceId===r.id);
   const existingIdx=new Set(mine.map(t=>Number(t.installment)).filter(Boolean));
   const existingDates=new Set(mine.map(t=>t.date));
   const skip=new Set((r.skip||[]).map(Number));
   const recurring=isRecurring(r);
   let last=recurring?recurrenceHorizonIdx(r):Number(r.count||0);
-  if(recurring&&r.endIdx)last=Math.min(last,Number(r.endIdx));
+  if(recurring&&r.endIdx!=null)last=Math.min(last,Number(r.endIdx));
   let added=0;
   for(let i=0;i<last;i++){
     const n=i+1;
@@ -1181,7 +1238,7 @@ function generateRecurrence(r){
     if(!recurring&&existingDates.has(date))continue;
     db.transactions.push({
       id:uid(),type:r.type,date,description:recurring?String(r.description||'').trim():installmentDescription(r.description,n,r.count),
-      value:+r.value,accountId:+r.accountId,categoryId:+r.categoryId,
+      value:+r.value,...recurrenceOccurrencePayment(r,n,date),categoryId:+r.categoryId,
       confirmed:false,recurrenceId:r.id,installment:n,totalInstallments:recurring?null:r.count,recurring:recurring||undefined
     });
     added++;
@@ -1260,19 +1317,32 @@ function openRecurrence(id){
     <option value="installments" ${sel(mode,'installments')}>Parcelada</option>
     <option value="recurring" ${sel(mode,'recurring')}>Recorrente (todo mês)</option></select></label>
   <div class="row">
-    <label>Tipo<select name="type" required>
+    <label>Tipo<select name="type" id="recTypeSelect" onchange="toggleRecurrencePayment()" required>
       <option value="" disabled ${r?'':'selected'}>Selecione…</option>
       <option value="despesa" ${sel(r?.type,'despesa')}>Despesa</option>
       <option value="receita" ${sel(r?.type,'receita')}>Receita</option></select></label>
-    <label>Primeiro vencimento<input type="date" name="start" value="${r?.start||''}" required></label>
+    <label><span id="recDateLabel">Primeiro vencimento</span><input type="date" name="start" value="${r?.start||''}" required></label>
   </div>
   <label>Descrição<input name="description" value="${esc(r?.description||'')}" required placeholder="Ex.: Financiamento habitacional"></label>
   <div class="row">
-    <label><span id="recValueLabel">Valor de cada parcela</span><input type="number" inputmode="decimal" step="0.01" min="0.01" name="value" value="${r?.value??''}" required placeholder="0,00"></label>
+    <label><span id="recValueLabel">Valor de cada parcela</span><input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" data-min="0.01" name="value" value="${decimalInputValue(r?.value??'')}" required placeholder="0,00"></label>
     <label id="recCountWrap">Número de parcelas<input type="number" inputmode="numeric" min="1" max="1200" name="count" id="recCountInput" value="${r&&!isRecurring(r)?r.count:''}" required placeholder="Ex.: 12"></label>
   </div>
+  <label>Forma de lançamento<select name="paymentMethod" id="recPaymentSelect" onchange="toggleRecurrencePayment()" required>
+    <option value="" disabled ${r?'':'selected'}>Selecione…</option>
+    <option value="account" ${r&&!r.cardId?'selected':''}>Conta bancária</option>
+    <option value="card" ${r?.cardId?'selected':''}>Cartão de crédito</option>
+  </select></label>
+  <div id="recCardWrap" hidden>
+    <label>Cartão de crédito<select name="cardId" id="recCardSelect" onchange="toggleRecurrencePayment()">
+      <option value="">Selecione um cartão</option>
+      ${[...db.cards].sort((a,b)=>(a.order??0)-(b.order??0)).map(c=>`<option value="${c.id}" ${sel(r?.cardId,c.id)}>💳 ${esc(c.name)}</option>`).join('')}
+    </select></label>
+    <label id="recHolderWrap" hidden>Titular<select name="cardHolder" id="recHolderSelect" data-current="${esc(r?.cardHolder||'')}"></select></label>
+    <p class="muted" id="recCardHint">Informe o valor de cada parcela ou cobrança mensal, não o valor total da compra. A data da primeira compra/cobrança determina a fatura conforme o fechamento do cartão. As parcelas/cobranças seguintes entram em faturas mensais consecutivas e não debitam diretamente a conta bancária.</p>
+  </div>
   <div class="row">
-    <label>Conta<select name="accountId" required>
+    <label id="recAccountWrap">Conta<select name="accountId" id="recAccountSelect" required>
       <option value="" disabled ${r?.accountId?'':'selected'}>Selecione uma conta</option>
       ${accounts.map(a=>`<option value="${a.id}" ${sel(r?.accountId,a.id)}>${esc(a.name)}</option>`).join('')}</select></label>
     ${recurrenceCategoryPickerHtml(r?.categoryId??'')}
@@ -1283,6 +1353,7 @@ function openRecurrence(id){
   <button class="btn primary">${r?'Salvar alterações':'Criar programação'}</button>
   </form>`);
   toggleRecurrenceMode();
+  toggleRecurrencePayment();
   const picker=document.getElementById('recurrenceCategoryPicker');
   if(picker){
     picker.addEventListener('focusout',()=>setTimeout(()=>{const box=document.getElementById('recurrenceCategoryOptions');if(box&&!picker.contains(document.activeElement))box.style.display='none';},150));
@@ -1297,21 +1368,73 @@ function toggleRecurrenceMode(){
   const gw=document.getElementById('recGenerateWrap');if(gw){if(rec)gw.style.setProperty('display','none','important');else gw.style.removeProperty('display');}
   const h=document.getElementById('recRecurringHint');if(h)h.style.display=rec?'':'none';
 }
+
+function toggleRecurrencePayment(){
+  const method=document.getElementById('recPaymentSelect'),type=document.getElementById('recTypeSelect');
+  if(!method||!type)return;
+  const cardOption=method.querySelector('option[value="card"]');
+  if(cardOption)cardOption.disabled=type.value==='receita';
+  if(type.value==='receita'&&method.value==='card'){
+    method.value='account';toast('Receitas são lançadas em conta; cartão é exclusivo para despesas.');
+  }
+  const useCard=method.value==='card';
+  const cs=document.getElementById('recCardSelect'),ac=document.getElementById('recAccountSelect');
+  document.getElementById('recCardWrap').hidden=!useCard;
+  document.getElementById('recAccountWrap').hidden=useCard;
+  cs.disabled=!useCard;cs.required=useCard;
+  ac.disabled=useCard;ac.required=!useCard;
+  document.getElementById('recDateLabel').textContent=useCard?'Data da primeira compra/cobrança':'Primeiro vencimento';
+  const holder=document.getElementById('recHolderSelect'),wrap=document.getElementById('recHolderWrap');
+  const card=useCard?db.cards.find(c=>String(c.id)===cs.value):null;
+  wrap.hidden=!card;holder.disabled=!card;holder.required=!!card;
+  if(card){
+    if(holder.dataset.card!==String(card.id)){
+      const current=holder.value||holder.dataset.current||'';
+      holder.innerHTML='<option value="" disabled>Selecione o titular</option><option value="principal">Principal</option>'+
+        ((card.hasAdditional||card.additionalName)?`<option value="additional">${esc(card.additionalName||'Adicional')}</option>`:'');
+      holder.value=[...holder.options].some(o=>o.value===current)?current:'';
+      holder.dataset.card=String(card.id);
+    }
+  }else holder.dataset.card='';
+}
+function recurrenceCardData(r){
+  if(!r.cardId)return {cardId:null,cardHolder:undefined,accountId:Number(r.accountId)||0};
+  const card=db.cards.find(c=>String(c.id)===String(r.cardId));
+  if(!card)return null; // Nunca converter cartão excluído em débito bancário silenciosamente.
+  return {cardId:card.id,cardHolder:r.cardHolder==='additional'&&(card.hasAdditional||card.additionalName)?'additional':'principal',accountId:Number(card.accountId)||0};
+}
+
+function recurrenceOccurrencePayment(r,n,date){
+  const payment=recurrenceCardData(r);
+  if(!payment)return null;
+  if(!r.cardId)return {...payment,automationBillingMonth:null,automationBillingDate:null,automationBillingCardId:null};
+  const card=db.cards.find(c=>String(c.id)===String(r.cardId));
+  const first=cardBillingMonth(r.start,card);
+  const [y,m]=first.split('-').map(Number);
+  return {...payment,automationBillingMonth:monthKeyFromDate(new Date(y,m+n-2,1)),automationBillingDate:date,automationBillingCardId:card.id};
+}
 function saveRecurrence(e,id){
   e.preventDefault();
   const f=new FormData(e.target);
   const mode=f.get('mode')==='recurring'?'recurring':(f.get('mode')==='installments'?'installments':'');
   if(!mode)return toast('Selecione a modalidade.');
   if(!f.get('type'))return toast('Selecione o tipo.');
-  if(!f.get('accountId'))return toast('Selecione a conta.');
+  const paymentMethod=f.get('paymentMethod');
+  if(!['account','card'].includes(paymentMethod))return toast('Selecione a forma de lançamento.');
+  const card=paymentMethod==='card'?db.cards.find(c=>String(c.id)===String(f.get('cardId'))):null;
+  if(paymentMethod==='card'&&!card)return toast('Selecione um cartão válido.');
+  if(card&&f.get('type')!=='despesa')return toast('Cartão de crédito aceita somente despesas.');
+  if(!card&&!f.get('accountId'))return toast('Selecione a conta.');
+  if(card&&!['principal','additional'].includes(f.get('cardHolder')))return toast('Selecione o titular.');
+  if(card&&f.get('cardHolder')==='additional'&&!(card.hasAdditional||card.additionalName))return toast('Este cartão não possui adicional.');
   if(!f.get('categoryId'))return toast('Selecione a categoria.');
   const data={mode,type:f.get('type'),start:String(f.get('start')||''),description:String(f.get('description')||'').trim(),
-    value:+f.get('value'),count:mode==='recurring'?null:+f.get('count'),accountId:+f.get('accountId'),categoryId:+f.get('categoryId')};
+    value:parseDecimalBR(f.get('value')),count:mode==='recurring'?null:+f.get('count'),accountId:card?(Number(card.accountId)||0):+f.get('accountId'),categoryId:+f.get('categoryId'),cardId:card?card.id:null,cardHolder:card?f.get('cardHolder'):undefined};
   if(!data.start)return toast('Informe o primeiro vencimento.');
   if(!(data.value>0))return toast('Informe um valor maior que zero.');
   if(mode==='installments'&&!(data.count>=1))return toast('Informe o número de parcelas.');
   if(!id){
-    const r={id:uid(),...data,cardId:null,skip:[],order:db.recurrences.length};
+    const r={id:uid(),...data,skip:[],order:db.recurrences.length};
     db.recurrences.push(r);
     let n=0;
     if(mode==='recurring'||f.get('generateNow')==='on')n=generateRecurrence(r);
@@ -1334,7 +1457,7 @@ function saveRecurrence(e,id){
     const rec=mode==='recurring';
     pending.forEach(t=>{
       const n=Number(t.installment)||1;
-      Object.assign(t,{type:r.type,value:+r.value,accountId:+r.accountId,categoryId:+r.categoryId,
+      Object.assign(t,{type:r.type,value:+r.value,...recurrenceOccurrencePayment(r,n,addMonthsSafe(r.start,n-1)),categoryId:+r.categoryId,
         date:addMonthsSafe(r.start,n-1),
         description:rec?r.description:installmentDescription(r.description,n,r.count),
         totalInstallments:rec?null:r.count,recurring:rec||undefined});
@@ -1397,7 +1520,7 @@ function recurrences(){
       ?(ended?`<button class="btn" onclick="reactivateRecurrence(${r.id})">Reativar</button>`:`<button class="btn" onclick="endRecurrence(${r.id})">Encerrar</button>`)
       :`<button class="btn" onclick="generateRecurrence(db.recurrences.find(x=>x.id==${r.id}));save();toast('Parcelas atualizadas');render()">↻ Atualizar</button>`;
     return `<tr>
-  <td>${esc(r.description)}<br><span class="muted">${r.type==='receita'?'Receita':'Despesa'} · ${esc(catName(r.categoryId))}</span></td>
+  <td>${esc(r.description)}<br><span class="muted">${r.type==='receita'?'Receita':'Despesa'} · ${esc(catName(r.categoryId))}</span><br><span class="muted rec-payment-label">${r.cardId?`💳 ${esc(cardName(r.cardId))} · ${esc(cardHolderLabel(r))}${recurrenceCardData(r)?'':' — cartão não cadastrado'}`:`🏦 ${esc(accountName(r.accountId))}`}</span></td>
   <td>${pill}</td>
   <td>${fmtDate(r.start)}</td><td>${qty}</td><td class="${r.type==='receita'?'blue':'red'}">${money(r.value)}</td>
   <td>${lastTxt}</td>
@@ -2337,7 +2460,7 @@ function budgetPanelHtml(month){
     const nCats=db.categories.filter(c=>c.type==='despesa'&&c.budgetGroup===g.key).length;
     return `<tr>
       <td><span class="cat-dot" style="background:${g.color}"></span><span class="category-icon">${g.icon}</span><b>${esc(g.name)}</b><br><span class="muted" style="white-space:normal;font-size:12px">${esc(g.hint)}</span><br><span class="muted" style="font-size:12px">${nCats} categoria(s) vinculada(s)${g.key==='investimentos'?' + transferências para contas de investimentos':''}</span></td>
-      <td><input class="budget-pct" type="number" min="0" max="100" step="0.5" data-key="${g.key}" value="${pct}" oninput="budgetPctLive()"> %</td>
+      <td><input inputmode="decimal" data-decimal="true" autocomplete="off" class="budget-pct" type="text" data-min="0" data-max="100" data-key="${g.key}" value="${decimalInputValue(pct)}" oninput="budgetPctLive()"> %</td>
       <td>${money(planned)}</td>
       <td class="red">${money(sp.confirmed)}</td>
       <td>${money(sp.total)}</td>
@@ -2361,7 +2484,7 @@ function budgetPanelHtml(month){
           </select>
         </label>
         <label id="budgetManualWrap" style="display:${b.incomeMode==='manual'?'grid':'none'}">Receita mensal fixa (R$)
-          <input type="number" id="budgetManualIncome" step="0.01" min="0" value="${b.manualIncome||''}">
+          <input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" id="budgetManualIncome" data-min="0" value="${decimalInputValue(b.manualIncome||'')}">
         </label>
         <div class="metric"><div class="label">Receita base em ${monthLabel(month)}</div><div class="value blue">${money(income)}</div></div>
       </div>
@@ -2380,7 +2503,7 @@ function budgetPanelHtml(month){
   </div>`;
 }
 function budgetPctLive(){
-  let sum=0;document.querySelectorAll('.budget-pct').forEach(i=>sum+=Number(i.value)||0);
+  let sum=0;document.querySelectorAll('.budget-pct').forEach(i=>sum+=parseDecimalBR(i.value)||0);
   const el=document.getElementById('budgetPctTotal');if(!el)return;
   el.textContent=sum.toFixed(1)+' %';
   el.className=Math.abs(sum-100)<0.005?'budget-total-ok':'budget-total-bad';
@@ -2389,12 +2512,12 @@ function saveBudgetSettings(e){
   e.preventDefault();
   const b=db.settings.budget;
   const pcts={};let sum=0,invalid=false;
-  document.querySelectorAll('.budget-pct').forEach(i=>{const v=Number(i.value);if(!Number.isFinite(v)||v<0||v>100)invalid=true;pcts[i.dataset.key]=v;sum+=v||0;});
+  document.querySelectorAll('.budget-pct').forEach(i=>{const v=parseDecimalBR(i.value);if(!Number.isFinite(v)||v<0||v>100)invalid=true;pcts[i.dataset.key]=v;sum+=v||0;});
   if(invalid)return toast('Informe percentuais entre 0 e 100.');
   if(Math.abs(sum-100)>=0.005&&!confirm(`A soma dos percentuais é ${sum.toFixed(1)}% (diferente de 100%).\n\nDeseja salvar mesmo assim?`))return;
   b.groups.forEach(g=>{if(pcts[g.key]!==undefined)g.percent=pcts[g.key];});
   b.incomeMode=document.getElementById('budgetIncomeMode').value;
-  b.manualIncome=Number(document.getElementById('budgetManualIncome')?.value)||0;
+  b.manualIncome=parseDecimalBR(document.getElementById('budgetManualIncome')?.value)||0;
   if(b.incomeMode==='manual'&&!(b.manualIncome>0))return toast('Informe a receita mensal fixa.');
   save();toast('Divisão do orçamento salva');render();
 }
@@ -2685,7 +2808,8 @@ function saveTransactionEdit(e,id){
   const oldDate=String(t.date);
   const newDate=String(f.get('date'));
   const oldValue=+t.value||0;
-  const newValue=+f.get('value')||0;
+  const newValue=parseDecimalBR(f.get('value'));
+  if(!Number.isFinite(newValue)||newValue<=0)return toast('Informe um valor válido maior que zero.');
   const future=relatedFutureTransactions(t);
 
   const changed={
@@ -2890,7 +3014,7 @@ function openTx(id){
       <label>Data de vencimento<input type="date" name="date" value="${today}" required></label>
     </div>
     <label>Descrição<input name="description" value="${esc(t?.description||'')}" required placeholder="Ex.: Supermercado"></label>
-    <label>Valor<input type="number" inputmode="decimal" step="0.01" min="0.01" name="value" value="${t?.value||''}" required placeholder="0,00"></label>
+    <label>Valor<input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" data-min="0.01" name="value" value="${decimalInputValue(t?.value||'')}" required placeholder="0,00"></label>
     <label>Cartão de crédito<select name="cardId" id="txCardSelect" onchange="toggleCardAccountFields()"><option value="">Não é compra no cartão</option>${[...db.cards].sort((a,b)=>(a.order??0)-(b.order??0)).map(c=>`<option value="${c.id}" ${String(cardId)===String(c.id)?'selected':''}>💳 ${esc(c.name)}</option>`).join('')}</select></label>
     <label id="txHolderWrap" style="display:${cardId?'block':'none'}">Titular da compra<select name="cardHolder" id="txHolderSelect"></select></label>
     <div class="row">
@@ -2901,7 +3025,7 @@ function openTx(id){
     <p class="muted">Compra no cartão: a despesa entra no controle da fatura, mas não reduz o saldo da conta bancária. A fatura será exibida automaticamente pelo cartão.</p>
     <button class="btn primary">${t?'Salvar alterações':'Salvar movimentação'}</button>
   </form>`);
-  if(cardId){const hs=document.getElementById("txHolderSelect");if(hs)hs.dataset.current="${t?.cardHolder||'principal'}";toggleCardAccountFields();}
+  if(cardId){const hs=document.getElementById("txHolderSelect");if(hs)hs.dataset.current=t?.cardHolder||'principal';toggleCardAccountFields();}
   const picker=document.getElementById('txCategoryPicker');
   if(picker){
     picker.addEventListener('focusout',()=>setTimeout(()=>{const box=document.getElementById('txCategoryOptions');if(box&&!picker.contains(document.activeElement))box.style.display='none';},150));
@@ -2915,7 +3039,8 @@ function addTx(e){
   if(!f.get('categoryId'))return toast('Selecione a categoria.');
   if(!cardId&&!f.get('accountId'))return toast('Selecione a conta.');
   if(cardId && f.get('type')!=='despesa'){toast('Compras no cartão devem ser despesas.');return;}
-  const card=db.cards.find(c=>c.id===cardId); db.transactions.push({id:uid(),type:f.get('type'),date:f.get('date'),description:f.get('description'),value:+f.get('value'),accountId:cardId?Number(card?.accountId||0):+f.get('accountId'),cardId:cardId||undefined,cardHolder:cardId?(f.get('cardHolder')||'principal'):undefined,categoryId:+f.get('categoryId'),confirmed:f.get('confirmed')==='on'});
+  if(!(parseDecimalBR(f.get('value'))>0))return toast('Informe um valor válido maior que zero.');
+  const card=db.cards.find(c=>c.id===cardId); db.transactions.push({id:uid(),type:f.get('type'),date:f.get('date'),description:f.get('description'),value:parseDecimalBR(f.get('value')),accountId:cardId?Number(card?.accountId||0):+f.get('accountId'),cardId:cardId||undefined,cardHolder:cardId?(f.get('cardHolder')||'principal'):undefined,categoryId:+f.get('categoryId'),confirmed:f.get('confirmed')==='on'});
   save();closeModal();toast(cardId?'Compra lançada no cartão':'Movimentação cadastrada');render();
 }
 
@@ -2925,15 +3050,15 @@ let a=id?db.accounts.find(x=>x.id==id):null;
 openModal(a?'Editar conta bancária':'Nova conta bancária',`<form class="form" onsubmit="saveAccount(event,${id||0})">
 <label>Nome da conta<input name="name" value="${esc(a?.name||'')}" required placeholder="Conta corrente"></label>
 <label>Descrição<input name="description" value="${esc(a?.description||'')}"></label>
-<label>Saldo inicial<input type="number" step="0.01" name="initial" value="${a?.initial||0}"></label>
+<label>Saldo inicial<input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" name="initial" value="${decimalInputValue(a?.initial||0)}"></label>
 <label style="display:flex;grid-template-columns:auto 1fr;align-items:center;gap:8px"><input type="checkbox" name="showInSummary" ${a?.showInSummary!==false?'checked':''}> Aparecer no resumo e no saldo geral</label>
 <label style="display:flex;grid-template-columns:auto 1fr;align-items:center;gap:8px"><input type="checkbox" name="investmentAccount" ${a?.investmentAccount?'checked':''}> Conta de investimentos (transferências recebidas contam no grupo Investimentos do orçamento)</label>
 <button class="btn primary">${a?'Salvar alterações':'Salvar'}</button></form>`)
 }
 function saveAccount(e,id){
 e.preventDefault();let f=new FormData(e.target);
-if(id){let a=db.accounts.find(x=>x.id==id);Object.assign(a,{name:f.get('name'),description:f.get('description'),initial:+f.get('initial')||0,showInSummary:f.get('showInSummary')==='on',investmentAccount:f.get('investmentAccount')==='on'})}
-else db.accounts.push({id:uid(),name:f.get('name'),description:f.get('description'),initial:+f.get('initial')||0,showInSummary:f.get('showInSummary')==='on',investmentAccount:f.get('investmentAccount')==='on',order:db.accounts.length});
+if(id){let a=db.accounts.find(x=>x.id==id);Object.assign(a,{name:f.get('name'),description:f.get('description'),initial:parseDecimalBR(f.get('initial'))||0,showInSummary:f.get('showInSummary')==='on',investmentAccount:f.get('investmentAccount')==='on'})}
+else db.accounts.push({id:uid(),name:f.get('name'),description:f.get('description'),initial:parseDecimalBR(f.get('initial'))||0,showInSummary:f.get('showInSummary')==='on',investmentAccount:f.get('investmentAccount')==='on',order:db.accounts.length});
 save();closeModal();toast(id?'Conta alterada':'Conta cadastrada');render()
 }
 function delAccount(id){if(confirm('Excluir a conta e manter os lançamentos?')){db.accounts=db.accounts.filter(a=>a.id!=id);save();render()}}
@@ -2959,13 +3084,13 @@ function openPlan(id){
 let p=id?db.plans.find(x=>x.id==id):null;
 openModal(p?'Editar planejamento':'Novo planejamento',`<form class="form" onsubmit="savePlan(event,${id||0})">
 <label>Categoria<select name="categoryId">${[...db.categories].filter(c=>c.type==='despesa').sort((a,b)=>(a.order??0)-(b.order??0)).map(c=>`<option value="${c.id}" ${p?.categoryId==c.id?'selected':''}>${esc(categoryIcon(c.id))} ${esc(c.name)}</option>`).join('')}</select></label>
-<label>Meta mensal<input type="number" step="0.01" name="value" value="${p?.value||''}" required></label>
+<label>Meta mensal<input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" name="value" value="${decimalInputValue(p?.value||'')}" required></label>
 <button class="btn primary">${p?'Salvar alterações':'Salvar'}</button></form>`)
 }
 function savePlan(e,id){
 e.preventDefault();let f=new FormData(e.target);
-if(id){let p=db.plans.find(x=>x.id==id);Object.assign(p,{categoryId:+f.get('categoryId'),value:+f.get('value')})}
-else db.plans.push({id:uid(),categoryId:+f.get('categoryId'),value:+f.get('value'),order:db.plans.length});
+if(id){let p=db.plans.find(x=>x.id==id);Object.assign(p,{categoryId:+f.get('categoryId'),value:parseDecimalBR(f.get('value'))})}
+else db.plans.push({id:uid(),categoryId:+f.get('categoryId'),value:parseDecimalBR(f.get('value')),order:db.plans.length});
 save();closeModal();toast(id?'Planejamento alterado':'Planejamento cadastrado');render()
 }
 function delPlan(id){if(confirm('Excluir planejamento?')){db.plans=db.plans.filter(p=>p.id!=id);save();render()}}
@@ -2975,13 +3100,13 @@ function openTransfer(id){
   openModal(tr?'Editar transferência':'Nova transferência',`<form class="form" onsubmit="${tr?'saveTransferEdit(event,'+tr.id+')':'addTransfer(event)'}">
     <label>Data<input type="date" name="date" value="${tr?.date||defaultDueDate()}" required></label>
     <div class="row"><label>Conta origem<select name="from" required>${transferFormOptions(tr?.from)}</select></label><label>Conta destino<select name="to" required>${transferFormOptions(tr?.to)}</select></label></div>
-    <label>Valor<input type="number" step="0.01" min="0.01" name="value" value="${tr?.value??''}" required></label>
+    <label>Valor<input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" data-min="0.01" name="value" value="${decimalInputValue(tr?.value??'')}" required></label>
     <button class="btn primary">${tr?'Salvar alterações':'Transferir'}</button>
   </form>`)
 }
 function addTransfer(e){
   e.preventDefault();
-  let f=new FormData(e.target),from=+f.get('from'),to=+f.get('to'),value=+f.get('value');
+  let f=new FormData(e.target),from=+f.get('from'),to=+f.get('to'),value=parseDecimalBR(f.get('value'));
   if(from===to)return toast('Escolha contas diferentes');
   if(!from||!to||!(value>0))return toast('Informe contas e um valor válido');
   const id=uid(),date=f.get('date');
@@ -2994,7 +3119,7 @@ function addTransfer(e){
 function saveTransferEdit(e,id){
   e.preventDefault();
   const tr=db.transfers.find(x=>x.id==id); if(!tr)return;
-  const f=new FormData(e.target),from=+f.get('from'),to=+f.get('to'),value=+f.get('value'),date=f.get('date');
+  const f=new FormData(e.target),from=+f.get('from'),to=+f.get('to'),value=parseDecimalBR(f.get('value')),date=f.get('date');
   if(from===to)return toast('Escolha contas diferentes');
   if(!from||!to||!(value>0))return toast('Informe contas e um valor válido');
   const fromTx=db.transactions.find(x=>x.id==tr.fromTxId) || db.transactions.find(x=>x.transferId==tr.id&&x.type==='despesa');
@@ -3017,7 +3142,7 @@ function openCard(id){
 let c=id?db.cards.find(x=>x.id==id):null;
 openModal(c?'Editar cartão':'Novo cartão',`<form class="form" onsubmit="saveCard(event,${id||0})">
 <label>Nome do cartão<input name="name" value="${esc(c?.name||'')}" required placeholder="Meu cartão"></label>
-<div class="row"><label>Bandeira<input name="brand" value="${esc(c?.brand||'')}"></label><label>Limite<input type="number" step="0.01" name="limit" value="${c?.limit||0}"></label></div>
+<div class="row"><label>Bandeira<input name="brand" value="${esc(c?.brand||'')}"></label><label>Limite<input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" name="limit" value="${decimalInputValue(c?.limit||0)}"></label></div>
 <div class="row"><label>Fechamento<input type="number" name="close" min="1" max="31" value="${c?.close||''}"></label><label>Vencimento<input type="number" name="due" min="1" max="31" value="${c?.due||''}"></label></div>
 <label>Conta vinculada<select name="accountId"><option value="">Nenhuma</option>${[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0)).map(a=>`<option value="${a.id}" ${String(c?.accountId||'')===String(a.id)?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>
 <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="hasAdditional" ${c?.hasAdditional?'checked':''}> Possui cartão adicional</label>
@@ -3027,7 +3152,7 @@ openModal(c?'Editar cartão':'Novo cartão',`<form class="form" onsubmit="saveCa
 }
 function saveCard(e,id){
 e.preventDefault();let f=new FormData(e.target);
-let data={name:f.get('name'),brand:f.get('brand'),limit:+f.get('limit')||0,close:+f.get('close')||0,due:+f.get('due')||0,accountId:+f.get('accountId')||0,hasAdditional:f.get('hasAdditional')==='on',additionalName:String(f.get('additionalName')||'').trim()};
+let data={name:f.get('name'),brand:f.get('brand'),limit:parseDecimalBR(f.get('limit'))||0,close:+f.get('close')||0,due:+f.get('due')||0,accountId:+f.get('accountId')||0,hasAdditional:f.get('hasAdditional')==='on',additionalName:String(f.get('additionalName')||'').trim()};
 if(id)Object.assign(db.cards.find(x=>x.id==id),data);else db.cards.push({id:uid(),...data,order:db.cards.length});
 save();closeModal();toast(id?'Cartão alterado':'Cartão cadastrado');render()
 }
@@ -3133,7 +3258,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v71',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v72',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
@@ -3253,4 +3378,3 @@ window.addEventListener('load',()=>{
 });
 </script>
 </body>
-</html>
