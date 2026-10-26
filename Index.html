@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#17202a">
 <meta name="format-detection" content="telephone=no">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
-<title>Ricas Finança</title>
+<title>Ricas Finanças</title>
 <style>
 :root{--bg:#f5f7fb;--card:#fff;--text:#17202a;--muted:#6b7280;--primary:#246bfe;--green:#159447;--red:#d92d20;--amber:#d98c00;--border:#e6e9ef;--shadow:0 8px 24px #17202a12}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
@@ -416,91 +416,54 @@ tr.group-hl td{background:#eef3ff;font-weight:700}
 input[data-decimal]{font-variant-numeric:tabular-nums}
 @media(max-width:1180px){#recCardWrap,#recCardWrap label,#recCardWrap select{width:100%;min-width:0;max-width:100%}}
 </style>
-
-<style id="responsive-v73">
-/* Layout por espaço disponível; sem alterar cálculos ou armazenamento. */
-:root{--sidebar-width:250px}
+<style id="v74-layout">
+/* Mantém os ajustes de tablet e evita comprimir tabelas tradicionais. */
 .main{min-width:0;padding-top:calc(var(--toph) + 16px)}
-.main,#content,.grid>*{min-width:0}
-.top{gap:12px}.top>div:first-child{min-width:0}.top h1{line-height:1.3}
+#content,.grid>*{min-width:0}
 .month-nav,.summary-page .month-nav{top:var(--toph)}
-.table-wrap{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
-.table{table-layout:auto;line-height:1.45}
-.table th,.table td{vertical-align:middle;padding:12px;word-break:normal;overflow-wrap:break-word}
 .table td::after{display:none!important}
-.table td.red,.table td.blue,.table td.confirm-cell{white-space:nowrap;font-variant-numeric:tabular-nums}
-.table .sort-th{gap:6px;line-height:1.3}
-.table td .btn{min-height:40px;white-space:nowrap}
-.table td .muted{line-height:1.45}
-.form,.row,.form label{min-width:0}
-.metric .value{font-variant-numeric:tabular-nums}
-@media(min-width:1181px){
- table.table.rt{min-width:var(--readable-table-width,600px);table-layout:auto!important}
- .table td{max-width:340px}
- .table td:first-child{white-space:nowrap}
- .table td.rt-wide{min-width:180px;white-space:normal}
- .table th:has(.sort-th[onclick*="value"]),.table td.red,.table td.blue{text-align:right}
- .table td.confirm-cell{text-align:center}
- .table td.rec-actions{min-width:180px;white-space:normal}
- .rec-table td.rec-actions .btn{display:inline-block;width:auto;margin:3px}
- .grid.g2:has(.budget-cat-row){grid-template-columns:minmax(0,1fr)}
+.table{line-height:1.45}
+.table th,.table td{padding:12px;word-break:normal;overflow-wrap:break-word}
+.table td.red,.table td.blue{white-space:nowrap;font-variant-numeric:tabular-nums}
+@media(min-width:1181px){table.table.rt{min-width:var(--readable-table-width,600px);table-layout:auto!important}.table td.rt-wide{min-width:180px;white-space:normal}.table-wrap{overflow-x:auto}}
+@media(max-width:1180px){
+ table.table.rt,table.table.rt tbody{display:block;min-width:0!important;table-layout:auto!important}
+ table.table.rt tr{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px 18px;padding:16px;margin:12px 0}
+ table.table.rt tr.rt-head{display:none}
+ table.table.rt tr.rt-head.sortable-header{display:flex;flex-wrap:wrap;padding:0;gap:8px}
+ table.table.rt td{display:block;grid-column:span 3;min-width:0;max-width:100%;padding:0;border:0;white-space:normal!important;word-break:normal;overflow-wrap:break-word;font-size:15px;line-height:1.5}
+ table.table.rt td.rt-wide,table.table.rt td[colspan]{grid-column:1/-1;min-width:0}
+ table.table.rt td.red,table.table.rt td.blue{white-space:nowrap!important}
+ table.table.rt td.rt-btn,table.table.rt td.confirm-cell{grid-column:span 2;align-self:end}
+ table.table.rt td.rt-btn .btn{width:100%;min-height:44px}
+ table.table.rt td.rec-actions{grid-column:1/-1!important;display:flex;flex-wrap:wrap;gap:8px}
+ .top .actions{flex-wrap:wrap;overflow:visible}
+ .summary-page>.grid.g2,#reportOutput>.grid.g2,#content>.grid.g2:has(.budget-cat-row),#content>.grid.g2:has(.table-wrap){grid-template-columns:minmax(0,1fr)}
+ .month-nav,.summary-page .month-nav{margin:0 0 14px!important;top:var(--toph)!important}
 }
 @media(min-width:561px) and (max-width:1180px){
  .main{padding-left:20px!important;padding-right:20px!important}
- .top{padding-left:20px!important;padding-right:20px!important}
- .top h1{font-size:22px}
- .top .actions{flex-wrap:wrap;overflow:visible}
- .grid.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
- .summary-page>.grid.g2,#reportOutput>.grid.g2,#reportOutput .grid.g2:has(.summary-pie),#content>.grid.g2:has(.budget-cat-row),#content>.grid.g2:has(.table-wrap){grid-template-columns:minmax(0,1fr)}
- .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
  .modal{align-items:center;padding:24px!important}
- .modalbox{width:min(720px,100%)!important;max-width:720px!important;border-radius:16px;max-height:88vh}
+ .modalbox{width:min(720px,100%)!important;max-width:720px!important;border-radius:16px}
  #modalBody .row{grid-template-columns:repeat(2,minmax(0,1fr))!important}
- .report-content-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
- .report-content-actions{display:flex;flex-wrap:wrap}
- .report-content-actions .btn{width:auto}
 }
-@media(max-width:1180px){
- table.table.rt,table.table.rt tbody{display:block;min-width:0!important;table-layout:auto!important}
- table.table.rt tr{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px 18px;padding:16px;margin:12px 0;border-radius:12px}
- table.table.rt tr.rt-head{display:none}
- table.table.rt tr.rt-head.sortable-header{display:flex;gap:8px;margin:14px 0;padding:0}
- table.table.rt td{display:block;grid-column:span 3;min-width:0;max-width:100%;padding:0;border:0;white-space:normal!important;overflow-wrap:break-word;word-break:normal;font-size:15px;line-height:1.5;text-align:left}
- table.table.rt td::before{font-size:11px;line-height:1.4;margin-bottom:4px;font-weight:600}
- table.table.rt td.rt-wide,table.table.rt td[colspan]{grid-column:1/-1;min-width:0}
- table.table.rt td.rt-wide{font-size:16px;line-height:1.5}
- table.table.rt td.red,table.table.rt td.blue{white-space:nowrap!important;font-weight:600}
- table.table.rt td.rt-btn,table.table.rt td.confirm-cell{grid-column:span 2;align-self:end}
- table.table.rt td.confirm-cell{text-align:center}
- table.table.rt td.rt-btn .btn{width:100%;min-height:44px;margin:0}
- table.table.rt td.rec-actions{grid-column:1/-1!important;display:flex;gap:8px;flex-wrap:wrap}
- table.table.rt td.rec-actions .btn{flex:1 1 130px;width:auto;min-height:44px}
- table.table.rt .pill{white-space:normal;max-width:100%}
- .table-wrap{overflow:visible}
- .table td:first-child{min-width:0}
- .summary-pie-legend{min-width:0;max-width:100%}
- .summary-pie-legend-item{flex-wrap:wrap}
- .summary-pie-legend-item>span:nth-child(2){flex:1 1 140px!important}
- .month-nav,.summary-page .month-nav{margin:0 0 14px!important;top:var(--toph)!important}
- .top .actions .btn{min-height:44px}
- .budget-group-head{flex-wrap:wrap}
- .report-detail-table td:nth-child(5){white-space:normal}
- .mobilebar{z-index:45}
-}
-@media(max-width:560px){
- .top .actions{flex-wrap:wrap;overflow:visible}
- .top .actions .btn{flex:1 1 140px;padding:9px 8px;font-size:14px}
- .top h1{font-size:20px}
- .g2,.row{grid-template-columns:minmax(0,1fr)}
- table.table.rt tr{gap:12px;padding:13px}
- table.table.rt td{font-size:14px}
- table.table.rt td.rt-wide{font-size:15px}
- .card{padding:12px}
- .metric .value{font-size:clamp(16px,4.5vw,21px)!important}
- .report-content-grid{grid-template-columns:minmax(0,1fr)}
-}
+/* Distribuição real × meta: não usa mais tabela dentro de flexbox. */
+.distribution-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;width:100%;min-width:0;margin-top:14px}
+.distribution-chart{width:min(100%,260px);min-width:0;justify-self:center}
+.distribution-chart svg{display:block;width:100%;height:auto;aspect-ratio:1}
+.distribution-chart .summary-pie-empty{padding:16px;line-height:1.5}
+.distribution-data,.distribution-groups{width:100%;min-width:0;max-width:100%}
+.distribution-groups{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.distribution-group{min-width:0;border:1px solid var(--border);border-left:4px solid var(--group-color);border-radius:10px;padding:12px;background:#fff}
+.distribution-group h3{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:15px;line-height:1.4;word-break:normal;overflow-wrap:normal}
+.distribution-dot{width:9px;height:9px;border-radius:50%;background:var(--group-color);flex:0 0 auto}
+.distribution-group dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
+.distribution-group dl>div{min-width:0}
+.distribution-group dt{font-size:11px;color:var(--muted);line-height:1.4;word-break:normal;overflow-wrap:normal;margin:0 0 5px}
+.distribution-group dd{font-size:14px;font-weight:600;line-height:1.4;margin:0;white-space:nowrap;font-variant-numeric:tabular-nums}
+.distribution-selected{background:#eef3ff}
+@media(max-width:360px){.distribution-group dl{grid-template-columns:minmax(0,1fr)}.distribution-group dl>div{display:flex;justify-content:space-between;gap:8px}.distribution-group dt{margin:0}}
 </style>
-
 </head>
 <body>
 <div class="app">
@@ -1868,10 +1831,14 @@ function budgetReportHtml(r,af,gf){
   const active=pieItems.filter(x=>x.v>0);
   const totConf=active.reduce((s,x)=>s+x.v,0);
   const pie=active.length?`<svg viewBox="0 0 100 100" role="img" aria-label="Distribuição real dos gastos por grupo">${summaryPieGeometry(active).map(g=>`<path d="${g.path}" fill="${g.c.color}" stroke="#fff" stroke-width="1.2"><title>${esc(g.c.name)} — ${money(g.v)} (${g.percent.toFixed(1)}%)</title></path>`).join('')}<circle cx="50" cy="50" r="24" fill="#fff"/><text x="50" y="48" text-anchor="middle" font-size="5" fill="#6b7280">Realizado</text><text x="50" y="55" text-anchor="middle" font-size="5.2" font-weight="700" fill="#17202a">${esc(money(totConf))}</text></svg>`:'<div class="summary-pie-empty">Sem despesas confirmadas no período.</div>';
-  const pieLegend=`<table class="table"><tr><th>Grupo</th><th>% real da receita</th><th>% meta</th><th>Desvio</th></tr>${pieItems.map(x=>{
-    const real=bd.income?x.v/bd.income*100:0, dev=x.meta==null?null:real-x.meta;
+  const pieLegend=`<div class="distribution-groups">${pieItems.map(x=>{
+    const real=bd.income?x.v/bd.income*100:0,dev=x.meta==null?null:real-x.meta;
     const hl=gf!=='all'&&String(x.c.id)===(gf==='none'?'':gf);
-    return `<tr${hl?' class="group-hl"':''}><td><span class="cat-dot" style="background:${x.c.color}"></span>${x.icon} ${esc(x.c.name)}</td><td>${fmtPct(real)}</td><td>${x.meta==null?'—':fmtPct(x.meta)}</td><td class="${dev==null?'':(dev>0?'red':'blue')}">${dev==null?'—':(dev>0?'+':'')+dev.toFixed(1)+' p.p.'}</td></tr>`;}).join('')}</table>`;
+    return `<section class="distribution-group${hl?' distribution-selected':''}" style="--group-color:${x.c.color}">
+      <h3><span class="distribution-dot"></span><span>${x.icon} ${esc(x.c.name)}</span></h3>
+      <dl><div><dt>Real / receita</dt><dd>${fmtPct(real)}</dd></div><div><dt>Meta</dt><dd>${x.meta==null?'—':fmtPct(x.meta)}</dd></div><div><dt>Desvio</dt><dd class="${dev==null?'':dev>0?'red':'blue'}">${dev==null?'—':(dev>0?'+':'')+dev.toFixed(1)+' p.p.'}</dd></div></dl>
+    </section>`;
+  }).join('')}</div>`;
   const monthUse=bd.months.map(m=>{
     const pm=bd.perMonth[m];
     return {m,vals:shownGroups.map(g=>{const pl=pm.income*g.pct/100,v=pm.g[g.key].total;return {g,pl,v,u:pl>0?v/pl*100:(v>0?100:0)};})};
@@ -1891,7 +1858,7 @@ function budgetReportHtml(r,af,gf){
         <div class="bgr-legend"><span><i style="background:#9ca3af;opacity:.35"></i>Planejado</span><span><i style="background:#9ca3af"></i>Realizado (confirmado)</span><span><i style="background:#9ca3af;opacity:.35;background-image:repeating-linear-gradient(45deg,transparent 0 3px,#fff8 3px 6px)"></i>Comprometido (inclui pendentes)</span></div>
         ${bars}</div>
       <div class="card"><h2>Distribuição real × meta</h2>
-        <div class="summary-pie-wrap"><div class="summary-pie" style="max-width:260px">${pie}</div><div class="summary-pie-legend" style="max-height:none"><div class="table-wrap">${pieLegend}</div></div></div></div>
+        <div class="distribution-layout"><div class="distribution-chart">${pie}</div><div class="distribution-data">${pieLegend}</div></div></div>
     </div>
     ${evo}
   </div>`;
@@ -2805,7 +2772,7 @@ function enhanceResponsiveTables(root){
     if(!head)return;
     const labels=[];[...head.cells].forEach(c=>{const t=c.textContent.replace(/[↕↑↓]/g,'').trim();for(let k=0;k<(c.colSpan||1);k++)labels.push(k?'':t);});
     tb.classList.add('rt');head.classList.add('rt-head');
-    const count=labels.length;tb.style.setProperty('--readable-table-width',(count>=8?1120:count>=6?920:count>=5?780:count>=4?620:480)+'px');
+    tb.style.setProperty('--readable-table-width',(labels.length>=8?1120:labels.length>=6?920:labels.length>=5?780:600)+'px');
     rows.forEach(r=>{
       if(r===head||r.dataset.rtDone)return;
       r.dataset.rtDone='1';
@@ -3345,7 +3312,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v73',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v74',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
