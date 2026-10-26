@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#17202a">
 <meta name="format-detection" content="telephone=no">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
-<title>Ricas Finanças</title>
+<title>Ricas Finança</title>
 <style>
 :root{--bg:#f5f7fb;--card:#fff;--text:#17202a;--muted:#6b7280;--primary:#246bfe;--green:#159447;--red:#d92d20;--amber:#d98c00;--border:#e6e9ef;--shadow:0 8px 24px #17202a12}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
@@ -417,7 +417,6 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 @media(max-width:1180px){#recCardWrap,#recCardWrap label,#recCardWrap select{width:100%;min-width:0;max-width:100%}}
 </style>
 <style id="v74-layout">
-/* Mantém os ajustes de tablet e evita comprimir tabelas tradicionais. */
 .main{min-width:0;padding-top:calc(var(--toph) + 16px)}
 #content,.grid>*{min-width:0}
 .month-nav,.summary-page .month-nav{top:var(--toph)}
@@ -447,7 +446,6 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
  .modalbox{width:min(720px,100%)!important;max-width:720px!important;border-radius:16px}
  #modalBody .row{grid-template-columns:repeat(2,minmax(0,1fr))!important}
 }
-/* Distribuição real × meta: não usa mais tabela dentro de flexbox. */
 .distribution-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;width:100%;min-width:0;margin-top:14px}
 .distribution-chart{width:min(100%,260px);min-width:0;justify-self:center}
 .distribution-chart svg{display:block;width:100%;height:auto;aspect-ratio:1}
@@ -463,6 +461,20 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 .distribution-group dd{font-size:14px;font-weight:600;line-height:1.4;margin:0;white-space:nowrap;font-variant-numeric:tabular-nums}
 .distribution-selected{background:#eef3ff}
 @media(max-width:360px){.distribution-group dl{grid-template-columns:minmax(0,1fr)}.distribution-group dl>div{display:flex;justify-content:space-between;gap:8px}.distribution-group dt{margin:0}}
+</style>
+<style id="report-date-fit-v75">
+/* Safari/iOS: a largura intrínseca da data não pode determinar a largura da coluna. */
+#content .report-filters-card{min-width:0;max-width:100%;box-sizing:border-box}
+#content .report-filters-card .report-filter-grid{grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:12px}
+#content .report-filters-card .report-filter-grid>label{display:grid;grid-template-columns:minmax(0,1fr);min-width:0!important;max-width:100%;gap:6px;box-sizing:border-box}
+#content .report-filters-card .report-filter-grid input,
+#content .report-filters-card .report-filter-grid select{display:block;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box;margin:0;min-height:44px;font-size:16px}
+#content .report-filters-card input[type="date"]{-webkit-appearance:none;appearance:none;inline-size:100%;min-inline-size:0;max-inline-size:100%;text-align:left;line-height:1.4;padding:10px 12px;overflow:hidden}
+#content .report-filters-card input[type="date"]::-webkit-date-and-time-value{min-width:0;text-align:left;white-space:nowrap}
+#content .report-filters-card input[type="date"]::-webkit-datetime-edit{min-width:0;padding:0}
+#content .report-filters-card select{text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+@media(min-width:601px) and (max-width:1180px){#content .report-filters-card .report-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:600px){#content .report-filters-card .report-filter-grid{grid-template-columns:minmax(0,1fr)!important}.report-filters-card{padding:14px!important}}
 </style>
 </head>
 <body>
@@ -1627,15 +1639,15 @@ function syncReportDates(){
 }
 function report(){
   document.getElementById('topActions').innerHTML='';
-  document.getElementById('content').innerHTML=`${monthNav()}<div class="card"><h1>Relatórios</h1>
-  <div class="grid g3">
+  document.getElementById('content').innerHTML=`${monthNav()}<div class="card report-filters-card"><h1>Relatórios</h1>
+  <div class="grid g3 report-filter-grid">
   <label>Período<select id="reportPeriod"><option value="monthly">Mensal</option><option value="semester">Semestral</option><option value="annual">Anual</option><option value="custom">Personalizado</option></select></label>
   <label>Início<input type="date" id="reportStart"></label><label>Fim<input type="date" id="reportEnd"></label></div>
-  <div class="grid g3" style="margin-top:10px">
+  <div class="grid g3 report-filter-grid" style="margin-top:10px">
   <label>Conta<select id="reportAccount"><option value="all">Todas as contas</option>${db.accounts.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select></label>
   <label>Tipo<select id="reportType"><option value="all">Receitas e despesas</option><option value="receita">Receitas</option><option value="despesa">Despesas</option></select></label>
   <label>Categoria<select id="reportCategory"><option value="all">Todas as categorias</option>${db.categories.map(c=>`<option value="${c.id}">${esc(categoryIcon(c.id))} ${esc(c.name)}</option>`).join('')}</select></label></div>
-  <div class="grid g3" style="margin-top:10px">
+  <div class="grid g3 report-filter-grid" style="margin-top:10px">
   <label>Grupo do orçamento<select id="reportGroup">${groupFilterOptions(window.reportGroupFilter||'all')}</select></label></div>
   <details class="report-content-picker" open>
     <summary>⚙️ Conteúdo do relatório</summary>
@@ -3312,7 +3324,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v74',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v75',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
