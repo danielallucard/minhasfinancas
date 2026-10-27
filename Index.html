@@ -547,6 +547,24 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
   #modalBody .tx-form>button.primary{position:sticky;bottom:calc(-18px - env(safe-area-inset-bottom));z-index:3;border-radius:10px;box-shadow:0 -7px 18px #fff}
 }
 </style>
+<style id="invoice-category-v81">
+/* Automatização: categoria ocupa toda a largura quando o lançamento usa cartão. */
+#modalBody .rec-account-category-row.card-payment-active{grid-template-columns:minmax(0,1fr)!important}
+#modalBody .rec-account-category-row.card-payment-active #recurrenceCategoryPicker{width:100%;max-width:100%;min-width:0}
+#modalBody #recurrenceCategoryOptions{left:0!important;right:0!important;width:100%!important;max-width:100%!important;box-sizing:border-box}
+#modalBody #recurrenceCategoryOptions .category-option{display:flex;align-items:center;gap:10px;min-width:0}
+#modalBody #recurrenceCategoryOptions .category-option>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#modalBody #recurrenceCategoryOptions .category-option>span.muted{flex:0 0 auto}
+@media(min-width:1181px){#modalBody #recurrenceCategoryOptions{position:absolute!important;max-height:280px!important}}
+@media(max-width:1180px){#modalBody #recurrenceCategoryOptions{position:static!important;max-height:300px!important;margin-top:6px}}
+/* Fatura: total inclui despesas confirmadas e pendentes. */
+.invoice-cycle-nav{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:8px;margin-bottom:14px;padding:8px;border:1px solid var(--border);border-radius:11px;background:#f8fafc;text-align:center}
+.invoice-cycle-nav .btn{width:44px;height:42px;padding:0;font-size:23px}.invoice-cycle-nav span,.invoice-cycle-nav b{display:block}.invoice-cycle-nav b{text-transform:capitalize;margin-top:2px}
+.invoice-total small{display:block;color:var(--muted);font-size:11px;margin-top:3px}.invoice-note{margin:10px 0;padding:10px 12px;border:1px solid #dbe5f5;border-radius:10px;background:#f7faff;font-size:12px;color:#526174}
+.invoice-table td.red{white-space:nowrap}
+@media(max-width:1180px){.invoice-metrics.g4{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:560px){.invoice-metrics.g4{grid-template-columns:minmax(0,1fr)!important}.invoice-cycle-nav{position:sticky;top:48px;z-index:2}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -1209,13 +1227,29 @@ function cardTransactions(cardId,statementMonth){
 function cardStatementTotal(cardId,statementMonth){
   return cardTransactions(cardId,statementMonth).reduce((s,t)=>s+Number(t.value||0),0);
 }
+function suggestedCardStatementMonth(cardId,calendarMonth=selectedMonthKey()){
+  const card=db.cards.find(c=>String(c.id)===String(cardId));
+  const cycles=[...new Set(db.transactions.filter(t=>String(t.cardId)===String(cardId)&&t.type==='despesa'&&!t.virtualCardStatement&&monthKey(t.date)===calendarMonth).map(t=>transactionCardBillingMonth(t,card)))];
+  if(cycles.length===1)return cycles[0];
+  if(cycles.length>1)return cycles.sort().at(-1);
+  return calendarMonth;
+}
+function shiftStatementMonth(month,delta){const [y,m]=String(month).split('-').map(Number);return monthKeyFromDate(new Date(y,m-1+delta,1));}
+
 
 function cardFilterOptions(selected){selected=String(selected||'all');return `<option value="all">Todos os cartões e contas</option><option value="none" ${selected==='none'?'selected':''}>Sem cartão de crédito</option>`+[...db.cards].sort((a,b)=>(a.order||0)-(b.order||0)).map(c=>`<option value="${c.id}" ${selected===String(c.id)?'selected':''}>💳 ${esc(c.name)}</option>`).join('');}
 function matchesCardFilter(t,f){f=String(f||'all');return f==='all'||(f==='none'?!t.cardId:String(t.cardId)===f);}
-function openCardStatement(cardId,m=selectedMonthKey()){
+function openCardStatement(cardId,m){
  const c=db.cards.find(x=>String(x.id)===String(cardId));if(!c)return toast('Cartão não encontrado.');
+ m=m||suggestedCardStatementMonth(cardId,selectedMonthKey());
  const rows=cardTransactions(c.id,m).sort((a,b)=>String(a.date).localeCompare(String(b.date))),sum=xs=>xs.reduce((v,t)=>v+Number(t.value||0),0);
- openModal(`Fatura — ${c.name}`,`<div class="invoice-view"><div class="invoice-head"><div><span class="pill">💳 ${esc(c.brand||'Cartão')}</span><h2>${esc(c.name)}</h2><div class="muted">${monthLabel(m)} · Fecha dia ${c.close||'—'} · Vence dia ${c.due||'—'}</div></div><div class="invoice-total"><span>Total</span><b>${money(sum(rows))}</b></div></div><div class="grid g3 invoice-metrics"><div class="card metric"><div class="label">Principal</div><div class="value red">${money(sum(rows.filter(t=>(t.cardHolder||'principal')==='principal')))}</div></div><div class="card metric"><div class="label">${esc(c.additionalName||'Adicional')}</div><div class="value red">${money(sum(rows.filter(t=>t.cardHolder==='additional')))}</div></div><div class="card metric"><div class="label">Confirmado</div><div class="value blue">${money(sum(rows.filter(t=>t.confirmed)))}</div></div></div><div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Titular</th><th>Categoria</th><th>Grupo</th><th>Valor</th><th>Status</th><th>Ações</th></tr>${rows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(cardHolderLabel(t))}</td><td>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td class="red">− ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td><td><button class="btn" onclick="closeModal();openTx(${t.id})">Editar</button> <button class="btn danger" onclick="closeModal();deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')||'<tr><td colspan="8" class="empty">Nenhuma despesa nesta fatura.</td></tr>'}</table></div></div>`);enhanceResponsiveTables(modalBody);
+ const total=sum(rows),confirmed=sum(rows.filter(t=>t.confirmed===true)),pending=sum(rows.filter(t=>t.confirmed!==true));
+ openModal(`Fatura — ${c.name}`,`<div class="invoice-view">
+   <div class="invoice-cycle-nav"><button class="btn" onclick="openCardStatement('${c.id}','${shiftStatementMonth(m,-1)}')">‹</button><div><span class="muted">Ciclo da fatura</span><b>${monthLabel(m)}</b></div><button class="btn" onclick="openCardStatement('${c.id}','${shiftStatementMonth(m,1)}')">›</button></div>
+   <div class="invoice-head"><div><span class="pill">💳 ${esc(c.brand||'Cartão')}</span><h2>${esc(c.name)}</h2><div class="muted">Fecha dia ${c.close||'—'} · Vence dia ${c.due||'—'}</div></div><div class="invoice-total"><span>Total da fatura</span><b>${money(total)}</b><small>Confirmadas + pendentes</small></div></div>
+   <div class="grid g4 invoice-metrics"><div class="card metric"><div class="label">Principal</div><div class="value red">${money(sum(rows.filter(t=>(t.cardHolder||'principal')==='principal')))}</div></div><div class="card metric"><div class="label">${esc(c.additionalName||'Adicional')}</div><div class="value red">${money(sum(rows.filter(t=>t.cardHolder==='additional')))}</div></div><div class="card metric"><div class="label">Confirmado</div><div class="value blue">${money(confirmed)}</div></div><div class="card metric"><div class="label">Pendente</div><div class="value red">${money(pending)}</div></div></div>
+   ${rows.length?`<div class="invoice-note"><b>${rows.length} despesa(s) no ciclo.</b> Os valores aparecem na fatura mesmo quando ainda estão pendentes.</div>`:''}
+   <div class="table-wrap"><table class="table invoice-table"><tr><th>Data</th><th>Descrição</th><th>Titular</th><th>Categoria</th><th>Grupo</th><th>Valor</th><th>Status</th><th>Ações</th></tr>${rows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(cardHolderLabel(t))}</td><td>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td class="red">− ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td><td><button class="btn" onclick="closeModal();openTx(${t.id})">Editar</button> <button class="btn danger" onclick="closeModal();deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')||`<tr><td colspan="8" class="empty"><b>Nenhuma despesa nesta fatura.</b><br><span class="muted">Use as setas acima para consultar outro ciclo. Compras feitas após o fechamento aparecem na fatura do mês seguinte.</span></td></tr>`}</table></div></div>`);enhanceResponsiveTables(modalBody);
 }
 function cardStatementRows(statementMonth){
   return db.cards.map(c=>{
@@ -1481,7 +1515,7 @@ function openRecurrence(id){
     <label id="recHolderWrap" hidden>Titular<select name="cardHolder" id="recHolderSelect" data-current="${esc(r?.cardHolder||'')}"></select></label>
     <p class="muted" id="recCardHint">Informe o valor de cada parcela ou cobrança mensal, não o valor total da compra. A data da primeira compra/cobrança determina a fatura conforme o fechamento do cartão. As parcelas/cobranças seguintes entram em faturas mensais consecutivas e não debitam diretamente a conta bancária.</p>
   </div>
-  <div class="row">
+  <div class="row rec-account-category-row" id="recAccountCategoryRow">
     <label id="recAccountWrap">Conta<select name="accountId" id="recAccountSelect" required>
       <option value="" disabled ${r?.accountId?'':'selected'}>Selecione uma conta</option>
       ${accounts.map(a=>`<option value="${a.id}" ${sel(r?.accountId,a.id)}>${esc(a.name)}</option>`).join('')}</select></label>
@@ -1521,6 +1555,7 @@ function toggleRecurrencePayment(){
   const cs=document.getElementById('recCardSelect'),ac=document.getElementById('recAccountSelect');
   document.getElementById('recCardWrap').hidden=!useCard;
   document.getElementById('recAccountWrap').hidden=useCard;
+  document.getElementById('recAccountCategoryRow')?.classList.toggle('card-payment-active',useCard);
   cs.disabled=!useCard;cs.required=useCard;
   ac.disabled=useCard;ac.required=!useCard;
   document.getElementById('recDateLabel').textContent=useCard?'Data da primeira compra/cobrança':'Primeiro vencimento';
@@ -1767,7 +1802,7 @@ function renderReport(){
   const gf=document.getElementById('reportGroup')?.value||'all';
   const cardf=document.getElementById('reportCard')?.value||'all';
   const rows=db.transactions.filter(t=>reportDateInRange(t.date,r)).filter(t=>af==='all'||String(t.accountId)===String(af)).filter(t=>tf==='all'||t.type===tf).filter(t=>cf==='all'||String(t.categoryId)===String(cf)).filter(t=>gf==='all'||matchesGroupFilter(t,gf)).filter(t=>gf!=='all'||!t.transfer).filter(t=>matchesCardFilter(t,cardf));
-  const ia=document.getElementById('reportInvoiceAction');if(ia)ia.innerHTML=cardf!=='all'&&cardf!=='none'?`<button class="btn" onclick="openCardStatement('${cardf}','${selectedMonthKey()}')">💳 Abrir fatura de ${monthLabel(selectedMonthKey())}</button>`:'';
+  const ia=document.getElementById('reportInvoiceAction');if(ia)ia.innerHTML=cardf!=='all'&&cardf!=='none'?`<button class="btn" onclick="openCardStatement('${cardf}',suggestedCardStatementMonth('${cardf}',selectedMonthKey()))">💳 Abrir fatura de ${monthLabel(selectedMonthKey())}</button>`:'';
   const inc=rows.filter(t=>t.type==='receita').reduce((s,t)=>s+Number(t.value||0),0),exp=rows.filter(t=>t.type==='despesa').reduce((s,t)=>s+Number(t.value||0),0);
   const byCat={};rows.filter(t=>t.type==='despesa').forEach(t=>{const key=t.transfer?'__inv':t.categoryId;byCat[key]=(byCat[key]||0)+Number(t.value||0);});
   const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]),max=Math.max(...cats.map(x=>x[1]),1);
@@ -2480,7 +2515,7 @@ function transactions(){
             ${[...db.categories].sort((a,b)=>(a.order??0)-(b.order??0)).map(c=>`<option value="${String(c.id)}" ${cf===String(c.id)?'selected':''}>${esc(categoryIcon(c.id))} ${esc(c.name)}</option>`).join('')}
           </select>
         </label>
-        <label style="flex:1;min-width:220px">Cartão de crédito<select id="txCardFilter">${cardFilterOptions(cardf)}</select></label>${cardf!=='all'&&cardf!=='none'?`<button class="btn" onclick="openCardStatement('${cardf}','${k}')">💳 Abrir fatura</button>`:''}<button class="btn" id="txClearFilters">Limpar filtros</button>
+        <label style="flex:1;min-width:220px">Cartão de crédito<select id="txCardFilter">${cardFilterOptions(cardf)}</select></label>${cardf!=='all'&&cardf!=='none'?`<button class="btn" onclick="openCardStatement('${cardf}',suggestedCardStatementMonth('${cardf}','${k}'))">💳 Abrir fatura</button>`:''}<button class="btn" id="txClearFilters">Limpar filtros</button>
       </div>
       <div class="muted" style="margin-bottom:12px">
         ${rows.length} lançamento(s) encontrado(s) em ${monthLabel(k)}.
@@ -3483,7 +3518,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v80',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v81',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
