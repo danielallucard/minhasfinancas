@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#17202a">
 <meta name="format-detection" content="telephone=no">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
-<title>Ricas Finanças — v78</title>
+<title>Ricas Finanças</title>
 <style>
 :root{--bg:#f5f7fb;--card:#fff;--text:#17202a;--muted:#6b7280;--primary:#246bfe;--green:#159447;--red:#d92d20;--amber:#d98c00;--border:#e6e9ef;--shadow:0 8px 24px #17202a12}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
@@ -482,15 +482,38 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 #categoryIconSelect{max-height:280px}
 @media(max-width:1180px){.category-icon-preview{width:100%;min-width:0}.category-icon-preview .muted{font-size:12px}}
 </style>
-<style id="quick-category-v78">
-.tx-new-category-btn{width:100%;margin-top:8px;border-style:dashed;color:var(--primary);font-weight:700}
-.tx-quick-category{margin-top:10px;border:1px solid var(--border);border-radius:12px;padding:12px;background:#f8fafc;display:grid;gap:10px;min-width:0}
+<style id="quick-category-v79">
+/* Criação rápida de categoria dentro da movimentação */
+.tx-new-category-btn{width:100%;min-height:44px;margin-top:8px;border:1px dashed #b9c7e5;background:#f8fbff;color:var(--primary);font-weight:750}
+.tx-new-category-btn:hover{background:#eef4ff;border-color:var(--primary)}
+#modalBody .row.quick-category-open{grid-template-columns:minmax(0,1fr)!important;align-items:start}
+#modalBody .row.quick-category-open>label,#modalBody .row.quick-category-open>.category-picker{width:100%;min-width:0;max-width:100%}
+#modalBody .row.quick-category-open>label{display:grid;align-content:start;height:auto!important;min-height:0!important}
+#modalBody .row.quick-category-open>label select{height:44px!important;min-height:44px!important;max-height:44px!important}
+.tx-quick-category{margin-top:12px;border:1px solid #dbe3f0;border-radius:14px;padding:14px;background:#f8fafc;display:grid;grid-template-columns:minmax(0,1fr);gap:13px;min-width:0;max-width:100%;box-shadow:0 3px 12px #17202a0a}
 .tx-quick-category[hidden]{display:none!important}
-.tx-quick-category-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.tx-quick-category-head .close{font-size:20px}
-.quick-icon-preview{display:flex;align-items:center;gap:9px}.quick-icon-preview>span:first-child{display:grid;place-items:center;width:40px;height:40px;border:1px solid var(--border);border-radius:9px;background:#fff;font-size:24px}
-.tx-quick-category-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
-@media(max-width:560px){.tx-quick-category .row{grid-template-columns:minmax(0,1fr)!important}.tx-quick-category-actions{display:grid;grid-template-columns:minmax(0,1fr)}.tx-quick-category-actions .btn{width:100%}}
+.tx-quick-category-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.tx-quick-category-head b{font-size:16px}.tx-quick-category-head .close{display:grid;place-items:center;width:36px;height:36px;border-radius:9px;font-size:22px}.tx-quick-category-head .close:hover{background:#eef2f7}
+.tx-quick-category .row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px;align-items:start}
+.tx-quick-category label{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:6px;width:100%;min-width:0;color:var(--muted);font-size:12px}
+.tx-quick-category input,.tx-quick-category select{display:block;width:100%!important;min-width:0!important;max-width:100%!important;height:44px;box-sizing:border-box;margin:0}
+.tx-quick-category input[type=color]{padding:5px;cursor:pointer}
+.quick-icon-preview{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--border);border-radius:10px;background:#fff}
+.quick-icon-preview>span:first-child{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border:1px solid var(--border);border-radius:10px;background:#f8fafc;font-size:25px;line-height:1}
+.tx-quick-category-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;padding-top:2px}
+.tx-quick-category-actions .btn{min-height:44px;min-width:135px}.tx-quick-category-actions .primary{order:2}
+@media(min-width:700px){
+  .tx-quick-category{padding:16px}
+  .tx-quick-category-actions{display:grid;grid-template-columns:160px 200px;justify-content:end}
+  .tx-quick-category-actions .btn{width:100%}
+}
+@media(max-width:560px){
+  .tx-quick-category{padding:12px;border-radius:12px}
+  .tx-quick-category .row{grid-template-columns:minmax(0,1fr)!important}
+  .tx-quick-category-actions{display:grid;grid-template-columns:minmax(0,1fr)}
+  .tx-quick-category-actions .btn{width:100%;min-width:0}
+  .tx-quick-category-actions .primary{order:0}
+}
 </style>
 </head>
 <body>
@@ -3079,6 +3102,9 @@ function toggleQuickCategoryForm(show){
   const box=document.getElementById('txQuickCategory'),options=document.getElementById('txCategoryOptions');
   if(!box)return;
   box.hidden=!show;
+  const picker=box.closest('.category-picker'),row=picker?.closest('.row');
+  if(row)row.classList.toggle('quick-category-open',!!show);
+  if(picker)picker.classList.toggle('quick-category-active',!!show);
   if(show){
     if(options)options.style.display='none';
     const txType=document.querySelector('#modalBody form [name="type"]')?.value||'despesa';
@@ -3425,7 +3451,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v78',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v79',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
