@@ -565,6 +565,50 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 @media(max-width:1180px){.invoice-metrics.g4{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 @media(max-width:560px){.invoice-metrics.g4{grid-template-columns:minmax(0,1fr)!important}.invoice-cycle-nav{position:sticky;top:48px;z-index:2}}
 </style>
+<style id="invoice-layout-v82">
+/* Fatura: elimina corte de colunas e transforma a lista em cartões abaixo de 1180 px. */
+#modalBody .invoice-view-v82{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;width:100%;min-width:0;max-width:100%;overflow:hidden}
+#modalBody .invoice-view-v82 .invoice-cycle-nav,#modalBody .invoice-view-v82 .invoice-head,#modalBody .invoice-view-v82 .invoice-metrics,#modalBody .invoice-view-v82 .invoice-note,#modalBody .invoice-view-v82 .invoice-table-wrap{margin:0;min-width:0;max-width:100%}
+#modalBody .invoice-view-v82 .invoice-head{align-items:center}
+#modalBody .invoice-view-v82 .invoice-total{margin-left:auto;min-width:175px;text-align:right}
+#modalBody .invoice-view-v82 .invoice-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+#modalBody .invoice-view-v82 .invoice-metrics .card{min-width:0;padding:13px;box-shadow:none}
+#modalBody .invoice-view-v82 .invoice-metrics .value{font-size:clamp(17px,2.2vw,23px)!important;white-space:nowrap!important}
+#modalBody .invoice-view-v82 .invoice-table-wrap{overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:3px}
+#modalBody .invoice-view-v82 .invoice-table{min-width:940px;table-layout:auto}
+#modalBody .invoice-view-v82 .invoice-table th,#modalBody .invoice-view-v82 .invoice-table td{padding:10px 9px;vertical-align:middle}
+#modalBody .invoice-view-v82 .invoice-table td:nth-child(2){min-width:160px;white-space:normal}
+#modalBody .invoice-view-v82 .invoice-table td:nth-child(4){min-width:120px;white-space:normal}
+#modalBody .invoice-view-v82 .invoice-actions-cell{display:flex;gap:6px;white-space:nowrap}
+@media(max-width:1180px){
+ #modalBody .invoice-view-v82 .invoice-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}
+ #modalBody .invoice-view-v82 .invoice-total{text-align:right;min-width:145px}
+ #modalBody .invoice-view-v82 .invoice-metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ #modalBody .invoice-view-v82 .invoice-table-wrap{overflow:visible;padding:0}
+ #modalBody .invoice-view-v82 .invoice-table{display:block;min-width:0!important;width:100%;table-layout:auto!important}
+ #modalBody .invoice-view-v82 .invoice-table tbody{display:block;width:100%}
+ #modalBody .invoice-view-v82 .invoice-table tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px 14px;width:100%;margin:0 0 10px;padding:13px;border:1px solid var(--border);border-left:4px solid var(--primary);border-radius:11px;background:#fff;box-shadow:0 2px 8px #17202a0b}
+ #modalBody .invoice-view-v82 .invoice-table tr.rt-head{display:none!important}
+ #modalBody .invoice-view-v82 .invoice-table td{display:block;min-width:0!important;max-width:100%;padding:0!important;border:0;white-space:normal!important;overflow-wrap:break-word;font-size:14px}
+ #modalBody .invoice-view-v82 .invoice-table td::before{content:attr(data-label);display:block;margin-bottom:3px;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+ #modalBody .invoice-view-v82 .invoice-table td[data-label="Descrição"],#modalBody .invoice-view-v82 .invoice-table td.invoice-actions-cell{grid-column:1/-1}
+ #modalBody .invoice-view-v82 .invoice-table td.red{white-space:nowrap!important;font-weight:750}
+ #modalBody .invoice-view-v82 .invoice-actions-cell{display:flex;gap:8px}
+ #modalBody .invoice-view-v82 .invoice-actions-cell::before{display:none}
+ #modalBody .invoice-view-v82 .invoice-actions-cell .btn{flex:1 1 0;min-height:42px}
+ #modalBody .invoice-view-v82 .invoice-table td[colspan]{grid-column:1/-1;text-align:center;padding:18px!important}
+}
+@media(max-width:560px){
+ #modalBody .invoice-view-v82{gap:11px}
+ #modalBody .invoice-view-v82 .invoice-head{grid-template-columns:minmax(0,1fr)}
+ #modalBody .invoice-view-v82 .invoice-total{margin:0;text-align:left;min-width:0}
+ #modalBody .invoice-view-v82 .invoice-total b{font-size:25px}
+ #modalBody .invoice-view-v82 .invoice-metrics{grid-template-columns:minmax(0,1fr)!important}
+ #modalBody .invoice-view-v82 .invoice-table tr{grid-template-columns:minmax(0,1fr);gap:9px}
+ #modalBody .invoice-view-v82 .invoice-table td{grid-column:1/-1!important}
+ #modalBody .invoice-view-v82 .invoice-cycle-nav{position:static}
+}
+</style>
 </head>
 <body>
 <div class="app">
@@ -1244,12 +1288,12 @@ function openCardStatement(cardId,m){
  m=m||suggestedCardStatementMonth(cardId,selectedMonthKey());
  const rows=cardTransactions(c.id,m).sort((a,b)=>String(a.date).localeCompare(String(b.date))),sum=xs=>xs.reduce((v,t)=>v+Number(t.value||0),0);
  const total=sum(rows),confirmed=sum(rows.filter(t=>t.confirmed===true)),pending=sum(rows.filter(t=>t.confirmed!==true));
- openModal(`Fatura — ${c.name}`,`<div class="invoice-view">
+ openModal(`Fatura — ${c.name}`,`<div class="invoice-view invoice-view-v82">
    <div class="invoice-cycle-nav"><button class="btn" onclick="openCardStatement('${c.id}','${shiftStatementMonth(m,-1)}')">‹</button><div><span class="muted">Ciclo da fatura</span><b>${monthLabel(m)}</b></div><button class="btn" onclick="openCardStatement('${c.id}','${shiftStatementMonth(m,1)}')">›</button></div>
    <div class="invoice-head"><div><span class="pill">💳 ${esc(c.brand||'Cartão')}</span><h2>${esc(c.name)}</h2><div class="muted">Fecha dia ${c.close||'—'} · Vence dia ${c.due||'—'}</div></div><div class="invoice-total"><span>Total da fatura</span><b>${money(total)}</b><small>Confirmadas + pendentes</small></div></div>
    <div class="grid g4 invoice-metrics"><div class="card metric"><div class="label">Principal</div><div class="value red">${money(sum(rows.filter(t=>(t.cardHolder||'principal')==='principal')))}</div></div><div class="card metric"><div class="label">${esc(c.additionalName||'Adicional')}</div><div class="value red">${money(sum(rows.filter(t=>t.cardHolder==='additional')))}</div></div><div class="card metric"><div class="label">Confirmado</div><div class="value blue">${money(confirmed)}</div></div><div class="card metric"><div class="label">Pendente</div><div class="value red">${money(pending)}</div></div></div>
    ${rows.length?`<div class="invoice-note"><b>${rows.length} despesa(s) no ciclo.</b> Os valores aparecem na fatura mesmo quando ainda estão pendentes.</div>`:''}
-   <div class="table-wrap"><table class="table invoice-table"><tr><th>Data</th><th>Descrição</th><th>Titular</th><th>Categoria</th><th>Grupo</th><th>Valor</th><th>Status</th><th>Ações</th></tr>${rows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(cardHolderLabel(t))}</td><td>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td class="red">− ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td><td><button class="btn" onclick="closeModal();openTx(${t.id})">Editar</button> <button class="btn danger" onclick="closeModal();deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')||`<tr><td colspan="8" class="empty"><b>Nenhuma despesa nesta fatura.</b><br><span class="muted">Use as setas acima para consultar outro ciclo. Compras feitas após o fechamento aparecem na fatura do mês seguinte.</span></td></tr>`}</table></div></div>`);enhanceResponsiveTables(modalBody);
+   <div class="table-wrap invoice-table-wrap"><table class="table invoice-table"><tr><th>Data</th><th>Descrição</th><th>Titular</th><th>Categoria</th><th>Grupo</th><th>Valor</th><th>Status</th><th>Ações</th></tr>${rows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(cardHolderLabel(t))}</td><td>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td class="red">− ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td><td class="invoice-actions-cell"><button class="btn" onclick="closeModal();openTx(${t.id})">Editar</button><button class="btn danger" onclick="closeModal();deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')||`<tr><td colspan="8" class="empty"><b>Nenhuma despesa nesta fatura.</b><br><span class="muted">Use as setas acima para consultar outro ciclo. Compras feitas após o fechamento aparecem na fatura do mês seguinte.</span></td></tr>`}</table></div></div>`);enhanceResponsiveTables(modalBody);
 }
 function cardStatementRows(statementMonth){
   return db.cards.map(c=>{
@@ -3518,7 +3562,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v81',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v82',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
