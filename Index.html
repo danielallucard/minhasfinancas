@@ -515,6 +515,38 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
   .tx-quick-category-actions .primary{order:0}
 }
 </style>
+<style id="transaction-layout-v80">
+/* Nova movimentação: hierarquia, espaçamento e proporções */
+#modalBody .tx-form{gap:14px}
+#modalBody .tx-form>label,#modalBody .tx-form>.row>label,#modalBody .tx-category-field label{font-size:12px;color:var(--muted);gap:6px}
+#modalBody .tx-form input:not([type=checkbox]):not([type=color]),#modalBody .tx-form select{height:44px;min-height:44px;padding:9px 11px;border-radius:9px}
+#modalBody .tx-form>.row{gap:12px;align-items:start}
+#modalBody .tx-account-category-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:12px;align-items:start}
+#modalBody .tx-account-field,#modalBody .tx-category-field{min-width:0;width:100%;align-self:start}
+#modalBody #txAccountSelectModal{height:44px!important;min-height:44px!important;max-height:44px!important}
+#modalBody .tx-category-field #txCategorySearch{height:44px!important}
+#modalBody .tx-new-category-btn{height:44px;margin-top:8px}
+#modalBody .tx-confirmed{display:flex!important;grid-template-columns:none!important;align-items:center;gap:9px;width:max-content;max-width:100%;font-size:14px!important;color:var(--text)!important;margin-top:1px}
+#modalBody .tx-confirmed input{width:19px!important;height:19px!important;min-height:19px!important;margin:0;flex:0 0 19px;accent-color:var(--primary)}
+#modalBody .tx-card-help{margin:0;padding:11px 12px;border:1px solid #dbe5f5;border-radius:10px;background:#f7faff;font-size:12.5px;line-height:1.5;color:#64748b}
+#modalBody .tx-form>button.primary{margin-top:0;min-height:46px;font-weight:750}
+@media(min-width:1181px){
+  #modalBody .tx-form .row:first-of-type{grid-template-columns:minmax(0,.95fr) minmax(0,.95fr)!important}
+  #modalBody .tx-account-category-row{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)!important}
+}
+@media(min-width:561px) and (max-width:1180px){
+  /* Tablet: campos largos em uma coluna; somente Tipo/Data continuam lado a lado. */
+  #modalBody .tx-form>.row{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  #modalBody .tx-account-category-row{grid-template-columns:minmax(0,1fr)!important}
+  #modalBody .tx-category-field{margin-top:0}
+}
+@media(max-width:560px){
+  #modalBody .tx-form>.row,#modalBody .tx-account-category-row{grid-template-columns:minmax(0,1fr)!important}
+  #modalBody .tx-form{gap:12px}
+  #modalBody .tx-card-help{font-size:12px}
+  #modalBody .tx-form>button.primary{position:sticky;bottom:calc(-18px - env(safe-area-inset-bottom));z-index:3;border-radius:10px;box-shadow:0 -7px 18px #fff}
+}
+</style>
 </head>
 <body>
 <div class="app">
@@ -3073,7 +3105,7 @@ function toggleTxConfirmed(id){
 function categoryPickerHtml(selectedId){
   const cats=[...db.categories].sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR',{sensitivity:'base'}));
   const selected=cats.find(c=>String(c.id)===String(selectedId));
-  return `<div class="category-picker" id="txCategoryPicker">
+  return `<div class="category-picker tx-category-field" id="txCategoryPicker">
     <label>Categoria
       <input type="text" id="txCategorySearch" autocomplete="off" placeholder="Digite para pesquisar a categoria..." value="${esc(selected?.name||'')}" oninput="filterTxCategories()" onclick="showTxCategories()" onfocus="showTxCategories()">
       <input type="hidden" name="categoryId" id="txCategoryValue" value="${selectedId??''}">
@@ -3183,7 +3215,7 @@ function openTx(id){
   const today=t?.date||'';
   const title=t?'Editar movimentação':'Nova movimentação';
   const cardId=t?.cardId||'';
-  openModal(title,`<form class="form" onsubmit="${t?`saveTransactionEdit(event,${id})`:`addTx(event)`}">
+  openModal(title,`<form class="form tx-form" onsubmit="${t?`saveTransactionEdit(event,${id})`:`addTx(event)`}">
     <div class="row">
       <label>Tipo<select name="type" required><option value="" disabled ${t?'':'selected'}>Selecione…</option><option value="despesa" ${t?.type==='despesa'?'selected':''}>Despesa</option><option value="receita" ${t?.type==='receita'?'selected':''}>Receita</option></select></label>
       <label>Data de vencimento<input type="date" name="date" value="${today}" required></label>
@@ -3192,12 +3224,12 @@ function openTx(id){
     <label>Valor<input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" data-min="0.01" name="value" value="${decimalInputValue(t?.value||'')}" required placeholder="0,00"></label>
     <label>Cartão de crédito<select name="cardId" id="txCardSelect" onchange="toggleCardAccountFields()"><option value="">Não é compra no cartão</option>${[...db.cards].sort((a,b)=>(a.order??0)-(b.order??0)).map(c=>`<option value="${c.id}" ${String(cardId)===String(c.id)?'selected':''}>💳 ${esc(c.name)}</option>`).join('')}</select></label>
     <label id="txHolderWrap" style="display:${cardId?'block':'none'}">Titular da compra<select name="cardHolder" id="txHolderSelect"></select></label>
-    <div class="row">
-      <label>Conta<select name="accountId" id="txAccountSelectModal" required><option value="" ${t?'':'selected'}>Selecione uma conta</option>${[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0)).map(a=>`<option value="${a.id}" ${!cardId&&t?.accountId==a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>
+    <div class="row tx-account-category-row">
+      <label class="tx-account-field">Conta<select name="accountId" id="txAccountSelectModal" required><option value="" ${t?'':'selected'}>Selecione uma conta</option>${[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0)).map(a=>`<option value="${a.id}" ${!cardId&&t?.accountId==a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>
       ${categoryPickerHtml(t?.categoryId??'')}
     </div>
-    <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="confirmed" ${t?.confirmed?'checked':''}> Movimentação confirmada</label>
-    <p class="muted">Compra no cartão: a despesa entra no controle da fatura, mas não reduz o saldo da conta bancária. A fatura será exibida automaticamente pelo cartão.</p>
+    <label class="tx-confirmed"><input type="checkbox" name="confirmed" ${t?.confirmed?'checked':''}> <span>Movimentação confirmada</span></label>
+    <p class="muted tx-card-help"><b>Compra no cartão:</b> a despesa entra na fatura e não reduz o saldo da conta bancária. A fatura é exibida automaticamente no cartão.</p>
     <button class="btn primary">${t?'Salvar alterações':'Salvar movimentação'}</button>
   </form>`);
   if(cardId){const hs=document.getElementById("txHolderSelect");if(hs)hs.dataset.current=t?.cardHolder||'principal';toggleCardAccountFields();}
@@ -3451,7 +3483,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v79',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v80',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
