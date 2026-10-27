@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#17202a">
 <meta name="format-detection" content="telephone=no">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
-<title>Ricas Finanças</title>
+<title>Ricas Finanças — v78</title>
 <style>
 :root{--bg:#f5f7fb;--card:#fff;--text:#17202a;--muted:#6b7280;--primary:#246bfe;--green:#159447;--red:#d92d20;--amber:#d98c00;--border:#e6e9ef;--shadow:0 8px 24px #17202a12}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
@@ -481,6 +481,16 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 #categoryIconPreview{display:grid;place-items:center;width:42px;height:42px;border-radius:10px;background:#fff;border:1px solid var(--border);font-size:25px;line-height:1}
 #categoryIconSelect{max-height:280px}
 @media(max-width:1180px){.category-icon-preview{width:100%;min-width:0}.category-icon-preview .muted{font-size:12px}}
+</style>
+<style id="quick-category-v78">
+.tx-new-category-btn{width:100%;margin-top:8px;border-style:dashed;color:var(--primary);font-weight:700}
+.tx-quick-category{margin-top:10px;border:1px solid var(--border);border-radius:12px;padding:12px;background:#f8fafc;display:grid;gap:10px;min-width:0}
+.tx-quick-category[hidden]{display:none!important}
+.tx-quick-category-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tx-quick-category-head .close{font-size:20px}
+.quick-icon-preview{display:flex;align-items:center;gap:9px}.quick-icon-preview>span:first-child{display:grid;place-items:center;width:40px;height:40px;border:1px solid var(--border);border-radius:9px;background:#fff;font-size:24px}
+.tx-quick-category-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+@media(max-width:560px){.tx-quick-category .row{grid-template-columns:minmax(0,1fr)!important}.tx-quick-category-actions{display:grid;grid-template-columns:minmax(0,1fr)}.tx-quick-category-actions .btn{width:100%}}
 </style>
 </head>
 <body>
@@ -3048,7 +3058,59 @@ function categoryPickerHtml(selectedId){
     <div id="txCategoryOptions" class="category-options" style="display:none">
       ${cats.map(c=>`<button type="button" class="category-option" data-id="${c.id}" data-name="${esc(c.name)}" onclick="selectTxCategory(${c.id})"><span><span class="category-icon">${esc(c.icon||defaultCategoryIcon(c.name))}</span>${esc(c.name)}</span> <span class="muted">${c.type==='receita'?'Receita':'Despesa'}</span></button>`).join('')}
     </div>
+    <button type="button" class="btn tx-new-category-btn" onclick="toggleQuickCategoryForm(true)">＋ Criar nova categoria</button>
+    <div id="txQuickCategory" class="tx-quick-category" hidden>
+      <div class="tx-quick-category-head"><b>Nova categoria</b><button type="button" class="close" onclick="toggleQuickCategoryForm(false)" aria-label="Fechar">×</button></div>
+      <div class="row">
+        <label>Nome<input type="text" id="txQuickCategoryName" minlength="3" placeholder="Ex.: Supermercado"></label>
+        <label>Tipo<select id="txQuickCategoryType" onchange="toggleQuickCategoryGroup()"><option value="despesa">Despesa</option><option value="receita">Receita</option></select></label>
+      </div>
+      <div class="row">
+        <label>Ícone<select id="txQuickCategoryIcon" onchange="updateQuickCategoryIconPreview()">${categoryIconOptionsHtml('📁')}</select></label>
+        <label>Cor<input type="color" id="txQuickCategoryColor" value="#246bfe"></label>
+      </div>
+      <div class="quick-icon-preview"><span id="txQuickCategoryIconPreview">📁</span><span class="muted">Pré-visualização</span></div>
+      <label id="txQuickCategoryGroupWrap">Grupo do orçamento<select id="txQuickCategoryGroup"><option value="">❔ Sem grupo</option>${BUDGET_GROUPS_DEFAULT.map(g=>`<option value="${g.key}">${g.icon} ${esc(g.name)}</option>`).join('')}</select></label>
+      <div class="tx-quick-category-actions"><button type="button" class="btn" onclick="toggleQuickCategoryForm(false)">Cancelar</button><button type="button" class="btn primary" onclick="createQuickTransactionCategory()">Criar e selecionar</button></div>
+    </div>
   </div>`;
+}
+function toggleQuickCategoryForm(show){
+  const box=document.getElementById('txQuickCategory'),options=document.getElementById('txCategoryOptions');
+  if(!box)return;
+  box.hidden=!show;
+  if(show){
+    if(options)options.style.display='none';
+    const txType=document.querySelector('#modalBody form [name="type"]')?.value||'despesa';
+    const type=document.getElementById('txQuickCategoryType');if(type)type.value=txType==='receita'?'receita':'despesa';
+    toggleQuickCategoryGroup();
+    setTimeout(()=>document.getElementById('txQuickCategoryName')?.focus(),30);
+  }
+}
+function toggleQuickCategoryGroup(){
+  const type=document.getElementById('txQuickCategoryType')?.value,wrap=document.getElementById('txQuickCategoryGroupWrap');
+  if(wrap)wrap.hidden=type!=='despesa';
+}
+function updateQuickCategoryIconPreview(){
+  const value=document.getElementById('txQuickCategoryIcon')?.value,p=document.getElementById('txQuickCategoryIconPreview');if(p)p.textContent=value||'📁';
+}
+function refreshTransactionCategoryPicker(selectedId){
+  const selected=db.categories.find(c=>String(c.id)===String(selectedId));
+  const options=document.getElementById('txCategoryOptions');
+  if(options)options.innerHTML=[...db.categories].sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR',{sensitivity:'base'})).map(c=>`<button type="button" class="category-option" data-id="${c.id}" data-name="${esc(c.name)}" onclick="selectTxCategory(${c.id})"><span><span class="category-icon">${esc(c.icon||defaultCategoryIcon(c.name))}</span>${esc(c.name)}</span> <span class="muted">${c.type==='receita'?'Receita':'Despesa'}</span></button>`).join('');
+  if(selected){document.getElementById('txCategorySearch').value=selected.name;document.getElementById('txCategoryValue').value=String(selected.id);}
+}
+function createQuickTransactionCategory(){
+  const name=String(document.getElementById('txQuickCategoryName')?.value||'').trim();
+  const type=document.getElementById('txQuickCategoryType')?.value||'despesa';
+  const icon=document.getElementById('txQuickCategoryIcon')?.value||'📁';
+  const color=document.getElementById('txQuickCategoryColor')?.value||'#246bfe';
+  const group=type==='despesa'?(document.getElementById('txQuickCategoryGroup')?.value||''):'';
+  if(name.length<3)return toast('Informe um nome com pelo menos 3 caracteres.');
+  const duplicate=db.categories.find(c=>String(c.name||'').trim().toLocaleLowerCase('pt-BR')===name.toLocaleLowerCase('pt-BR')&&c.type===type);
+  if(duplicate){refreshTransactionCategoryPicker(duplicate.id);toggleQuickCategoryForm(false);return toast('Categoria existente selecionada.');}
+  const category={id:uid(),name,type,color,icon,order:db.categories.length,...(type==='despesa'?{budgetGroup:budgetGroupDef(group)?group:''}:{})};
+  db.categories.push(category);normalizeOrders();save();refreshTransactionCategoryPicker(category.id);toggleQuickCategoryForm(false);toast('Categoria criada e selecionada.');
 }
 function showTxCategories(){
   const box=document.getElementById('txCategoryOptions');
@@ -3115,7 +3177,7 @@ function openTx(id){
   if(cardId){const hs=document.getElementById("txHolderSelect");if(hs)hs.dataset.current=t?.cardHolder||'principal';toggleCardAccountFields();}
   const picker=document.getElementById('txCategoryPicker');
   if(picker){
-    picker.addEventListener('focusout',()=>setTimeout(()=>{const box=document.getElementById('txCategoryOptions');if(box&&!picker.contains(document.activeElement))box.style.display='none';},150));
+    picker.addEventListener('focusout',()=>setTimeout(()=>{const box=document.getElementById('txCategoryOptions');if(box&&!picker.contains(document.activeElement)&&document.getElementById('txQuickCategory')?.hidden!==false)box.style.display='none';},150));
   }
 }
 function addTx(e){
@@ -3363,7 +3425,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v77',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v78',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
