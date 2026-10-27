@@ -476,7 +476,13 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 @media(min-width:601px) and (max-width:1180px){#content .report-filters-card .report-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 @media(max-width:600px){#content .report-filters-card .report-filter-grid{grid-template-columns:minmax(0,1fr)!important}.report-filters-card{padding:14px!important}}
 </style>
-<style id="v76-invoice">.report-invoice-action{margin-top:10px}.invoice-head{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}.invoice-head h2{margin:8px 0}.invoice-total span{display:block;color:var(--muted);font-size:12px}.invoice-total b{font-size:25px;color:var(--red)}.invoice-metrics{margin:14px 0}@media(max-width:600px){.invoice-head{display:grid}.invoice-metrics{grid-template-columns:1fr!important}.report-invoice-action .btn{width:100%}}</style></head>
+<style id="v76-invoice">.report-invoice-action{margin-top:10px}.invoice-head{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}.invoice-head h2{margin:8px 0}.invoice-total span{display:block;color:var(--muted);font-size:12px}.invoice-total b{font-size:25px;color:var(--red)}.invoice-metrics{margin:14px 0}@media(max-width:600px){.invoice-head{display:grid}.invoice-metrics{grid-template-columns:1fr!important}.report-invoice-action .btn{width:100%}}</style><style id="category-icons-v77">
+.category-icon-preview{display:flex;align-items:center;gap:10px;border:1px solid var(--border);background:#f8fafc;border-radius:10px;padding:10px 12px}
+#categoryIconPreview{display:grid;place-items:center;width:42px;height:42px;border-radius:10px;background:#fff;border:1px solid var(--border);font-size:25px;line-height:1}
+#categoryIconSelect{max-height:280px}
+@media(max-width:1180px){.category-icon-preview{width:100%;min-width:0}.category-icon-preview .muted{font-size:12px}}
+</style>
+</head>
 <body>
 <div class="app">
 <aside class="sidebar"><div class="brand">💰 Ricas Finanças</div><div class="nav" id="nav"></div></aside>
@@ -3143,12 +3149,30 @@ else db.accounts.push({id:uid(),name:f.get('name'),description:f.get('descriptio
 save();closeModal();toast(id?'Conta alterada':'Conta cadastrada');render()
 }
 function delAccount(id){if(confirm('Excluir a conta e manter os lançamentos?')){db.accounts=db.accounts.filter(a=>a.id!=id);save();render()}}
+const CATEGORY_ICON_GROUPS=[
+  ['Geral',[['📁','Genérico'],['📌','Marcador'],['⭐','Favorito'],['✅','Concluído'],['🧾','Recibo'],['📦','Diversos'],['🔔','Lembrete'],['🗓️','Agenda']]],
+  ['Casa e contas',[['🏠','Moradia'],['🏢','Condomínio'],['💡','Energia'],['💧','Água'],['🔥','Gás'],['📱','Telefone'],['🌐','Internet'],['🧹','Limpeza'],['🛋️','Conforto'],['🧰','Reforma / manutenção'],['🔑','Aluguel'],['🪑','Móveis']]],
+  ['Alimentação',[['🍽️','Alimentação'],['🛒','Supermercado'],['🍎','Hortifruti'],['🥩','Carnes'],['🍞','Padaria'],['☕','Café'],['🍕','Delivery'],['🍔','Lanches'],['🍴','Restaurante'],['🥤','Bebidas']]],
+  ['Transporte e veículo',[['🚗','Automóvel'],['⛽','Combustível'],['🚌','Ônibus'],['🚇','Metrô'],['🚕','Táxi / aplicativo'],['🏍️','Motocicleta'],['🚲','Bicicleta'],['✈️','Passagens aéreas'],['🅿️','Estacionamento'],['🔧','Manutenção veicular'],['🛣️','Pedágio']]],
+  ['Finanças',[['💵','Dinheiro / salário'],['💰','Renda'],['🏦','Banco'],['💳','Cartão'],['🏧','Tarifa bancária'],['📈','Investimentos'],['📉','Prejuízo'],['🪙','Moedas'],['💸','Pagamento'],['🤝','Empréstimo / acordo'],['🧮','Contabilidade'],['🧾','Impostos / tarifas']]],
+  ['Saúde e bem-estar',[['🩺','Saúde / consulta'],['💊','Medicamentos'],['🏥','Hospital'],['🦷','Dentista'],['👓','Óculos'],['🏋️','Academia'],['🧘','Bem-estar'],['🧴','Cuidados pessoais'],['✂️','Salão / barbearia'],['🧠','Terapia']]],
+  ['Educação e trabalho',[['📚','Educação / livros'],['🎓','Faculdade'],['✏️','Papelaria'],['💻','Informática'],['🖥️','Equipamentos'],['🧑‍💼','Trabalho'],['🛠️','Ferramentas'],['📖','Cursos'],['🧪','Estudos'],['🗂️','Documentos']]],
+  ['Lazer e estilo de vida',[['🎉','Lazer'],['🎬','Cinema'],['🎮','Jogos'],['🎵','Música'],['⚽','Esportes'],['🏖️','Viagem / férias'],['🧳','Viagem'],['🎁','Presentes'],['👕','Roupas'],['👟','Calçados'],['💇','Salão'],['📺','Streaming'],['🔁','Assinaturas'],['🐾','Animais']]],
+  ['Família e compromissos',[['👨‍👩‍👧‍👦','Família'],['👶','Crianças'],['🏫','Escola'],['🤝','Doações'],['⛪','Contribuições'],['🛡️','Seguros'],['⚖️','Jurídico'],['🎯','Metas'],['🏆','Objetivos'],['❤️','Relacionamentos']]]
+];
+function categoryIconOptionsHtml(selected){
+  const used=new Set(),groups=CATEGORY_ICON_GROUPS.map(([name,items])=>[name,items.filter(([icon])=>!used.has(icon)&&(used.add(icon),true))]);
+  if(selected&&!used.has(selected))groups.unshift(['Ícone atual',[[selected,'Ícone personalizado já utilizado']]]);
+  return groups.map(([name,items])=>`<optgroup label="${esc(name)}">${items.map(([icon,label])=>`<option value="${icon}" ${selected===icon?'selected':''}>${icon} — ${esc(label)}</option>`).join('')}</optgroup>`).join('');
+}
+function updateCategoryIconPreview(){const s=document.getElementById('categoryIconSelect'),p=document.getElementById('categoryIconPreview');if(s&&p)p.textContent=s.value;}
 function openCategory(id){
 let c=id?db.categories.find(x=>x.id==id):null;
 openModal(c?'Editar categoria':'Nova categoria',`<form class="form" onsubmit="saveCategory(event,${id||0})">
 <label>Nome<input name="name" value="${esc(c?.name||'')}" required minlength="3"></label>
 <label>Tipo<select name="type"><option value="despesa" ${c?.type==='despesa'?'selected':''}>Despesa</option><option value="receita" ${c?.type==='receita'?'selected':''}>Receita</option></select></label>
-<label>Ícone<select name="icon">${[['📁','Genérico'],['🍽️','Alimentação'],['🏠','Moradia / contas domésticas'],['🚗','Transporte / veículo'],['💵','Salário / dinheiro'],['📚','Educação / livros'],['🏦','Empréstimo / banco'],['🤝','Doações'],['🩺','Saúde / medicamentos'],['🏧','Tarifa bancária'],['🎁','Presentes / brinquedos'],['👕','Roupas'],['💇','Salão'],['🔁','Assinaturas'],['🛡️','Seguros'],['💻','Informática'],['🧾','Impostos / tarifas'],['✏️','Papelaria'],['🧰','Reforma / manutenção'],['💳','Cartão / pagamentos'],['🎯','Outros objetivos']].map(([icon,label])=>`<option value="${icon}" ${(c?.icon||defaultCategoryIcon(c?.name))===icon?'selected':''}>${icon} — ${label}</option>`).join('')}</select></label>
+<label>Ícone<select name="icon" id="categoryIconSelect" onchange="updateCategoryIconPreview()">${categoryIconOptionsHtml(c?.icon||defaultCategoryIcon(c?.name))}</select></label>
+<div class="category-icon-preview"><span id="categoryIconPreview">${esc(c?.icon||defaultCategoryIcon(c?.name))}</span><span class="muted">Pré-visualização do ícone selecionado</span></div>
 <label>Cor<input type="color" name="color" value="${c?.color||'#246bfe'}"></label>
 <label>Grupo do orçamento (somente despesas)<select name="budgetGroup"><option value="">❔ Sem grupo</option>${BUDGET_GROUPS_DEFAULT.map(g=>`<option value="${g.key}" ${c?.budgetGroup===g.key?'selected':''}>${g.icon} ${esc(g.name)}</option>`).join('')}</select></label>
 <button class="btn primary">${c?'Salvar alterações':'Salvar'}</button></form>`)
@@ -3339,7 +3363,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v76',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v77',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
