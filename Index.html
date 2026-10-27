@@ -666,6 +666,12 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
  #modalBody .invoice-view-v82 table.invoice-table td.invoice-actions-cell{grid-template-columns:minmax(0,1fr)!important}
 }
 </style>
+<style id="automation-filter-v86">
+.tx-origin-pill{display:inline-block;margin-top:4px;background:#eef3ff;color:#3159bb;font-size:11px;font-weight:650;white-space:nowrap}
+#content .report-filters-card #reportAutomation{min-height:44px}
+.report-detail-table td:nth-child(6){white-space:nowrap}
+@media(max-width:1180px){.tx-origin-pill{white-space:normal}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -1365,6 +1371,37 @@ function txInvoiceNote(t){
 
 function cardFilterOptions(selected){selected=String(selected||'all');return `<option value="all">Todos os cartões e contas</option><option value="none" ${selected==='none'?'selected':''}>Sem cartão de crédito</option>`+[...db.cards].sort((a,b)=>(a.order||0)-(b.order||0)).map(c=>`<option value="${c.id}" ${selected===String(c.id)?'selected':''}>💳 ${esc(c.name)}</option>`).join('');}
 function matchesCardFilter(t,f){f=String(f||'all');return f==='all'||(f==='none'?!t.cardId:String(t.cardId)===f);}
+// ===== Origem do lançamento: parcelada, recorrente ou avulsa (v86) =====
+function txAutomationKind(t){
+  if(!t||t.virtualCardStatement)return 'single';
+  if(t.recurring===true)return 'recurring';
+  const r=t.recurrenceId?db.recurrences.find(x=>x.id===t.recurrenceId):null;
+  if(r)return isRecurring(r)?'recurring':'installment';
+  if(Number(t.totalInstallments)>1)return 'installment';
+  return 'single';
+}
+function matchesAutomationFilter(t,f){
+  f=String(f||'all');
+  if(f==='all')return true;
+  const k=txAutomationKind(t);
+  if(f==='automated')return k!=='single';
+  return k===f;
+}
+function automationFilterOptions(selected){
+  selected=String(selected||'all');
+  return [['all','Parceladas, recorrentes e avulsas'],['installment','🔢 Somente parceladas'],['recurring','🔁 Somente recorrentes'],['automated','⚙️ Parceladas + recorrentes'],['single','✋ Somente avulsas']]
+    .map(([v,l])=>`<option value="${v}" ${selected===v?'selected':''}>${l}</option>`).join('');
+}
+function automationFilterLabel(f){
+  return {all:'Todas',installment:'Somente parceladas',recurring:'Somente recorrentes',automated:'Parceladas + recorrentes',single:'Somente avulsas'}[String(f||'all')]||'Todas';
+}
+function txAutomationLabel(t){
+  const k=txAutomationKind(t);
+  if(k==='installment')return Number(t.totalInstallments)>1?`🔢 Parcela ${t.installment||1}/${t.totalInstallments}`:'🔢 Parcelada';
+  if(k==='recurring')return '🔁 Recorrente';
+  return '✋ Avulsa';
+}
+
 function openCardStatement(cardId,m){
  const c=db.cards.find(x=>String(x.id)===String(cardId));if(!c)return toast('Cartão não encontrado.');
  m=m||suggestedCardStatementMonth(cardId,selectedMonthKey());
@@ -1888,7 +1925,7 @@ function report(){
   <label>Tipo<select id="reportType"><option value="all">Receitas e despesas</option><option value="receita">Receitas</option><option value="despesa">Despesas</option></select></label>
   <label>Categoria<select id="reportCategory"><option value="all">Todas as categorias</option>${db.categories.map(c=>`<option value="${c.id}">${esc(categoryIcon(c.id))} ${esc(c.name)}</option>`).join('')}</select></label></div>
   <div class="grid g3 report-filter-grid" style="margin-top:10px">
-  <label>Grupo do orçamento<select id="reportGroup">${groupFilterOptions(window.reportGroupFilter||'all')}</select></label><label>Cartão de crédito<select id="reportCard">${cardFilterOptions(window.reportCardFilter||'all')}</select></label></div><div id="reportInvoiceAction" class="report-invoice-action"></div>
+  <label>Grupo do orçamento<select id="reportGroup">${groupFilterOptions(window.reportGroupFilter||'all')}</select></label><label>Cartão de crédito<select id="reportCard">${cardFilterOptions(window.reportCardFilter||'all')}</select></label><label>Origem do lançamento<select id="reportAutomation">${automationFilterOptions(window.reportAutomationFilter||'all')}</select></label></div><div id="reportInvoiceAction" class="report-invoice-action"></div>
   <details class="report-content-picker" open>
     <summary>⚙️ Conteúdo do relatório</summary>
     <div class="report-content-actions"><button type="button" class="btn" onclick="setReportSections('all')">Selecionar tudo</button><button type="button" class="btn" onclick="setReportSections('executive')">Somente executivo</button><button type="button" class="btn" onclick="setReportSections('none')">Limpar seleção</button></div>
@@ -1910,6 +1947,7 @@ function report(){
   ['reportStart','reportEnd'].forEach(id=>$(id).onchange=()=>{$('reportPeriod').value='custom';remember();renderReport();});
   ['reportAccount','reportType','reportCategory'].forEach(id=>$(id).addEventListener('change',()=>{remember();renderReport();}));
   document.getElementById('reportCard').onchange=()=>{window.reportCardFilter=document.getElementById('reportCard').value;renderReport();};
+  document.getElementById('reportAutomation').onchange=()=>{window.reportAutomationFilter=document.getElementById('reportAutomation').value;renderReport();};
   document.getElementById('reportGroup').onchange=()=>{window.reportGroupFilter=document.getElementById('reportGroup').value;
     // Limita as categorias às do grupo escolhido
     const gfv=window.reportGroupFilter, cs=document.getElementById('reportCategory'), cur=cs.value;
@@ -1927,7 +1965,8 @@ function renderReport(){
   const af=document.getElementById('reportAccount').value,tf=document.getElementById('reportType').value,cf=document.getElementById('reportCategory').value;
   const gf=document.getElementById('reportGroup')?.value||'all';
   const cardf=document.getElementById('reportCard')?.value||'all';
-  const rows=db.transactions.filter(t=>reportDateInRange(t.date,r)).filter(t=>af==='all'||String(t.accountId)===String(af)).filter(t=>tf==='all'||t.type===tf).filter(t=>cf==='all'||String(t.categoryId)===String(cf)).filter(t=>gf==='all'||matchesGroupFilter(t,gf)).filter(t=>gf!=='all'||!t.transfer).filter(t=>matchesCardFilter(t,cardf));
+  const autof=document.getElementById('reportAutomation')?.value||'all';
+  const rows=db.transactions.filter(t=>reportDateInRange(txCashDate(t),r)).filter(t=>matchesAutomationFilter(t,autof)).filter(t=>af==='all'||String(t.accountId)===String(af)).filter(t=>tf==='all'||t.type===tf).filter(t=>cf==='all'||String(t.categoryId)===String(cf)).filter(t=>gf==='all'||matchesGroupFilter(t,gf)).filter(t=>gf!=='all'||!t.transfer).filter(t=>matchesCardFilter(t,cardf));
   const ia=document.getElementById('reportInvoiceAction');if(ia)ia.innerHTML=cardf!=='all'&&cardf!=='none'?`<button class="btn" onclick="openCardStatement('${cardf}',suggestedCardStatementMonth('${cardf}',selectedMonthKey()))">💳 Abrir fatura de ${monthLabel(selectedMonthKey())}</button>`:'';
   const inc=rows.filter(t=>t.type==='receita').reduce((s,t)=>s+Number(t.value||0),0),exp=rows.filter(t=>t.type==='despesa').reduce((s,t)=>s+Number(t.value||0),0);
   const byCat={};rows.filter(t=>t.type==='despesa').forEach(t=>{const key=t.transfer?'__inv':t.categoryId;byCat[key]=(byCat[key]||0)+Number(t.value||0);});
@@ -1967,10 +2006,10 @@ ${sec.evolution?`<div class="card section"><h2>Evolução por mês</h2><div clas
     const monthCats={};
     monthRows.filter(t=>t.type==='despesa').forEach(t=>monthCats[t.categoryId]=(monthCats[t.categoryId]||0)+Number(t.value||0));
     const catHtml=Object.entries(monthCats).sort((a,b)=>b[1]-a[1]).map(([id,val])=>`<span class="pill" style="margin:3px 5px 3px 0"><span class="cat-dot" style="background:${categoryColor(id)}"></span><span class="category-icon">${esc(categoryIcon(id))}</span>${esc(catName(id))}: ${money(val)}</span>`).join('');
-    return `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">${monthLabel(k)}</h3><div class="grid g3" style="margin-bottom:12px"><div class="metric"><div class="label">Receitas</div><div class="value blue">${money(v.r)}</div></div><div class="metric"><div class="label">Despesas</div><div class="value red">${money(v.d)}</div></div><div class="metric"><div class="label">Saldo mensal</div><div class="value ${(v.r-v.d)<0?'red':'blue'}">${(v.r-v.d)<0?'− ':''}${money(Math.abs(v.r-v.d))}</div></div></div>${catHtml?`<div style="margin-bottom:10px"><div class="muted" style="margin-bottom:5px">Despesas por classificação</div>${catHtml}</div>`:''}<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Grupo</th><th>Tipo</th><th>Valor</th><th>Status</th></tr>${monthRows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(txAccountLabel(t))}</td><td><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td>${t.type==='receita'?'Receita':'Despesa'}</td><td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td></tr>`).join('')||'<tr><td colspan="7">Sem movimentações.</td></tr>'}</table></div></div>`;
+    return `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">${monthLabel(k)}</h3><div class="grid g3" style="margin-bottom:12px"><div class="metric"><div class="label">Receitas</div><div class="value blue">${money(v.r)}</div></div><div class="metric"><div class="label">Despesas</div><div class="value red">${money(v.d)}</div></div><div class="metric"><div class="label">Saldo mensal</div><div class="value ${(v.r-v.d)<0?'red':'blue'}">${(v.r-v.d)<0?'− ':''}${money(Math.abs(v.r-v.d))}</div></div></div>${catHtml?`<div style="margin-bottom:10px"><div class="muted" style="margin-bottom:5px">Despesas por classificação</div>${catHtml}</div>`:''}<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Grupo</th><th>Origem</th><th>Tipo</th><th>Valor</th><th>Status</th></tr>${monthRows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(txAccountLabel(t))}</td><td><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td>${esc(txAutomationLabel(t))}</td><td>${t.type==='receita'?'Receita':'Despesa'}</td><td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td></tr>`).join('')||'<tr><td colspan="7">Sem movimentações.</td></tr>'}</table></div></div>`;
   }).join('')||'<div class="empty">Sem movimentações no período.</div>'}</div>`:''}
-  ${sec.details?`<div class="card section"><h2>Detalhamento das movimentações</h2><div class="table-wrap"><table class="table report-detail-table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Grupo</th><th>Tipo</th><th>Valor</th><th>Status</th></tr>${rows.sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(txAccountLabel(t))}</td><td><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td>${t.type==='receita'?'Receita':'Despesa'}</td><td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td></tr>`).join('')||'<tr><td colspan="7">Sem movimentações.</td></tr>'}</table></div></div>`:''}`;
-  window.currentReportData={rows,inc,exp,budget:budgetReportData(r,af),group:gf,r,af,tf,cf,gf,cardf};
+  ${sec.details?`<div class="card section"><h2>Detalhamento das movimentações</h2><div class="table-wrap"><table class="table report-detail-table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Grupo</th><th>Origem</th><th>Tipo</th><th>Valor</th><th>Status</th></tr>${rows.sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(txAccountLabel(t))}</td><td><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td>${esc(txAutomationLabel(t))}</td><td>${t.type==='receita'?'Receita':'Despesa'}</td><td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td></tr>`).join('')||'<tr><td colspan="7">Sem movimentações.</td></tr>'}</table></div></div>`:''}`;
+  window.currentReportData={rows,inc,exp,budget:budgetReportData(r,af),group:gf,r,af,tf,cf,gf,cardf,autof};
 }
 
 function reportMonthsInRange(r){
@@ -2184,7 +2223,7 @@ function pdfSignedMoney(v){return (v<0?'- ':'')+pdfMoney(Math.abs(v));}
 function generateReportPDF(){
   renderReport();
   const d=window.currentReportData;if(!d)return toast('Verifique o período do relatório.');
-  const {rows,inc,exp,r,af,tf,cf,gf,cardf}=d;
+  const {rows,inc,exp,r,af,tf,cf,gf,cardf,autof}=d;
   if(!rows)return;
   const bd=d.budget;
   const sec=loadReportSections();
@@ -2203,7 +2242,7 @@ function generateReportPDF(){
   pdf.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`,M+CW,60,{size:9,color:'#9fb3c8',align:'right'});
   y=92;
   const typeLbl={all:'Receitas e despesas',receita:'Receitas',despesa:'Despesas'}[tf]||'—';
-  const filt=[`Conta: ${af==='all'?'Todas':accountName(af)}`,`Tipo: ${typeLbl}`,`Categoria: ${cf==='all'?'Todas':catName(cf)}`,`Grupo: ${gf==='all'?'Todos':groupFilterLabel(gf)}`,`Cartão: ${cardf==='all'?'Todos':cardf==='none'?'Sem cartão':cardName(cardf)}`].join('   •   ');
+  const filt=[`Conta: ${af==='all'?'Todas':accountName(af)}`,`Tipo: ${typeLbl}`,`Categoria: ${cf==='all'?'Todas':catName(cf)}`,`Grupo: ${gf==='all'?'Todos':groupFilterLabel(gf)}`,`Cartão: ${cardf==='all'?'Todos':cardf==='none'?'Sem cartão':cardName(cardf)}`,`Origem: ${automationFilterLabel(autof)}`].join('   •   ');
   pdf.rect(M,y,CW,22,C.soft);pdf.text(filt,M+8,y+6.5,{size:8.5,color:C.muted,maxW:CW-16});y+=34;
   // Indicadores
   const res=inc-exp;
@@ -2298,18 +2337,18 @@ function generateReportPDF(){
     months.forEach(k=>{
       const mr=rows.filter(t=>txCashMonth(t)===k).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
       ensure(32+mr.length*16);pdf.text(monthLabel(k),M,y,{size:10,bold:true});y+=15;
-      table([{t:'Data',w:52},{t:'Descrição',w:140},{t:'Categoria',w:90},{t:'Grupo',w:80},{t:'Valor',w:84,a:'right'},{t:'Status',w:CW-446}],
-        mr.map(t=>[fmtDate(t.date),t.description||'',t.transfer?'Aporte em investimentos':catName(t.categoryId),txGroupName(t),(t.type==='receita'?'+ ':'- ')+pdfMoney(t.value),t.confirmed?'Confirmada':'Pendente']),
-        (i,j)=>j===4?(mr[i].type==='receita'?C.blue:C.red):j===5&&!mr[i].confirmed?'#d98c00':C.text);
+      table([{t:'Data',w:50},{t:'Descrição',w:122},{t:'Categoria',w:78},{t:'Grupo',w:68},{t:'Origem',w:64},{t:'Valor',w:78,a:'right'},{t:'Status',w:CW-460}],
+        mr.map(t=>[fmtDate(t.date),t.description||'',t.transfer?'Aporte em investimentos':catName(t.categoryId),txGroupName(t),txAutomationLabel(t),(t.type==='receita'?'+ ':'- ')+pdfMoney(t.value),t.confirmed?'Confirmada':'Pendente']),
+        (i,j)=>j===5?(mr[i].type==='receita'?C.blue:C.red):j===6&&!mr[i].confirmed?'#d98c00':C.text);
     });
   }
   if(sec.details){
   section('Detalhamento das movimentações',60);
   const list=[...rows].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   if(!list.length){pdf.text('Sem movimentações no período.',M,y,{size:9.5,color:C.muted});y+=18;}
-  else table([{t:'Data',w:48},{t:'Descrição',w:115},{t:'Conta',w:70},{t:'Categoria',w:70},{t:'Grupo',w:64},{t:'Valor',w:78,a:'right',b:true},{t:'Status',w:CW-445}],
-    list.map(t=>[fmtDate(t.date),t.description||'',txAccountLabel(t),t.transfer?'Aporte em investimentos':catName(t.categoryId),txGroupName(t),(t.type==='receita'?'+ ':'- ')+pdfMoney(t.value),t.confirmed?'Confirmada':'Pendente']),
-    (i,j)=>j===5?(list[i].type==='receita'?C.blue:C.red):j===6&&!list[i].confirmed?'#d98c00':C.text);
+  else table([{t:'Data',w:46},{t:'Descrição',w:102},{t:'Conta',w:62},{t:'Categoria',w:62},{t:'Grupo',w:56},{t:'Origem',w:62},{t:'Valor',w:72,a:'right',b:true},{t:'Status',w:CW-462}],
+    list.map(t=>[fmtDate(t.date),t.description||'',txAccountLabel(t),t.transfer?'Aporte em investimentos':catName(t.categoryId),txGroupName(t),txAutomationLabel(t),(t.type==='receita'?'+ ':'- ')+pdfMoney(t.value),t.confirmed?'Confirmada':'Pendente']),
+    (i,j)=>j===6?(list[i].type==='receita'?C.blue:C.red):j===7&&!list[i].confirmed?'#d98c00':C.text);
   }
   // Rodapé com numeração
   const total=pdf.pages.length;
@@ -2604,6 +2643,7 @@ function transactions(){
   const tf=String(window.txTypeFilter ?? 'all');
   const cf=String(window.txCategoryFilter ?? 'all');
   const cardf=String(window.txCardFilter ?? 'all');
+  const autof=String(window.txAutomationFilter ?? 'all');
 
   const accounts=[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0));
   const actualRows=[...db.transactions]
@@ -2611,8 +2651,9 @@ function transactions(){
     .filter(t=>af==='all' || String(t.accountId)===af)
     .filter(t=>tf==='all' || String(t.type)===tf)
     .filter(t=>cf==='all' || String(t.categoryId)===cf)
-    .filter(t=>matchesCardFilter(t,cardf));
-  const statementRows=(af==='all'&&cardf==='all'?cardStatementRows(k):[]).filter(t=>tf==='all'||tf==='despesa');
+    .filter(t=>matchesCardFilter(t,cardf))
+    .filter(t=>matchesAutomationFilter(t,autof));
+  const statementRows=(af==='all'&&cardf==='all'&&autof==='all'?cardStatementRows(k):[]).filter(t=>tf==='all'||tf==='despesa');
   const rows=sortTransactions([...actualRows,...statementRows]);
 
   const accountOptions='<option value="all">Todas as contas</option>'+
@@ -2644,7 +2685,8 @@ function transactions(){
             ${[...db.categories].sort((a,b)=>(a.order??0)-(b.order??0)).map(c=>`<option value="${String(c.id)}" ${cf===String(c.id)?'selected':''}>${esc(categoryIcon(c.id))} ${esc(c.name)}</option>`).join('')}
           </select>
         </label>
-        <label style="flex:1;min-width:220px">Cartão de crédito<select id="txCardFilter">${cardFilterOptions(cardf)}</select></label>${cardf!=='all'&&cardf!=='none'?`<button class="btn" onclick="openCardStatement('${cardf}',suggestedCardStatementMonth('${cardf}','${k}'))">💳 Abrir fatura</button>`:''}<button class="btn" id="txClearFilters">Limpar filtros</button>
+        <label style="flex:1;min-width:220px">Cartão de crédito<select id="txCardFilter">${cardFilterOptions(cardf)}</select></label>
+        <label style="flex:1;min-width:220px">Origem do lançamento<select id="txAutomationFilter">${automationFilterOptions(autof)}</select></label>${cardf!=='all'&&cardf!=='none'?`<button class="btn" onclick="openCardStatement('${cardf}',suggestedCardStatementMonth('${cardf}','${k}'))">💳 Abrir fatura</button>`:''}<button class="btn" id="txClearFilters">Limpar filtros</button>
       </div>
       <div class="muted" style="margin-bottom:12px">
         ${rows.length} lançamento(s) encontrado(s) em ${monthLabel(k)}.
@@ -2669,7 +2711,7 @@ function transactions(){
         </tr>
         ${rows.map(t=>`<tr class="${t.virtualCardStatement?'pending-row':(t.confirmed?'':'pending-row')}">
           <td>${fmtDate(t.date)}</td>
-          <td>${t.virtualCardStatement?'💳 ':''}${esc(t.description)}${t.virtualCardStatement?'<br><span class="muted">Total automático da fatura</span>':''}${t.cardId&&!t.virtualCardStatement?`<br><span class="muted" style="font-size:11px">${esc(txInvoiceNote(t))}</span>`:''}</td>
+          <td>${t.virtualCardStatement?'💳 ':''}${esc(t.description)}${t.virtualCardStatement?'<br><span class="muted">Total automático da fatura</span>':''}${t.cardId&&!t.virtualCardStatement?`<br><span class="muted" style="font-size:11px">${esc(txInvoiceNote(t))}</span>`:''}${!t.virtualCardStatement&&txAutomationKind(t)!=='single'?`<br><span class="pill tx-origin-pill">${esc(txAutomationLabel(t))}</span>`:''}</td>
           <td>${esc(txAccountLabel(t))}</td>
           <td>${t.virtualCardStatement?'—':'<span class="cat-dot" style="background:'+categoryColor(t.categoryId)+'"></span><span class="category-icon">'+esc(categoryIcon(t.categoryId))+'</span>'+esc(catName(t.categoryId))}</td>
           <td>${t.type==='receita'?'Receita':'Despesa'}</td>
@@ -2691,7 +2733,9 @@ function transactions(){
   as.onchange=()=>{window.txAccountFilter=as.value; transactions();};
   cs.onchange=()=>{window.txCategoryFilter=cs.value; transactions();};
   cardSel.onchange=()=>{window.txCardFilter=cardSel.value;transactions();};
-  clear.onclick=()=>{window.txTypeFilter='all';window.txAccountFilter='all';window.txCategoryFilter='all';window.txCardFilter='all';transactions();};
+  const autoSel=document.getElementById('txAutomationFilter');
+  if(autoSel)autoSel.onchange=()=>{window.txAutomationFilter=autoSel.value;transactions();};
+  clear.onclick=()=>{window.txTypeFilter='all';window.txAccountFilter='all';window.txCategoryFilter='all';window.txCardFilter='all';window.txAutomationFilter='all';transactions();};
 }
 
 async function confirmAccountMonthPending(accountId, monthKeyValue){
@@ -3647,7 +3691,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v85',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v86',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
