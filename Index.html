@@ -666,6 +666,59 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
  #modalBody .invoice-view-v82 table.invoice-table td.invoice-actions-cell{grid-template-columns:minmax(0,1fr)!important}
 }
 </style>
+<style id="tx-sections-v88">
+/* Separação visual entre o que debita a conta e o que compõe a fatura do cartão. */
+.tx-section-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;margin:22px 0 10px;padding-bottom:8px;border-bottom:2px solid var(--border)}
+.tx-section-head h2{margin:0;font-size:17px}
+.tx-section-head .muted{font-size:12px;flex:1 1 260px;line-height:1.45}
+.tx-section-card{border-bottom-color:#f0c56b}
+.tx-invoice-pill{background:#fff4e2;color:#9a6200;font-weight:700;font-size:11px;white-space:nowrap}
+.tx-card-total{margin:0 0 12px;padding:10px 12px;border:1px solid #f0d9a8;border-radius:10px;background:#fffaf0;font-size:13px}
+.tx-card-group{margin:0 0 14px;border:1px solid var(--border);border-left:4px solid #e8a33d;border-radius:12px;padding:13px;background:#fff}
+.tx-card-group-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}
+.tx-card-group-head .muted{font-size:12px;line-height:1.45}
+.tx-card-group-total{text-align:right;white-space:nowrap}
+.tx-card-group-total span{display:block;font-size:11px}
+.tx-card-group-total b{font-size:18px}
+.tx-card-group-actions{margin-top:10px}
+@media(max-width:1180px){
+  .tx-card-group-head{flex-direction:column}
+  .tx-card-group-total{text-align:left}
+  .tx-card-group-actions .btn{width:100%}
+}
+</style>
+<style id="invoice-cards-v89">
+/* Faturas em cards clicáveis: as compras do cartão não aparecem soltas na lista. */
+.tx-invoice-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;margin-bottom:12px}
+.tx-invoice-card{display:block;width:100%;text-align:left;padding:15px;border:1px solid var(--border);border-left:4px solid #e8a33d;border-radius:13px;background:#fff;cursor:pointer;font:inherit;color:inherit;box-shadow:0 2px 8px #17202a0d;transition:transform .12s,box-shadow .12s,border-color .12s}
+.tx-invoice-card:hover{border-color:#e8a33d;box-shadow:0 6px 18px #17202a1a;transform:translateY(-2px)}
+.tx-invoice-card:active{transform:translateY(0)}
+.tx-invoice-card-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:5px}
+.tx-invoice-card-name{font-weight:750;font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tx-invoice-card-count{flex:0 0 auto;padding:3px 9px;border-radius:999px;background:#f1f5f9;color:#52607a;font-size:11px;font-weight:650;white-space:nowrap}
+.tx-invoice-card-cycle{color:var(--muted);font-size:12px;line-height:1.45;margin-bottom:9px}
+.tx-invoice-card-value{color:var(--red);font-size:25px;font-weight:800;line-height:1.2;font-variant-numeric:tabular-nums}
+.tx-invoice-card-split{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.tx-chip{padding:3px 9px;border-radius:999px;font-size:11px;font-weight:650;white-space:nowrap}
+.tx-chip-pending{background:#fff4e2;color:#9a6200}
+.tx-chip-ok{background:#e9f7ef;color:#126c3c}
+.tx-invoice-card-cta{display:inline-block;margin-top:11px;color:var(--primary);font-size:12.5px;font-weight:700}
+@media(max-width:1180px){
+  .tx-invoice-cards{grid-template-columns:minmax(0,1fr)}
+  .tx-invoice-card{padding:14px}
+  .tx-invoice-card-value{font-size:23px}
+}
+</style>
+<style id="installment-start-v88">
+#recStartIdxWrap{display:grid;gap:7px;min-width:0}
+#recStartIdxWrap[hidden]{display:none!important}
+#recStartIdxInput{max-width:160px}
+#recStartIdxHint{margin:0;font-size:12px;line-height:1.45}
+.rec-range-hint{padding:10px 12px;border:1px solid #cfe0ff;border-radius:10px;background:#f5f9ff;color:#2f4a7a;font-size:12.5px;line-height:1.5}
+.rec-range-hint[hidden]{display:none!important}
+.rec-range-error{border-color:#f3c2bd;background:#fdf3f2;color:#a3372c;font-weight:600}
+@media(max-width:1180px){#recStartIdxInput{max-width:100%}}
+</style>
 <style id="automation-filter-v86">
 .tx-origin-pill{display:inline-block;margin-top:4px;background:#eef3ff;color:#3159bb;font-size:11px;font-weight:650;white-space:nowrap}
 #content .report-filters-card #reportAutomation{min-height:44px}
@@ -1549,6 +1602,15 @@ function installmentDescription(description, installment, total){
 //  r.skip = parcelas excluídas individualmente (não são recriadas); r.endIdx = última ocorrência (recorrência encerrada).
 const RECURRING_AHEAD_MONTHS=12;
 function isRecurring(r){return r&&r.mode==='recurring';}
+// Parcela em que a automatização começa a lançar.
+// Permite cadastrar uma compra já em andamento (ex.: começar na 45/392) sem criar as parcelas passadas.
+// A data informada passa a ser o vencimento dessa parcela inicial.
+function recStartIdx(r){
+  if(!r||isRecurring(r))return 1;
+  const n=Number(r.startIdx);
+  return Number.isFinite(n)&&n>=1?Math.floor(n):1;
+}
+function recOccurrenceDate(r,n){return addMonthsSafe(r.start,Number(n)-recStartIdx(r));}
 function recurrenceHorizonIdx(r){
   const s=new Date(r.start+'T12:00:00');
   const now=new Date();
@@ -1567,11 +1629,11 @@ function generateRecurrence(r){
   const recurring=isRecurring(r);
   let last=recurring?recurrenceHorizonIdx(r):Number(r.count||0);
   if(recurring&&r.endIdx!=null)last=Math.min(last,Number(r.endIdx));
+  const first=recurring?1:recStartIdx(r);
   let added=0;
-  for(let i=0;i<last;i++){
-    const n=i+1;
+  for(let n=first;n<=last;n++){
     if(existingIdx.has(n)||skip.has(n))continue;
-    const date=addMonthsSafe(r.start,i);
+    const date=recOccurrenceDate(r,n);
     if(!recurring&&existingDates.has(date))continue;
     db.transactions.push({
       id:uid(),type:r.type,date,description:recurring?String(r.description||'').trim():installmentDescription(r.description,n,r.count),
@@ -1663,7 +1725,12 @@ function openRecurrence(id){
   <label>Descrição<input name="description" value="${esc(r?.description||'')}" required placeholder="Ex.: Financiamento habitacional"></label>
   <div class="row">
     <label><span id="recValueLabel">Valor de cada parcela</span><input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" data-min="0.01" name="value" value="${decimalInputValue(r?.value??'')}" required placeholder="0,00"></label>
-    <label id="recCountWrap">Número de parcelas<input type="number" inputmode="numeric" min="1" max="1200" name="count" id="recCountInput" value="${r&&!isRecurring(r)?r.count:''}" required placeholder="Ex.: 12"></label>
+    <label id="recCountWrap">Número total de parcelas<input type="number" inputmode="numeric" min="1" max="1200" name="count" id="recCountInput" value="${r&&!isRecurring(r)?r.count:''}" required placeholder="Ex.: 12" oninput="updateInstallmentRangeHint()"></label>
+  </div>
+  <div id="recStartIdxWrap">
+    <label>Começar na parcela nº<input type="number" inputmode="numeric" min="1" max="1200" name="startIdx" id="recStartIdxInput" value="${r&&!isRecurring(r)?recStartIdx(r):1}" placeholder="1" oninput="updateInstallmentRangeHint()"></label>
+    <p class="muted" id="recStartIdxHint">Use <b>1</b> para uma compra nova. Para uma compra <b>já em andamento</b>, informe a próxima parcela a vencer: as anteriores não são lançadas.</p>
+    <div class="rec-range-hint" id="recRangeHint" hidden></div>
   </div>
   <label>Forma de lançamento<select name="paymentMethod" id="recPaymentSelect" onchange="toggleRecurrencePayment()" required>
     <option value="" disabled ${r?'':'selected'}>Selecione…</option>
@@ -1702,10 +1769,39 @@ function toggleRecurrenceMode(){
   if(cw)cw.style.display=rec?'none':'';
   if(ci){ci.required=!rec;ci.disabled=rec;}
   const vl=document.getElementById('recValueLabel');if(vl)vl.textContent=rec?'Valor mensal':'Valor de cada parcela';
+  const sw=document.getElementById('recStartIdxWrap'),si=document.getElementById('recStartIdxInput');
+  if(sw)sw.hidden=rec;
+  if(si)si.disabled=rec;
+  updateInstallmentRangeHint();
   const gw=document.getElementById('recGenerateWrap');if(gw){if(rec)gw.style.setProperty('display','none','important');else gw.style.removeProperty('display');}
   const h=document.getElementById('recRecurringHint');if(h)h.style.display=rec?'':'none';
 }
 
+function updateInstallmentRangeHint(){
+  const box=document.getElementById('recRangeHint');if(!box)return;
+  const recurring=document.getElementById('recModeSelect')?.value==='recurring';
+  const total=Number(document.getElementById('recCountInput')?.value);
+  const startIdx=Number(document.getElementById('recStartIdxInput')?.value)||1;
+  // Rótulo da data acompanha a parcela inicial escolhida.
+  const dateLabel=document.getElementById('recDateLabel');
+  const useCard=document.getElementById('recPaymentSelect')?.value==='card';
+  if(dateLabel&&!recurring){
+    dateLabel.textContent=startIdx>1
+      ? (useCard?`Data da parcela nº ${startIdx}`:`Vencimento da parcela nº ${startIdx}`)
+      : (useCard?'Data da primeira compra/cobrança':'Primeiro vencimento');
+  }
+  if(recurring||!Number.isFinite(total)||total<1){box.hidden=true;return;}
+  if(startIdx>total){
+    box.hidden=false;box.className='rec-range-hint rec-range-error';
+    box.innerHTML=`A parcela inicial (${startIdx}) não pode ser maior que o total (${total}).`;
+    return;
+  }
+  const qtd=total-startIdx+1;
+  box.hidden=false;box.className='rec-range-hint';
+  box.innerHTML=startIdx>1
+    ? `Serão lançadas as parcelas <b>${startIdx}/${total}</b> até <b>${total}/${total}</b> — ${qtd} lançamento(s). As ${startIdx-1} parcelas anteriores não serão criadas.`
+    : `Serão lançadas as parcelas <b>1/${total}</b> até <b>${total}/${total}</b> — ${qtd} lançamento(s).`;
+}
 function toggleRecurrencePayment(){
   const method=document.getElementById('recPaymentSelect'),type=document.getElementById('recTypeSelect');
   if(!method||!type)return;
@@ -1721,7 +1817,7 @@ function toggleRecurrencePayment(){
   document.getElementById('recAccountCategoryRow')?.classList.toggle('card-payment-active',useCard);
   cs.disabled=!useCard;cs.required=useCard;
   ac.disabled=useCard;ac.required=!useCard;
-  document.getElementById('recDateLabel').textContent=useCard?'Data da primeira compra/cobrança':'Primeiro vencimento';
+  updateInstallmentRangeHint();
   const holder=document.getElementById('recHolderSelect'),wrap=document.getElementById('recHolderWrap');
   const card=useCard?db.cards.find(c=>String(c.id)===cs.value):null;
   wrap.hidden=!card;holder.disabled=!card;holder.required=!!card;
@@ -1749,7 +1845,8 @@ function recurrenceOccurrencePayment(r,n,date){
   const card=db.cards.find(c=>String(c.id)===String(r.cardId));
   const first=cardBillingMonth(r.start,card);
   const [y,m]=first.split('-').map(Number);
-  return {...payment,automationBillingMonth:monthKeyFromDate(new Date(y,m+n-2,1)),automationBillingDate:date,automationBillingCardId:card.id};
+  const offset=Number(n)-recStartIdx(r);
+  return {...payment,automationBillingMonth:monthKeyFromDate(new Date(y,m-1+offset,1)),automationBillingDate:date,automationBillingCardId:card.id};
 }
 function saveRecurrence(e,id){
   e.preventDefault();
@@ -1767,17 +1864,21 @@ function saveRecurrence(e,id){
   if(card&&f.get('cardHolder')==='additional'&&!(card.hasAdditional||card.additionalName))return toast('Este cartão não possui adicional.');
   if(!f.get('categoryId'))return toast('Selecione a categoria.');
   const data={mode,type:f.get('type'),start:String(f.get('start')||''),description:String(f.get('description')||'').trim(),
-    value:parseDecimalBR(f.get('value')),count:mode==='recurring'?null:+f.get('count'),accountId:card?(Number(card.accountId)||0):+f.get('accountId'),categoryId:+f.get('categoryId'),cardId:card?card.id:null,cardHolder:card?f.get('cardHolder'):undefined};
+    value:parseDecimalBR(f.get('value')),count:mode==='recurring'?null:+f.get('count'),
+    startIdx:mode==='recurring'?null:Math.max(1,Math.floor(Number(f.get('startIdx'))||1)),accountId:card?(Number(card.accountId)||0):+f.get('accountId'),categoryId:+f.get('categoryId'),cardId:card?card.id:null,cardHolder:card?f.get('cardHolder'):undefined};
   if(!data.start)return toast('Informe o primeiro vencimento.');
   if(!(data.value>0))return toast('Informe um valor maior que zero.');
-  if(mode==='installments'&&!(data.count>=1))return toast('Informe o número de parcelas.');
+  if(mode==='installments'&&!(data.count>=1))return toast('Informe o número total de parcelas.');
+  if(mode==='installments'&&data.startIdx>data.count)return toast(`A parcela inicial (${data.startIdx}) não pode ser maior que o total (${data.count}).`);
   if(!id){
     const r={id:uid(),...data,skip:[],order:db.recurrences.length};
     db.recurrences.push(r);
     let n=0;
     if(mode==='recurring'||f.get('generateNow')==='on')n=generateRecurrence(r);
     save();closeModal();
-    toast(mode==='recurring'?`Recorrência mensal criada (${n} meses já lançados)`:`${r.count} movimentações programadas`);
+    toast(mode==='recurring'
+      ?`Recorrência mensal criada (${n} meses já lançados)`
+      :(r.startIdx>1?`Parcelas ${r.startIdx}/${r.count} a ${r.count}/${r.count} programadas`:`${r.count} movimentações programadas`));
     render();return;
   }
   const r=db.recurrences.find(x=>x.id==id);if(!r)return;
@@ -1795,13 +1896,16 @@ function saveRecurrence(e,id){
     const rec=mode==='recurring';
     pending.forEach(t=>{
       const n=Number(t.installment)||1;
-      Object.assign(t,{type:r.type,value:+r.value,...recurrenceOccurrencePayment(r,n,addMonthsSafe(r.start,n-1)),categoryId:+r.categoryId,
-        date:addMonthsSafe(r.start,n-1),
+      const occDate=rec?addMonthsSafe(r.start,n-1):recOccurrenceDate(r,n);
+      Object.assign(t,{type:r.type,value:+r.value,...recurrenceOccurrencePayment(r,n,occDate),categoryId:+r.categoryId,
+        date:occDate,
         description:rec?r.description:installmentDescription(r.description,n,r.count),
         totalInstallments:rec?null:r.count,recurring:rec||undefined});
     });
     if(!rec){
-      const drop=new Set(pending.filter(t=>(Number(t.installment)||1)>r.count).map(t=>t.id));
+      // Remove pendentes fora do novo intervalo (abaixo da parcela inicial ou acima do total).
+      const first=recStartIdx(r);
+      const drop=new Set(pending.filter(t=>{const n=Number(t.installment)||1;return n>r.count||n<first;}).map(t=>t.id));
       if(drop.size)db.transactions=db.transactions.filter(t=>!drop.has(t.id));
     }
   }
@@ -1852,8 +1956,9 @@ function recurrences(){
   ${[...db.recurrences].sort((a,b)=>(a.order??0)-(b.order??0)).map(r=>{
     const rec=isRecurring(r), ended=rec&&r.endIdx!=null;
     const pill=rec?(ended?'<span class="pill" style="background:#f1f5f9;color:#64748b">🔁 Recorrente · encerrada</span>':'<span class="pill" style="background:#ecfdf5;color:#047857">🔁 Recorrente</span>'):'<span class="pill">🔢 Parcelada</span>';
-    const qty=rec?(ended?`${r.endIdx} mês(es)`:'Todo mês'):r.count;
-    const lastTxt=rec?(ended?(r.endIdx?fmtDate(addMonthsSafe(r.start,r.endIdx-1)):'—'):'Sem fim'):fmtDate(addMonthsSafe(r.start,r.count-1));
+    const first=rec?1:recStartIdx(r);
+    const qty=rec?(ended?`${r.endIdx} mês(es)`:'Todo mês'):(first>1?`${first} a ${r.count}<br><span class="muted" style="font-size:11px">${r.count-first+1} lançamento(s)</span>`:r.count);
+    const lastTxt=rec?(ended?(r.endIdx?fmtDate(addMonthsSafe(r.start,r.endIdx-1)):'—'):'Sem fim'):fmtDate(recOccurrenceDate(r,r.count));
     const actions=rec
       ?(ended?`<button class="btn" onclick="reactivateRecurrence(${r.id})">Reativar</button>`:`<button class="btn" onclick="endRecurrence(${r.id})">Encerrar</button>`)
       :`<button class="btn" onclick="generateRecurrence(db.recurrences.find(x=>x.id==${r.id}));save();toast('Parcelas atualizadas');render()">↻ Atualizar</button>`;
@@ -2653,8 +2758,26 @@ function transactions(){
     .filter(t=>cf==='all' || String(t.categoryId)===cf)
     .filter(t=>matchesCardFilter(t,cardf))
     .filter(t=>matchesAutomationFilter(t,autof));
-  const statementRows=(af==='all'&&cardf==='all'&&autof==='all'?cardStatementRows(k):[]).filter(t=>tf==='all'||tf==='despesa');
-  const rows=sortTransactions([...actualRows,...statementRows]);
+  // Separação por natureza do dinheiro, para que nada pareça contado duas vezes:
+  //  • Conta bancária: receitas, despesas em conta e o pagamento das faturas.
+  //  • Compras no cartão: não debitam a conta agora; apenas compõem a fatura de um ciclo futuro.
+  const statementRows=(af==='all'&&cardf==='all'&&autof==='all'?cardStatementRows(k):[])
+    .filter(t=>(tf==='all'||tf==='despesa')&&Number(t.value||0)>0);
+  const bankRows=actualRows.filter(t=>!t.cardId);
+  const cardPurchases=actualRows.filter(t=>t.cardId);
+  const rows=sortTransactions([...bankRows,...statementRows]);
+  // Agrupa as compras pelo ciclo de fatura que elas compõem.
+  const cardGroups={};
+  cardPurchases.forEach(t=>{
+    const key=`${t.cardId}|${txStatementMonth(t)}`;
+    if(!cardGroups[key])cardGroups[key]={cardId:t.cardId,cycle:txStatementMonth(t),due:txCashDate(t),items:[],total:0,confirmed:0,pending:0};
+    cardGroups[key].items.push(t);
+    const v=Number(t.value||0);
+    cardGroups[key].total+=v;
+    if(t.confirmed===true)cardGroups[key].confirmed+=v; else cardGroups[key].pending+=v;
+  });
+  const cardGroupList=Object.values(cardGroups).sort((a,b)=>String(a.cycle).localeCompare(String(b.cycle)));
+  const cardPurchasesTotal=cardPurchases.reduce((s,t)=>s+Number(t.value||0),0);
 
   const accountOptions='<option value="all">Todas as contas</option>'+
     accounts.map(a=>`<option value="${String(a.id)}" ${af===String(a.id)?'selected':''}>${esc(a.name)}</option>`).join('');
@@ -2663,7 +2786,7 @@ function transactions(){
     '<option value="despesa" '+(tf==='despesa'?'selected':'')+'>Despesas</option>';
 
   // Compras de cartão não debitam a conta no mês da compra; quem debita é a fatura.
-  const cashRows=actualRows.filter(t=>!t.cardId);
+  const cashRows=bankRows;
   const statementTotal=statementRows.reduce((s,t)=>s+Number(t.value||0),0);
   const confirmed=cashRows.filter(t=>t.confirmed===true)
     .reduce((s,t)=>s+(t.type==='receita'?1:-1)*Number(t.value||0),0);
@@ -2689,7 +2812,7 @@ function transactions(){
         <label style="flex:1;min-width:220px">Origem do lançamento<select id="txAutomationFilter">${automationFilterOptions(autof)}</select></label>${cardf!=='all'&&cardf!=='none'?`<button class="btn" onclick="openCardStatement('${cardf}',suggestedCardStatementMonth('${cardf}','${k}'))">💳 Abrir fatura</button>`:''}<button class="btn" id="txClearFilters">Limpar filtros</button>
       </div>
       <div class="muted" style="margin-bottom:12px">
-        ${rows.length} lançamento(s) encontrado(s) em ${monthLabel(k)}.
+        ${rows.length} lançamento(s) na conta e ${cardPurchases.length} compra(s) no cartão em ${monthLabel(k)}.
       </div>
       <div class="grid g2">
         <div class="card metric"><div class="label">Saldo confirmado</div>
@@ -2699,6 +2822,7 @@ function transactions(){
           <div class="value ${estimated<0?'red':'blue'}">${estimated<0?'− ':''}${money(Math.abs(estimated))}</div>
         </div>
       </div>
+      <div class="tx-section-head"><h2>🏦 Conta bancária</h2><span class="muted">Dinheiro que entra e sai da conta neste mês, incluindo o pagamento das faturas.</span></div>
       <div class="table-wrap"><table class="table">
         <tr class="sortable-header">
           <th><button type="button" class="sort-th" onclick="setTxSort('date')">Data <span>${txSortIndicator('date')}</span></button></th>
@@ -2711,16 +2835,34 @@ function transactions(){
         </tr>
         ${rows.map(t=>`<tr class="${t.virtualCardStatement?'pending-row':(t.confirmed?'':'pending-row')}">
           <td>${fmtDate(t.date)}</td>
-          <td>${t.virtualCardStatement?'💳 ':''}${esc(t.description)}${t.virtualCardStatement?'<br><span class="muted">Total automático da fatura</span>':''}${t.cardId&&!t.virtualCardStatement?`<br><span class="muted" style="font-size:11px">${esc(txInvoiceNote(t))}</span>`:''}${!t.virtualCardStatement&&txAutomationKind(t)!=='single'?`<br><span class="pill tx-origin-pill">${esc(txAutomationLabel(t))}</span>`:''}</td>
+          <td>${t.virtualCardStatement?'💳 ':''}${esc(t.description)}${t.virtualCardStatement?'<br><span class="pill tx-invoice-pill">Pagamento da fatura</span><br><span class="muted" style="font-size:11px">Soma das compras do ciclo, listadas abaixo</span>':''}${!t.virtualCardStatement&&txAutomationKind(t)!=='single'?`<br><span class="pill tx-origin-pill">${esc(txAutomationLabel(t))}</span>`:''}</td>
           <td>${esc(txAccountLabel(t))}</td>
           <td>${t.virtualCardStatement?'—':'<span class="cat-dot" style="background:'+categoryColor(t.categoryId)+'"></span><span class="category-icon">'+esc(categoryIcon(t.categoryId))+'</span>'+esc(catName(t.categoryId))}</td>
           <td>${t.type==='receita'?'Receita':'Despesa'}</td>
           <td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td>
-          <td>${t.virtualCardStatement?'Automático':'<button class="btn" onclick="openTx('+t.id+')">✎</button>'}</td>
+          <td>${t.virtualCardStatement?`<button class="btn" onclick="openCardStatement('${t.cardId}',suggestedCardStatementMonth('${t.cardId}','${k}'))">🔍 Ver</button>`:'<button class="btn" onclick="openTx('+t.id+')">✎</button>'}</td>
           <td class="confirm-cell">${t.virtualCardStatement?'—':'<input type="checkbox" class="confirm-check" '+(t.confirmed?'checked':'')+' onchange="toggleTxConfirmed('+t.id+')">'}</td>
           <td>${t.virtualCardStatement?'—':'<button class="btn danger" onclick="deleteTransaction('+t.id+')">Excluir</button>'}</td>
-        </tr>`).join('') || '<tr><td colspan="9" class="empty">Nenhuma movimentação encontrada neste mês.</td></tr>'}
+        </tr>`).join('') || '<tr><td colspan="9" class="empty">Nenhuma movimentação na conta neste mês.</td></tr>'}
       </table></div>
+
+      <div class="tx-section-head tx-section-card"><h2>💳 Faturas do cartão</h2><span class="muted">As compras deste mês ficam dentro da fatura. Toque no card para abrir e ver cada despesa.</span></div>
+      ${cardGroupList.length?`
+      <div class="tx-invoice-cards">
+      ${cardGroupList.map(g=>`
+        <button type="button" class="tx-invoice-card" onclick="openCardStatement('${g.cardId}','${g.cycle}')" aria-label="Abrir fatura de ${esc(cardName(g.cardId))} de ${monthLabel(g.cycle)}">
+          <div class="tx-invoice-card-top">
+            <span class="tx-invoice-card-name">💳 ${esc(cardName(g.cardId))}</span>
+            <span class="tx-invoice-card-count">${g.items.length} ${g.items.length===1?'compra':'compras'}</span>
+          </div>
+          <div class="tx-invoice-card-cycle">Fatura de ${monthLabel(g.cycle)} · vence ${fmtDate(g.due)}</div>
+          <div class="tx-invoice-card-value">${money(g.total)}</div>
+          <div class="tx-invoice-card-split">${g.pending>0?`<span class="tx-chip tx-chip-pending">Pendente ${money(g.pending)}</span>`:''}${g.confirmed>0?`<span class="tx-chip tx-chip-ok">Confirmado ${money(g.confirmed)}</span>`:''}</div>
+          <span class="tx-invoice-card-cta">🔍 Abrir fatura</span>
+        </button>`).join('')}
+      </div>
+      <div class="tx-card-total">Total comprado no cartão em ${monthLabel(k)}: <b>${money(cardPurchasesTotal)}</b> — não sai da conta agora; entra na fatura do ciclo correspondente.</div>`
+      :'<div class="empty">Nenhuma compra no cartão neste mês.</div>'}
     </div>`;
 
   const ts=document.getElementById('txTypeSelect');
@@ -3691,7 +3833,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v86',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v89',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
