@@ -687,6 +687,46 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
   .tx-card-group-actions .btn{width:100%}
 }
 </style>
+<style id="goals-v93">
+/* Metas de alocação: cada card acompanha quanto já foi guardado para um objetivo. */
+.goal-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.goal-card{border:1px solid var(--border);border-left:4px solid var(--goal-color);border-radius:14px;padding:16px;background:#fff;box-shadow:0 2px 8px #17202a0d;min-width:0}
+.goal-done{opacity:.72;background:#f8fafc}
+.goal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
+.goal-id{display:flex;align-items:center;gap:10px;min-width:0}
+.goal-icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:11px;background:color-mix(in srgb,var(--goal-color,#8b5cf6) 14%,#fff);font-size:23px;line-height:1}
+.goal-id b{font-size:16px;line-height:1.3;overflow-wrap:anywhere}
+.goal-id .muted{font-size:12px;line-height:1.4}
+.goal-badge-done{background:#e9f7ef;color:#126c3c;font-weight:700;white-space:nowrap}
+.goal-badge-late{background:#fdecea;color:#a3372c;font-weight:700;white-space:nowrap}
+.goal-values{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.goal-values b{font-size:25px;color:var(--goal-color);font-variant-numeric:tabular-nums}
+.goal-values .muted{font-size:13px}
+.goal-bar{height:12px;background:#edf0f4;border-radius:99px;overflow:hidden}
+.goal-bar>i{display:block;height:100%;background:var(--goal-color,#8b5cf6);border-radius:99px;transition:width .3s}
+.goal-pct{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:12.5px;font-weight:650}
+.goal-ok{color:var(--green);font-weight:700}
+.goal-info{margin-top:12px;display:grid;gap:5px;font-size:12.5px;color:#52607a;line-height:1.5}
+.goal-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+.goal-actions .btn{flex:1 1 auto;min-height:40px;white-space:nowrap}
+.goal-actions .primary{flex:1 1 100%}
+.goal-icon-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:6px}
+.goal-icon-opt{display:block;cursor:pointer;margin:0}
+.goal-icon-opt input{position:absolute;opacity:0;pointer-events:none}
+.goal-icon-opt span{display:grid;place-items:center;height:44px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:21px;transition:border-color .12s,background .12s}
+.goal-icon-opt input:checked+span{border-color:var(--primary);border-width:2px;background:#eef4ff}
+.goal-deposit-head{display:flex;align-items:center;gap:11px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:4px}
+.goal-history-list{display:grid;gap:8px;margin-top:14px;max-height:340px;overflow:auto}
+.goal-history-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:#fff}
+.goal-history-item b{font-size:16px;font-variant-numeric:tabular-nums}
+.goal-history-item .muted{font-size:12px;line-height:1.4}
+.goal-history-add{width:100%;margin-top:14px}
+@media(max-width:1180px){
+  .goal-list{grid-template-columns:minmax(0,1fr)}
+  .goal-values b{font-size:23px}
+  .goal-actions .btn{flex:1 1 calc(50% - 7px)}
+}
+</style>
 <style id="merchant-v92">
 /* Nome do estabelecimento conforme a fatura: texto técnico, em fonte monoespaçada para facilitar a conferência. */
 .invoice-merchant{display:inline-block;margin-top:3px;padding:2px 7px;border-radius:6px;background:#f1f5f9;color:#52607a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.4;letter-spacing:.02em;word-break:break-all}
@@ -827,7 +867,7 @@ const KEY='ricas_financas_web_v1';
 const base={recurrences:[],accounts:[],categories:[
 {id:1,name:'Alimentação',type:'despesa',color:'#f59e0b'},{id:2,name:'Moradia',type:'despesa',color:'#ef4444'},
 {id:3,name:'Transporte',type:'despesa',color:'#3b82f6'},{id:4,name:'Salário',type:'receita',color:'#22c55e'}
-],transactions:[],plans:[],transfers:[],cards:[],sms:[],settings:{currency:'BRL'}};
+],transactions:[],plans:[],goals:[],transfers:[],cards:[],sms:[],settings:{currency:'BRL'}};
 // Divisão do orçamento por grupos (referência: método de Raul Sena / Investidor Sardinha).
 // Os percentuais são aplicados sobre a receita mensal e podem ser alterados pelo usuário.
 const BUDGET_GROUPS_DEFAULT=[
@@ -883,7 +923,7 @@ function normalizeTransfers(){
 
 function normalizeOrders(){
   // Mantém a ordem dos cadastros estável e compatível com versões anteriores.
-  const collections=['accounts','categories','cards','plans','transfers','recurrences'];
+  const collections=['accounts','categories','cards','plans','goals','transfers','recurrences'];
   for(const key of collections){
     if(!Array.isArray(db[key])) db[key]=[];
     db[key].forEach((item,i)=>{
@@ -898,12 +938,31 @@ function normalizeOrders(){
   if(!Array.isArray(db.sms)) db.sms=[];
   if(!db.settings || typeof db.settings!=='object') db.settings={};
   normalizeBudget();
+  normalizeGoals();
+}
+// Metas de alocação: objetivos concretos (viagem, equipamento) com aportes registrados ao longo do tempo.
+// Não confundir com a divisão do orçamento: aqui o dinheiro é guardado para um objetivo específico.
+function normalizeGoals(){
+  if(!Array.isArray(db.goals)) db.goals=[];
+  db.goals.forEach((g,i)=>{
+    if(!g) return;
+    g.name=String(g.name||'').trim();
+    g.icon=g.icon||'🎯';
+    g.color=g.color||'#8b5cf6';
+    g.target=Number(g.target)||0;
+    g.deadline=String(g.deadline||'');
+    g.note=String(g.note||'');
+    g.done=g.done===true;
+    if(g.order===undefined||g.order===null) g.order=i;
+    if(!Array.isArray(g.deposits)) g.deposits=[];
+    g.deposits.forEach(d=>{d.value=Number(d.value)||0;d.date=String(d.date||'');d.note=String(d.note||'');});
+  });
 }
 
 let db=JSON.parse(JSON.stringify(base)); normalizeCardData(); normalizeTransfers();
 let page='dashboard';
 let selectedMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);
-const navItems=[['dashboard','🏠','Resumo'],['transactions','↔️','Movimentações'],['recurrences','🔁','Automatizações'],['accounts','🏦','Contas'],['categories','🏷️','Categorias'],['planning','🎯','Planejamentos'],['transfers','⇄','Transferências'],['cards','💳','Cartões'],['reports','📊','Relatórios'],['settings','⚙️','Configurações']];
+const navItems=[['dashboard','🏠','Resumo'],['transactions','↔️','Movimentações'],['recurrences','🔁','Automatizações'],['accounts','🏦','Contas'],['categories','🏷️','Categorias'],['goals','🎯','Metas'],['transfers','⇄','Transferências'],['cards','💳','Cartões'],['reports','📊','Relatórios'],['settings','⚙️','Configurações']];
 let dbReady=false;
 let dbDirHandle=null;
 let sqliteFileHandle=null;
@@ -911,7 +970,7 @@ let sqliteDb=null;
 let SQL=null;
 let dbStorageMode='disconnected';
 const SQLITE_FILE='ricas-financas.sqlite';
-const SQLITE_TABLES=['accounts','categories','transactions','plans','transfers','cards','sms','recurrences','settings'];
+const SQLITE_TABLES=['accounts','categories','transactions','plans','goals','transfers','cards','sms','recurrences','settings'];
 const DB_HANDLE_KEY='ricas_financas_sqlite_handle';
 
 function sqliteStateRows(){
@@ -1621,7 +1680,7 @@ function go(target){
   if(page==='recurrences') return recurrences();
   if(page==='accounts') return accounts();
   if(page==='categories') return categories();
-  if(page==='planning') return plans();
+  if(page==='goals') return goals();
   if(page==='transfers') return transfers();
   if(page==='cards') return cards();
   if(page==='reports') return reports();
@@ -3158,7 +3217,184 @@ function categories(){
     <div class="card"><h2>Receitas</h2>${inc.map(c=>categoryRowHtml(c,false)).join('')||'<div class="empty">Nenhuma categoria de receita.</div>'}</div>
   </div>`;
 }
-function plans(){document.getElementById('topActions').innerHTML=`<button class="btn primary" onclick="openPlan()">+ Novo planejamento</button>`;let m=totals();document.getElementById('content').innerHTML=`<div class="grid g2">${[...db.plans].sort((a,b)=>(a.order??0)-(b.order??0)).map(p=>{let spent=db.transactions.filter(t=>t.categoryId==p.categoryId&&t.type==='despesa'&&monthKey(t.date)===monthKey(new Date().toISOString().slice(0,10))).reduce((s,t)=>s+ +t.value,0);let pct=Math.min(100,spent/p.value*100);return `<div class="card"><div class="muted">${esc(catName(p.categoryId))}</div><h2>${money(spent)} / ${money(p.value)}</h2><div class="progress"><i style="width:${pct}%"></i></div><p>${pct.toFixed(0)}% utilizado</p>${orderButtons('plans',p.id)} <button class="btn" onclick="openPlan(${p.id})">Editar</button><button class="btn danger" onclick="delPlan(${p.id})">Excluir</button></div>`}).join('')||'<div class="card empty">Nenhum planejamento cadastrado.</div>'}</div>`}
+function goalAllocated(g){return (g.deposits||[]).reduce((s,d)=>s+Number(d.value||0),0);}
+function goalProgress(g){const t=Number(g.target)||0;return t>0?Math.min(100,goalAllocated(g)/t*100):(goalAllocated(g)>0?100:0);}
+function goalMonthAllocated(month){
+  return (db.goals||[]).reduce((s,g)=>s+(g.deposits||[]).filter(d=>monthKey(d.date)===month).reduce((x,d)=>x+Number(d.value||0),0),0);
+}
+// Ritmo médio dos últimos 6 meses com aporte, usado para estimar a conclusão.
+function goalMonthlyPace(g){
+  const byMonth={};
+  (g.deposits||[]).forEach(d=>{const k=monthKey(d.date);if(k)byMonth[k]=(byMonth[k]||0)+Number(d.value||0);});
+  const months=Object.keys(byMonth).sort().slice(-6);
+  if(!months.length)return 0;
+  return months.reduce((s,k)=>s+byMonth[k],0)/months.length;
+}
+function goalForecast(g){
+  const falta=Math.max(0,(Number(g.target)||0)-goalAllocated(g));
+  if(falta<=0)return {falta:0,texto:'Meta alcançada'};
+  const pace=goalMonthlyPace(g);
+  if(pace<=0)return {falta,texto:'Registre aportes para estimar a conclusão'};
+  const meses=Math.ceil(falta/pace);
+  const d=new Date();d.setMonth(d.getMonth()+meses);
+  return {falta,meses,texto:`No ritmo atual (${money(pace)}/mês): ~${meses} ${meses===1?'mês':'meses'}, até ${d.toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}`};
+}
+function goalDeadlineInfo(g){
+  if(!g.deadline)return null;
+  const hoje=new Date();hoje.setHours(0,0,0,0);
+  const alvo=new Date(g.deadline+'T12:00:00');
+  const meses=Math.max(0,(alvo.getFullYear()-hoje.getFullYear())*12+(alvo.getMonth()-hoje.getMonth()));
+  const falta=Math.max(0,(Number(g.target)||0)-goalAllocated(g));
+  const porMes=meses>0?falta/meses:falta;
+  const atrasada=alvo<hoje&&falta>0;
+  return {alvo,meses,falta,porMes,atrasada};
+}
+function goals(){
+  document.getElementById('topActions').innerHTML=`<button class="btn primary" onclick="openGoal()">+ Nova meta</button>`;
+  const month=selectedMonthKey();
+  const lista=[...(db.goals||[])].sort((a,b)=>(a.done===b.done?0:a.done?1:-1)||((a.order??0)-(b.order??0)));
+  const ativas=lista.filter(g=>!g.done);
+  const totalAlvo=ativas.reduce((s,g)=>s+(Number(g.target)||0),0);
+  const totalGuardado=ativas.reduce((s,g)=>s+goalAllocated(g),0);
+  const noMes=goalMonthAllocated(month);
+  // Compara com o que o orçamento reservou para o grupo Metas neste mês.
+  const planejadoGrupo=budgetIncome(month)*budgetPercent('metas')/100;
+  const cards=lista.map(g=>{
+    const guardado=goalAllocated(g), alvo=Number(g.target)||0, pct=goalProgress(g);
+    const falta=Math.max(0,alvo-guardado);
+    const prazo=goalDeadlineInfo(g);
+    const prev=goalForecast(g);
+    const noMesMeta=(g.deposits||[]).filter(d=>monthKey(d.date)===month).reduce((s,d)=>s+Number(d.value||0),0);
+    return `<div class="goal-card${g.done?' goal-done':''}" style="--goal-color:${g.color}">
+      <div class="goal-head">
+        <div class="goal-id"><span class="goal-icon">${esc(g.icon)}</span><div><b>${esc(g.name)}</b>${g.note?`<br><span class="muted">${esc(g.note)}</span>`:''}</div></div>
+        ${g.done?'<span class="pill goal-badge-done">✓ Alcançada</span>':(prazo?.atrasada?'<span class="pill goal-badge-late">⚠ Prazo vencido</span>':'')}
+      </div>
+      <div class="goal-values"><b>${money(guardado)}</b><span class="muted">de ${money(alvo)}</span></div>
+      <div class="goal-bar"><i style="width:${pct}%"></i></div>
+      <div class="goal-pct"><span>${pct.toFixed(0)}% guardado</span>${falta>0?`<span class="muted">Faltam ${money(falta)}</span>`:'<span class="goal-ok">Objetivo atingido</span>'}</div>
+      <div class="goal-info">
+        ${noMesMeta?`<div>📅 Guardado em ${monthLabel(month)}: <b>${money(noMesMeta)}</b></div>`:''}
+        ${prazo?`<div>🗓️ Prazo: <b>${fmtDate(g.deadline)}</b>${prazo.falta>0&&prazo.meses>0?` · precisa de ${money(prazo.porMes)}/mês`:''}${prazo.atrasada?' · <span class="red">prazo vencido</span>':''}</div>`:''}
+        ${!g.done&&falta>0?`<div>📈 ${esc(prev.texto)}</div>`:''}
+        <div>💰 ${(g.deposits||[]).length} aporte(s) registrado(s)</div>
+      </div>
+      <div class="goal-actions">
+        ${g.done?'':`<button class="btn primary" onclick="openGoalDeposit(${g.id})">+ Guardar dinheiro</button>`}
+        <button class="btn" onclick="openGoalHistory(${g.id})">📜 Histórico</button>
+        <button class="btn" onclick="openGoal(${g.id})">✎ Editar</button>
+        <button class="btn" onclick="toggleGoalDone(${g.id})">${g.done?'↩ Reabrir':'✓ Concluir'}</button>
+        <button class="btn danger" onclick="deleteGoal(${g.id})">Excluir</button>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('content').innerHTML=`${monthNav()}
+    <div class="card">
+      <h2>🎯 Metas</h2>
+      <p class="muted" style="margin-top:0">Objetivos para os quais você vai guardando dinheiro aos poucos: uma viagem, um equipamento, uma reserva. Cada aporte registrado aqui aumenta o valor acumulado da meta. A divisão do orçamento continua em Categorias.</p>
+      <div class="grid g3 section">
+        <div class="card metric"><div class="label">Guardado nas metas ativas</div><div class="value blue">${money(totalGuardado)}</div></div>
+        <div class="card metric"><div class="label">Soma dos objetivos</div><div class="value">${money(totalAlvo)}</div></div>
+        <div class="card metric"><div class="label">Guardado em ${monthLabel(month)}</div><div class="value ${noMes>0?'blue':''}">${money(noMes)}</div>${planejadoGrupo>0?`<div class="muted">Grupo Metas do orçamento reserva ${money(planejadoGrupo)} neste mês</div>`:''}</div>
+      </div>
+    </div>
+    <div class="goal-list section">${cards||'<div class="card empty">Nenhuma meta cadastrada. Toque em <b>+ Nova meta</b> para criar a primeira, como uma viagem ou uma compra planejada.</div>'}</div>`;
+}
+const GOAL_ICONS=['🎯','✈️','🏝️','🗾','🏠','🚗','🏍️','💻','📱','🪑','🧹','🛋️','📷','🎸','🎓','💍','👶','🐶','🏥','🛠️','🎁','💰','🏆','⛰️'];
+function openGoal(id){
+  const g=id?db.goals.find(x=>x.id==id):null;
+  openModal(g?'Editar meta':'Nova meta',`<form class="form goal-form" onsubmit="saveGoal(event,${id||0})">
+    <label>Nome da meta<input name="name" value="${esc(g?.name||'')}" required minlength="2" placeholder="Ex.: Viagem para o Japão"></label>
+    <div class="row">
+      <label>Valor do objetivo<input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" data-min="0.01" name="target" value="${decimalInputValue(g?.target||'')}" required placeholder="0,00"></label>
+      <label>Prazo <span class="muted">(opcional)</span><input type="date" name="deadline" value="${g?.deadline||''}"></label>
+    </div>
+    <label>Ícone<div class="goal-icon-picker">${GOAL_ICONS.map(ic=>`<label class="goal-icon-opt"><input type="radio" name="icon" value="${ic}" ${((g?.icon)||'🎯')===ic?'checked':''}><span>${ic}</span></label>`).join('')}</div></label>
+    <div class="row">
+      <label>Cor<input type="color" name="color" value="${g?.color||'#8b5cf6'}"></label>
+      <label>Observação <span class="muted">(opcional)</span><input name="note" value="${esc(g?.note||'')}" maxlength="80" placeholder="Ex.: Passagem + hospedagem"></label>
+    </div>
+    <button class="btn primary">${g?'Salvar alterações':'Criar meta'}</button>
+  </form>`);
+}
+function saveGoal(e,id){
+  e.preventDefault();
+  const f=new FormData(e.target);
+  const name=String(f.get('name')||'').trim();
+  const target=parseDecimalBR(f.get('target'));
+  if(name.length<2)return toast('Informe um nome para a meta.');
+  if(!Number.isFinite(target)||target<=0)return toast('Informe um valor de objetivo maior que zero.');
+  const data={name,target,deadline:String(f.get('deadline')||''),icon:f.get('icon')||'🎯',color:f.get('color')||'#8b5cf6',note:String(f.get('note')||'').trim()};
+  if(id){Object.assign(db.goals.find(x=>x.id==id),data);}
+  else db.goals.push({id:uid(),...data,done:false,deposits:[],order:db.goals.length});
+  save();closeModal();toast(id?'Meta alterada':'Meta criada');render();
+}
+function deleteGoal(id){
+  const g=db.goals.find(x=>x.id==id);if(!g)return;
+  const n=(g.deposits||[]).length;
+  if(!confirm(`Excluir a meta "${g.name}"?${n?`\n\nOs ${n} aporte(s) registrados nela também serão apagados.`:''}\n\nEsta ação não pode ser desfeita.`))return;
+  db.goals=db.goals.filter(x=>x.id!=id);
+  save();toast('Meta excluída');render();
+}
+function toggleGoalDone(id){
+  const g=db.goals.find(x=>x.id==id);if(!g)return;
+  g.done=!g.done;
+  save();toast(g.done?'Meta marcada como alcançada':'Meta reaberta');render();
+}
+function openGoalDeposit(goalId){
+  const g=db.goals.find(x=>x.id==goalId);if(!g)return;
+  const falta=Math.max(0,(Number(g.target)||0)-goalAllocated(g));
+  openModal(`Guardar dinheiro — ${g.name}`,`<form class="form" onsubmit="saveGoalDeposit(event,${goalId})">
+    <div class="goal-deposit-head"><span class="goal-icon">${esc(g.icon)}</span><div><b>${esc(g.name)}</b><br><span class="muted">Já guardado: ${money(goalAllocated(g))} de ${money(g.target)}${falta>0?` · faltam ${money(falta)}`:''}</span></div></div>
+    <div class="row">
+      <label>Data<input type="date" name="date" value="${localDateKey()}" required></label>
+      <label>Valor<input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" name="value" required placeholder="0,00"></label>
+    </div>
+    <label>Observação <span class="muted">(opcional)</span><input name="note" maxlength="80" placeholder="Ex.: 13º salário"></label>
+    <p class="muted">Use um valor negativo para registrar uma retirada, caso precise usar parte do dinheiro guardado.</p>
+    <button class="btn primary">Registrar aporte</button>
+  </form>`);
+}
+function saveGoalDeposit(e,goalId){
+  e.preventDefault();
+  const g=db.goals.find(x=>x.id==goalId);if(!g)return;
+  const f=new FormData(e.target);
+  const value=parseDecimalBR(f.get('value'));
+  if(!Number.isFinite(value)||value===0)return toast('Informe um valor diferente de zero.');
+  const date=String(f.get('date')||'');
+  if(!date)return toast('Informe a data do aporte.');
+  g.deposits=Array.isArray(g.deposits)?g.deposits:[];
+  g.deposits.push({id:uid(),date,value,note:String(f.get('note')||'').trim()});
+  const total=goalAllocated(g);
+  if(!g.done&&total>=(Number(g.target)||0)&&(Number(g.target)||0)>0){
+    if(confirm(`Com este aporte você alcançou ${money(total)} de ${money(g.target)}.\n\nDeseja marcar a meta "${g.name}" como alcançada?`))g.done=true;
+  }
+  save();closeModal();
+  toast(value>0?`${money(value)} guardado em "${g.name}"`:`${money(Math.abs(value))} retirado de "${g.name}"`);
+  render();
+}
+function deleteGoalDeposit(goalId,depositId){
+  const g=db.goals.find(x=>x.id==goalId);if(!g)return;
+  const d=(g.deposits||[]).find(x=>x.id==depositId);if(!d)return;
+  if(!confirm(`Excluir o aporte de ${money(d.value)} em ${fmtDate(d.date)}?`))return;
+  g.deposits=g.deposits.filter(x=>x.id!=depositId);
+  save();openGoalHistory(goalId);toast('Aporte excluído');
+}
+function openGoalHistory(goalId){
+  const g=db.goals.find(x=>x.id==goalId);if(!g)return;
+  const lista=[...(g.deposits||[])].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const total=goalAllocated(g);
+  openModal(`Histórico — ${g.name}`,`<div class="goal-history">
+    <div class="goal-deposit-head"><span class="goal-icon">${esc(g.icon)}</span><div><b>${esc(g.name)}</b><br><span class="muted">${money(total)} de ${money(g.target)} · ${goalProgress(g).toFixed(0)}%</span></div></div>
+    <div class="goal-bar" style="--goal-color:${g.color}"><i style="width:${goalProgress(g)}%"></i></div>
+    ${lista.length?`<div class="goal-history-list">${lista.map(d=>`<div class="goal-history-item">
+      <div><b class="${d.value<0?'red':'blue'}">${d.value<0?'− ':'+ '}${money(Math.abs(d.value))}</b><br><span class="muted">${fmtDate(d.date)}${d.note?` · ${esc(d.note)}`:''}</span></div>
+      <button class="btn danger" onclick="deleteGoalDeposit(${g.id},${d.id})">Excluir</button>
+    </div>`).join('')}</div>`:'<div class="empty">Nenhum aporte registrado ainda.</div>'}
+    ${g.done?'':`<button class="btn primary goal-history-add" onclick="openGoalDeposit(${g.id})">+ Guardar dinheiro</button>`}
+  </div>`);
+}
+
 function transfers(){
   document.getElementById('topActions').innerHTML=`<button class="btn primary" onclick="openTransfer()">+ Nova transferência</button>`;
   const rows=[...db.transfers].sort((a,b)=>String(b.date).localeCompare(String(a.date)) || ((b.order??0)-(a.order??0))).map(t=>`<tr>
@@ -3744,20 +3980,8 @@ else db.categories.push({id:uid(),name:f.get('name'),type:f.get('type'),color:f.
 save();closeModal();toast(id?'Categoria alterada':'Categoria cadastrada');render()
 }
 function delCat(id){if(confirm('Excluir categoria?')){db.categories=db.categories.filter(c=>c.id!=id);save();render()}}
-function openPlan(id){
-let p=id?db.plans.find(x=>x.id==id):null;
-openModal(p?'Editar planejamento':'Novo planejamento',`<form class="form" onsubmit="savePlan(event,${id||0})">
-<label>Categoria<select name="categoryId">${[...db.categories].filter(c=>c.type==='despesa').sort((a,b)=>(a.order??0)-(b.order??0)).map(c=>`<option value="${c.id}" ${p?.categoryId==c.id?'selected':''}>${esc(categoryIcon(c.id))} ${esc(c.name)}</option>`).join('')}</select></label>
-<label>Meta mensal<input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" name="value" value="${decimalInputValue(p?.value||'')}" required></label>
-<button class="btn primary">${p?'Salvar alterações':'Salvar'}</button></form>`)
-}
-function savePlan(e,id){
-e.preventDefault();let f=new FormData(e.target);
-if(id){let p=db.plans.find(x=>x.id==id);Object.assign(p,{categoryId:+f.get('categoryId'),value:parseDecimalBR(f.get('value'))})}
-else db.plans.push({id:uid(),categoryId:+f.get('categoryId'),value:parseDecimalBR(f.get('value')),order:db.plans.length});
-save();closeModal();toast(id?'Planejamento alterado':'Planejamento cadastrado');render()
-}
-function delPlan(id){if(confirm('Excluir planejamento?')){db.plans=db.plans.filter(p=>p.id!=id);save();render()}}
+// As funções de planejamento por categoria foram substituídas pelas Metas (v93).
+// O campo db.plans é mantido apenas para compatibilidade com bases antigas.
 function transferFormOptions(selected){return [...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0)).map(a=>`<option value="${a.id}" ${String(selected??'')===String(a.id)?'selected':''}>${esc(a.name)}</option>`).join('')}
 function openTransfer(id){
   const tr=id?db.transfers.find(x=>x.id==id):null;
@@ -3922,7 +4146,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v92',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v93',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
