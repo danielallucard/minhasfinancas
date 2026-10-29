@@ -687,6 +687,16 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
   .tx-card-group-actions .btn{width:100%}
 }
 </style>
+<style id="invoice-confirm-v90">
+/* Confirmação direta dentro da fatura */
+.invoice-confirm{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0}
+.invoice-confirm input{width:20px;height:20px;flex:0 0 20px;margin:0;cursor:pointer;accent-color:var(--primary)}
+.invoice-confirm span{font-size:13px;line-height:1.3}
+.invoice-bulk{margin-top:10px}
+.invoice-bulk .btn{width:100%}
+#modalBody .invoice-view-v82 table.invoice-table td.invoice-status-cell::before{content:'STATUS'}
+@media(min-width:561px){.invoice-bulk .btn{width:auto}}
+</style>
 <style id="invoice-cards-v89">
 /* Faturas em cards clicáveis: as compras do cartão não aparecem soltas na lista. */
 .tx-invoice-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;margin-bottom:12px}
@@ -1464,8 +1474,26 @@ function openCardStatement(cardId,m){
    <div class="invoice-cycle-nav"><button class="btn" onclick="openCardStatement('${c.id}','${shiftStatementMonth(m,-1)}')">‹</button><div><span class="muted">Ciclo da fatura</span><b>${monthLabel(m)}</b></div><button class="btn" onclick="openCardStatement('${c.id}','${shiftStatementMonth(m,1)}')">›</button></div>
    <div class="invoice-head"><div><span class="pill">💳 ${esc(c.brand||'Cartão')}</span><h2>${esc(c.name)}</h2><div class="muted">Fecha dia ${c.close||'—'} · Vence dia ${c.due||'—'}</div></div><div class="invoice-total"><span>Total da fatura</span><b>${money(total)}</b><small>Confirmadas + pendentes</small></div></div>
    <div class="grid g4 invoice-metrics"><div class="card metric"><div class="label">Principal</div><div class="value red">${money(sum(rows.filter(t=>(t.cardHolder||'principal')==='principal')))}</div></div><div class="card metric"><div class="label">${esc(c.additionalName||'Adicional')}</div><div class="value red">${money(sum(rows.filter(t=>t.cardHolder==='additional')))}</div></div><div class="card metric"><div class="label">Confirmado</div><div class="value blue">${money(confirmed)}</div></div><div class="card metric"><div class="label">Pendente</div><div class="value red">${money(pending)}</div></div></div>
-   ${rows.length?`<div class="invoice-note"><b>${rows.length} despesa(s) no ciclo.</b> Os valores aparecem na fatura mesmo quando ainda estão pendentes.</div>`:''}
-   <div class="table-wrap invoice-table-wrap"><table class="table invoice-table"><tr><th>Data</th><th>Descrição</th><th>Titular</th><th>Categoria</th><th>Grupo</th><th>Valor</th><th>Status</th><th>Ações</th></tr>${rows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(cardHolderLabel(t))}</td><td>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td class="red">− ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td><td class="invoice-actions-cell"><button class="btn" onclick="closeModal();openTx(${t.id})">Editar</button><button class="btn danger" onclick="closeModal();deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')||`<tr><td colspan="8" class="empty"><b>Nenhuma despesa nesta fatura.</b><br><span class="muted">Use as setas acima para consultar outro ciclo. Compras feitas após o fechamento aparecem na fatura do mês seguinte.</span></td></tr>`}</table></div></div>`);enhanceResponsiveTables(modalBody);
+   ${rows.length?`<div class="invoice-note"><b>${rows.length} despesa(s) no ciclo.</b> Os valores entram na fatura mesmo quando ainda estão pendentes. Use a caixa de seleção na coluna <b>Status</b> para confirmar cada despesa.${pending>0?`<div class="invoice-bulk"><button class="btn primary" onclick="confirmAllInvoice('${c.id}','${m}')">✓ Confirmar todas as ${rows.filter(t=>t.confirmed!==true).length} pendentes</button></div>`:''}</div>`:''}
+   <div class="table-wrap invoice-table-wrap"><table class="table invoice-table"><tr><th>Data</th><th>Descrição</th><th>Titular</th><th>Categoria</th><th>Grupo</th><th>Valor</th><th>Status</th><th>Ações</th></tr>${rows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(cardHolderLabel(t))}</td><td>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td class="red">− ${money(t.value)}</td><td class="invoice-status-cell"><label class="invoice-confirm"><input type="checkbox" class="confirm-check" ${t.confirmed?'checked':''} onchange="toggleInvoiceConfirmed(${t.id},'${c.id}','${m}')"><span>${t.confirmed?'Confirmada':'Pendente'}</span></label></td><td class="invoice-actions-cell"><button class="btn" onclick="closeModal();openTx(${t.id})">Editar</button><button class="btn danger" onclick="closeModal();deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')||`<tr><td colspan="8" class="empty"><b>Nenhuma despesa nesta fatura.</b><br><span class="muted">Use as setas acima para consultar outro ciclo. Compras feitas após o fechamento aparecem na fatura do mês seguinte.</span></td></tr>`}</table></div></div>`);enhanceResponsiveTables(modalBody);
+}
+// Confirma/desconfirma uma despesa sem fechar a fatura: o modal é redesenhado na mesma posição.
+function toggleInvoiceConfirmed(id,cardId,statementMonth){
+  const t=db.transactions.find(x=>x.id==id);
+  if(!t)return;
+  t.confirmed=!t.confirmed;
+  save();
+  openCardStatement(cardId,statementMonth);
+  toast(t.confirmed?'Despesa confirmada.':'Despesa marcada como pendente.');
+}
+function confirmAllInvoice(cardId,statementMonth){
+  const pending=cardTransactions(cardId,statementMonth).filter(t=>t.confirmed!==true);
+  if(!pending.length)return toast('Não há despesas pendentes nesta fatura.');
+  if(!confirm(`Confirmar ${pending.length} despesa(s) pendente(s) da fatura de ${monthLabel(statementMonth)}?`))return;
+  pending.forEach(t=>t.confirmed=true);
+  save();
+  openCardStatement(cardId,statementMonth);
+  toast(`${pending.length} despesa(s) confirmada(s).`);
 }
 function cardStatementRows(statementMonth){
   return db.cards.map(c=>{
@@ -1638,7 +1666,9 @@ function generateRecurrence(r){
     db.transactions.push({
       id:uid(),type:r.type,date,description:recurring?String(r.description||'').trim():installmentDescription(r.description,n,r.count),
       value:+r.value,...recurrenceOccurrencePayment(r,n,date),categoryId:+r.categoryId,
-      confirmed:false,recurrenceId:r.id,installment:n,totalInstallments:recurring?null:r.count,recurring:recurring||undefined
+      // Parcelamento no cartão já foi efetivado na compra: nasce confirmado.
+      // Recorrentes (assinaturas, mensalidades) nascem pendentes, pois a cobrança ainda vai ocorrer.
+      confirmed:(!recurring&&!!r.cardId),recurrenceId:r.id,installment:n,totalInstallments:recurring?null:r.count,recurring:recurring||undefined
     });
     added++;
   }
@@ -1900,7 +1930,8 @@ function saveRecurrence(e,id){
       Object.assign(t,{type:r.type,value:+r.value,...recurrenceOccurrencePayment(r,n,occDate),categoryId:+r.categoryId,
         date:occDate,
         description:rec?r.description:installmentDescription(r.description,n,r.count),
-        totalInstallments:rec?null:r.count,recurring:rec||undefined});
+        totalInstallments:rec?null:r.count,recurring:rec||undefined,
+        confirmed:(!rec&&!!r.cardId)?true:t.confirmed});
     });
     if(!rec){
       // Remove pendentes fora do novo intervalo (abaixo da parcela inicial ou acima do total).
@@ -3833,7 +3864,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v89',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v90',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
