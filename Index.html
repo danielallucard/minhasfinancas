@@ -687,6 +687,31 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
   .tx-card-group-actions .btn{width:100%}
 }
 </style>
+<style id="merchant-v92">
+/* Nome do estabelecimento conforme a fatura: texto técnico, em fonte monoespaçada para facilitar a conferência. */
+.invoice-merchant{display:inline-block;margin-top:3px;padding:2px 7px;border-radius:6px;background:#f1f5f9;color:#52607a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.4;letter-spacing:.02em;word-break:break-all}
+#txMerchantWrap input,#modalBody input[name="merchant"]{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px;text-transform:uppercase}
+#txMerchantWrap[style*="none"]{display:none!important}
+</style>
+<style id="bill-card-v91">
+/* Pagamento de fatura: card próprio, sem campos vazios de conta/categoria/confirmação. */
+.tx-bill-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:6px}
+.tx-bill-card{display:block;width:100%;text-align:left;padding:15px;border:1px solid var(--border);border-left:4px solid #d08700;border-radius:13px;background:#fffdf7;cursor:pointer;font:inherit;color:inherit;box-shadow:0 2px 8px #17202a0d;transition:transform .12s,box-shadow .12s,border-color .12s}
+.tx-bill-card:hover{border-color:#d08700;box-shadow:0 6px 18px #17202a1a;transform:translateY(-2px)}
+.tx-bill-card:active{transform:translateY(0)}
+.tx-bill-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px}
+.tx-bill-name{font-weight:750;font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tx-bill-due{flex:0 0 auto;padding:3px 9px;border-radius:999px;background:#fff4e2;color:#9a6200;font-size:11px;font-weight:650;white-space:nowrap}
+.tx-bill-value{color:var(--red);font-size:25px;font-weight:800;line-height:1.2;font-variant-numeric:tabular-nums}
+.tx-bill-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;margin-top:9px}
+.tx-bill-foot .muted{font-size:12px}
+.tx-bill-cta{color:var(--primary);font-size:12.5px;font-weight:700;white-space:nowrap}
+@media(max-width:1180px){
+  .tx-bill-cards{grid-template-columns:minmax(0,1fr)}
+  .tx-bill-card{padding:14px}
+  .tx-bill-value{font-size:23px}
+}
+</style>
 <style id="invoice-confirm-v90">
 /* Confirmação direta dentro da fatura */
 .invoice-confirm{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0}
@@ -1366,6 +1391,9 @@ function defaultCategoryIcon(name){
 }
 function categoryIcon(id){const c=db.categories.find(x=>String(x.id)===String(id));return c?.icon||defaultCategoryIcon(c?.name);}
 function cardName(id){return db.cards.find(x=>x.id==id)?.name||'Cartão';}
+// Nome do estabelecimento como aparece na fatura do cartão.
+// Campo opcional: ajuda a conferir a descrição amigável com o texto real da operadora.
+function merchantLabel(t){return String(t?.merchant||'').trim();}
 function cardHolderLabel(t){
   if(!t?.cardId)return '';
   const c=db.cards.find(x=>x.id==t.cardId);
@@ -1475,7 +1503,7 @@ function openCardStatement(cardId,m){
    <div class="invoice-head"><div><span class="pill">💳 ${esc(c.brand||'Cartão')}</span><h2>${esc(c.name)}</h2><div class="muted">Fecha dia ${c.close||'—'} · Vence dia ${c.due||'—'}</div></div><div class="invoice-total"><span>Total da fatura</span><b>${money(total)}</b><small>Confirmadas + pendentes</small></div></div>
    <div class="grid g4 invoice-metrics"><div class="card metric"><div class="label">Principal</div><div class="value red">${money(sum(rows.filter(t=>(t.cardHolder||'principal')==='principal')))}</div></div><div class="card metric"><div class="label">${esc(c.additionalName||'Adicional')}</div><div class="value red">${money(sum(rows.filter(t=>t.cardHolder==='additional')))}</div></div><div class="card metric"><div class="label">Confirmado</div><div class="value blue">${money(confirmed)}</div></div><div class="card metric"><div class="label">Pendente</div><div class="value red">${money(pending)}</div></div></div>
    ${rows.length?`<div class="invoice-note"><b>${rows.length} despesa(s) no ciclo.</b> Os valores entram na fatura mesmo quando ainda estão pendentes. Use a caixa de seleção na coluna <b>Status</b> para confirmar cada despesa.${pending>0?`<div class="invoice-bulk"><button class="btn primary" onclick="confirmAllInvoice('${c.id}','${m}')">✓ Confirmar todas as ${rows.filter(t=>t.confirmed!==true).length} pendentes</button></div>`:''}</div>`:''}
-   <div class="table-wrap invoice-table-wrap"><table class="table invoice-table"><tr><th>Data</th><th>Descrição</th><th>Titular</th><th>Categoria</th><th>Grupo</th><th>Valor</th><th>Status</th><th>Ações</th></tr>${rows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(cardHolderLabel(t))}</td><td>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td class="red">− ${money(t.value)}</td><td class="invoice-status-cell"><label class="invoice-confirm"><input type="checkbox" class="confirm-check" ${t.confirmed?'checked':''} onchange="toggleInvoiceConfirmed(${t.id},'${c.id}','${m}')"><span>${t.confirmed?'Confirmada':'Pendente'}</span></label></td><td class="invoice-actions-cell"><button class="btn" onclick="closeModal();openTx(${t.id})">Editar</button><button class="btn danger" onclick="closeModal();deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')||`<tr><td colspan="8" class="empty"><b>Nenhuma despesa nesta fatura.</b><br><span class="muted">Use as setas acima para consultar outro ciclo. Compras feitas após o fechamento aparecem na fatura do mês seguinte.</span></td></tr>`}</table></div></div>`);enhanceResponsiveTables(modalBody);
+   <div class="table-wrap invoice-table-wrap"><table class="table invoice-table"><tr><th>Data</th><th>Descrição</th><th>Titular</th><th>Categoria</th><th>Grupo</th><th>Valor</th><th>Status</th><th>Ações</th></tr>${rows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}${merchantLabel(t)?`<br><span class="invoice-merchant">${esc(merchantLabel(t))}</span>`:''}</td><td>${esc(cardHolderLabel(t))}</td><td>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td class="red">− ${money(t.value)}</td><td class="invoice-status-cell"><label class="invoice-confirm"><input type="checkbox" class="confirm-check" ${t.confirmed?'checked':''} onchange="toggleInvoiceConfirmed(${t.id},'${c.id}','${m}')"><span>${t.confirmed?'Confirmada':'Pendente'}</span></label></td><td class="invoice-actions-cell"><button class="btn" onclick="closeModal();openTx(${t.id})">Editar</button><button class="btn danger" onclick="closeModal();deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')||`<tr><td colspan="8" class="empty"><b>Nenhuma despesa nesta fatura.</b><br><span class="muted">Use as setas acima para consultar outro ciclo. Compras feitas após o fechamento aparecem na fatura do mês seguinte.</span></td></tr>`}</table></div></div>`);enhanceResponsiveTables(modalBody);
 }
 // Confirma/desconfirma uma despesa sem fechar a fatura: o modal é redesenhado na mesma posição.
 function toggleInvoiceConfirmed(id,cardId,statementMonth){
@@ -1513,6 +1541,8 @@ function toggleCardAccountFields(){
   account.disabled=has;
   if(has)account.value=String(c.accountId||'');
   else account.disabled=false;
+  const merchantWrap=document.getElementById('txMerchantWrap');
+  if(merchantWrap)merchantWrap.style.display=has?'block':'none';
   if(wrap&&holder){
     wrap.style.display=has?'block':'none';
     if(has){
@@ -1773,6 +1803,7 @@ function openRecurrence(id){
       ${[...db.cards].sort((a,b)=>(a.order??0)-(b.order??0)).map(c=>`<option value="${c.id}" ${sel(r?.cardId,c.id)}>💳 ${esc(c.name)}</option>`).join('')}
     </select></label>
     <label id="recHolderWrap" hidden>Titular<select name="cardHolder" id="recHolderSelect" data-current="${esc(r?.cardHolder||'')}"></select></label>
+    <label>Estabelecimento na fatura <span class="muted">(opcional)</span><input name="merchant" value="${esc(r?.merchant||'')}" placeholder="Ex.: SMARTFIT*MENSALIDADE" autocomplete="off" maxlength="80"></label>
     <p class="muted" id="recCardHint">Informe o valor de cada parcela ou cobrança mensal, não o valor total da compra. A data da primeira compra/cobrança determina a fatura conforme o fechamento do cartão. As parcelas/cobranças seguintes entram em faturas mensais consecutivas e não debitam diretamente a conta bancária.</p>
   </div>
   <div class="row rec-account-category-row" id="recAccountCategoryRow">
@@ -1862,10 +1893,10 @@ function toggleRecurrencePayment(){
   }else holder.dataset.card='';
 }
 function recurrenceCardData(r){
-  if(!r.cardId)return {cardId:null,cardHolder:undefined,accountId:Number(r.accountId)||0};
+  if(!r.cardId)return {cardId:null,cardHolder:undefined,merchant:undefined,accountId:Number(r.accountId)||0};
   const card=db.cards.find(c=>String(c.id)===String(r.cardId));
   if(!card)return null; // Nunca converter cartão excluído em débito bancário silenciosamente.
-  return {cardId:card.id,cardHolder:r.cardHolder==='additional'&&(card.hasAdditional||card.additionalName)?'additional':'principal',accountId:Number(card.accountId)||0};
+  return {cardId:card.id,cardHolder:r.cardHolder==='additional'&&(card.hasAdditional||card.additionalName)?'additional':'principal',merchant:String(r.merchant||'').trim()||undefined,accountId:Number(card.accountId)||0};
 }
 
 function recurrenceOccurrencePayment(r,n,date){
@@ -1895,7 +1926,7 @@ function saveRecurrence(e,id){
   if(!f.get('categoryId'))return toast('Selecione a categoria.');
   const data={mode,type:f.get('type'),start:String(f.get('start')||''),description:String(f.get('description')||'').trim(),
     value:parseDecimalBR(f.get('value')),count:mode==='recurring'?null:+f.get('count'),
-    startIdx:mode==='recurring'?null:Math.max(1,Math.floor(Number(f.get('startIdx'))||1)),accountId:card?(Number(card.accountId)||0):+f.get('accountId'),categoryId:+f.get('categoryId'),cardId:card?card.id:null,cardHolder:card?f.get('cardHolder'):undefined};
+    startIdx:mode==='recurring'?null:Math.max(1,Math.floor(Number(f.get('startIdx'))||1)),accountId:card?(Number(card.accountId)||0):+f.get('accountId'),categoryId:+f.get('categoryId'),cardId:card?card.id:null,cardHolder:card?f.get('cardHolder'):undefined,merchant:card?(String(f.get('merchant')||'').trim()||undefined):undefined};
   if(!data.start)return toast('Informe o primeiro vencimento.');
   if(!(data.value>0))return toast('Informe um valor maior que zero.');
   if(mode==='installments'&&!(data.count>=1))return toast('Informe o número total de parcelas.');
@@ -2796,7 +2827,9 @@ function transactions(){
     .filter(t=>(tf==='all'||tf==='despesa')&&Number(t.value||0)>0);
   const bankRows=actualRows.filter(t=>!t.cardId);
   const cardPurchases=actualRows.filter(t=>t.cardId);
-  const rows=sortTransactions([...bankRows,...statementRows]);
+  // A fatura não é uma movimentação comum: não tem conta, categoria nem confirmação individual.
+  // Por isso sai da tabela genérica e ganha um card próprio, com apenas o que faz sentido.
+  const rows=sortTransactions(bankRows);
   // Agrupa as compras pelo ciclo de fatura que elas compõem.
   const cardGroups={};
   cardPurchases.forEach(t=>{
@@ -2843,7 +2876,7 @@ function transactions(){
         <label style="flex:1;min-width:220px">Origem do lançamento<select id="txAutomationFilter">${automationFilterOptions(autof)}</select></label>${cardf!=='all'&&cardf!=='none'?`<button class="btn" onclick="openCardStatement('${cardf}',suggestedCardStatementMonth('${cardf}','${k}'))">💳 Abrir fatura</button>`:''}<button class="btn" id="txClearFilters">Limpar filtros</button>
       </div>
       <div class="muted" style="margin-bottom:12px">
-        ${rows.length} lançamento(s) na conta e ${cardPurchases.length} compra(s) no cartão em ${monthLabel(k)}.
+        ${rows.length} lançamento(s) na conta${statementRows.length?`, ${statementRows.length} fatura(s) a pagar`:''} e ${cardPurchases.length} compra(s) no cartão em ${monthLabel(k)}.
       </div>
       <div class="grid g2">
         <div class="card metric"><div class="label">Saldo confirmado</div>
@@ -2853,7 +2886,28 @@ function transactions(){
           <div class="value ${estimated<0?'red':'blue'}">${estimated<0?'− ':''}${money(Math.abs(estimated))}</div>
         </div>
       </div>
-      <div class="tx-section-head"><h2>🏦 Conta bancária</h2><span class="muted">Dinheiro que entra e sai da conta neste mês, incluindo o pagamento das faturas.</span></div>
+      ${statementRows.length?`
+      <div class="tx-section-head"><h2>🧾 Pagamento de faturas</h2><span class="muted">Valor que sai da conta neste mês para quitar as faturas fechadas.</span></div>
+      <div class="tx-bill-cards">
+      ${statementRows.map(t=>{
+        // A linha da fatura já corresponde ao ciclo do mês exibido.
+        const cycle=k;
+        const items=cardTransactions(t.cardId,cycle);
+        const pend=items.filter(x=>x.confirmed!==true).length;
+        return `<button type="button" class="tx-bill-card" onclick="openCardStatement('${t.cardId}','${cycle}')" aria-label="Abrir fatura de ${esc(cardName(t.cardId))}">
+          <div class="tx-bill-top">
+            <span class="tx-bill-name">💳 ${esc(cardName(t.cardId))}</span>
+            <span class="tx-bill-due">Vence ${fmtDate(t.date)}</span>
+          </div>
+          <div class="tx-bill-value">${money(t.value)}</div>
+          <div class="tx-bill-foot">
+            <span class="muted">${items.length} ${items.length===1?'compra':'compras'} no ciclo${pend?` · ${pend} pendente${pend===1?'':'s'}`:''}</span>
+            <span class="tx-bill-cta">🔍 Abrir fatura</span>
+          </div>
+        </button>`;
+      }).join('')}
+      </div>`:''}
+      <div class="tx-section-head"><h2>🏦 Conta bancária</h2><span class="muted">Receitas e despesas que movimentam a conta diretamente neste mês.</span></div>
       <div class="table-wrap"><table class="table">
         <tr class="sortable-header">
           <th><button type="button" class="sort-th" onclick="setTxSort('date')">Data <span>${txSortIndicator('date')}</span></button></th>
@@ -2866,7 +2920,7 @@ function transactions(){
         </tr>
         ${rows.map(t=>`<tr class="${t.virtualCardStatement?'pending-row':(t.confirmed?'':'pending-row')}">
           <td>${fmtDate(t.date)}</td>
-          <td>${t.virtualCardStatement?'💳 ':''}${esc(t.description)}${t.virtualCardStatement?'<br><span class="pill tx-invoice-pill">Pagamento da fatura</span><br><span class="muted" style="font-size:11px">Soma das compras do ciclo, listadas abaixo</span>':''}${!t.virtualCardStatement&&txAutomationKind(t)!=='single'?`<br><span class="pill tx-origin-pill">${esc(txAutomationLabel(t))}</span>`:''}</td>
+          <td>${esc(t.description)}${txAutomationKind(t)!=='single'?`<br><span class="pill tx-origin-pill">${esc(txAutomationLabel(t))}</span>`:''}</td>
           <td>${esc(txAccountLabel(t))}</td>
           <td>${t.virtualCardStatement?'—':'<span class="cat-dot" style="background:'+categoryColor(t.categoryId)+'"></span><span class="category-icon">'+esc(categoryIcon(t.categoryId))+'</span>'+esc(catName(t.categoryId))}</td>
           <td>${t.type==='receita'?'Receita':'Despesa'}</td>
@@ -3148,7 +3202,7 @@ function cards(){
       </div>
       <div class="muted" style="margin-top:8px">Confirmado: ${money(confirmed)} · ${tx.length} compra(s)</div><div class="grid g2" style="margin-top:8px"><div><span class="muted">Principal</span><br><b>${money(principalTotal)}</b></div>${c.hasAdditional||c.additionalName?`<div><span class="muted">${esc(c.additionalName||'Adicional')}</span><br><b>${money(additionalTotal)}</b></div>`:''} </div>
       <hr><h3>Lançamentos do cartão</h3>
-      ${tx.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Titular</th><th>Categoria</th><th>Valor</th><th>Status</th><th>Ações</th></tr>${tx.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(cardHolderLabel(t))}</td><td><span class="cat-dot" style="background:${categoryColor(t.categoryId)}"></span><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td class="red">− ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td><td><button class="btn" onclick="openTx(${t.id})">✎ Editar</button> <button class="btn danger" onclick="deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhuma compra vinculada a este cartão na fatura selecionada.</div>'}
+      ${tx.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Titular</th><th>Categoria</th><th>Valor</th><th>Status</th><th>Ações</th></tr>${tx.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}${merchantLabel(t)?`<br><span class="invoice-merchant">${esc(merchantLabel(t))}</span>`:''}</td><td>${esc(cardHolderLabel(t))}</td><td><span class="cat-dot" style="background:${categoryColor(t.categoryId)}"></span><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td class="red">− ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td><td><button class="btn" onclick="openTx(${t.id})">✎ Editar</button> <button class="btn danger" onclick="deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhuma compra vinculada a este cartão na fatura selecionada.</div>'}
       <div style="margin-top:10px">${orderButtons('cards',c.id)} <button class="btn" onclick="openCard(${c.id})">Editar</button><button class="btn danger" onclick="deleteCard(${c.id})">Excluir</button></div>
     </div>`;
   }).join('');
@@ -3353,7 +3407,8 @@ function saveTransactionEdit(e,id){
     type:f.get('type'),
     confirmed:f.get('confirmed')==='on',
     cardId:f.get('cardId')?Number(f.get('cardId')):null,
-    cardHolder:f.get('cardHolder')||'principal'
+    cardHolder:f.get('cardHolder')||'principal',
+    merchant:String(f.get('merchant')||'').trim()
   };
 
   const newCardId=changed.cardId;
@@ -3369,6 +3424,8 @@ function saveTransactionEdit(e,id){
     t.accountId=changed.accountId;
   }
   t.cardHolder=newCardId?changed.cardHolder:'principal';
+  // O estabelecimento só faz sentido em compras no cartão.
+  if(newCardId&&changed.merchant)t.merchant=changed.merchant; else delete t.merchant;
 
   const dateChanged=newDate!==oldDate;
 
@@ -3605,6 +3662,7 @@ function openTx(id){
     <label>Valor<input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" data-min="0.01" name="value" value="${decimalInputValue(t?.value||'')}" required placeholder="0,00"></label>
     <label>Cartão de crédito<select name="cardId" id="txCardSelect" onchange="toggleCardAccountFields()"><option value="">Não é compra no cartão</option>${[...db.cards].sort((a,b)=>(a.order??0)-(b.order??0)).map(c=>`<option value="${c.id}" ${String(cardId)===String(c.id)?'selected':''}>💳 ${esc(c.name)}</option>`).join('')}</select></label>
     <label id="txHolderWrap" style="display:${cardId?'block':'none'}">Titular da compra<select name="cardHolder" id="txHolderSelect"></select></label>
+    <label id="txMerchantWrap" style="display:${cardId?'block':'none'}">Estabelecimento na fatura <span class="muted">(opcional)</span><input name="merchant" value="${esc(t?.merchant||'')}" placeholder="Ex.: SMARTFIT*MENSALIDADE" autocomplete="off" maxlength="80"></label>
     <div class="row tx-account-category-row">
       <label class="tx-account-field">Conta<select name="accountId" id="txAccountSelectModal" required><option value="" ${t?'':'selected'}>Selecione uma conta</option>${[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0)).map(a=>`<option value="${a.id}" ${!cardId&&t?.accountId==a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>
       ${categoryPickerHtml(t?.categoryId??'')}
@@ -3628,7 +3686,7 @@ function addTx(e){
   if(!cardId&&!f.get('accountId'))return toast('Selecione a conta.');
   if(cardId && f.get('type')!=='despesa'){toast('Compras no cartão devem ser despesas.');return;}
   if(!(parseDecimalBR(f.get('value'))>0))return toast('Informe um valor válido maior que zero.');
-  const card=db.cards.find(c=>c.id===cardId); db.transactions.push({id:uid(),type:f.get('type'),date:f.get('date'),description:f.get('description'),value:parseDecimalBR(f.get('value')),accountId:cardId?Number(card?.accountId||0):+f.get('accountId'),cardId:cardId||undefined,cardHolder:cardId?(f.get('cardHolder')||'principal'):undefined,categoryId:+f.get('categoryId'),confirmed:f.get('confirmed')==='on'});
+  const card=db.cards.find(c=>c.id===cardId); db.transactions.push({id:uid(),type:f.get('type'),date:f.get('date'),description:f.get('description'),value:parseDecimalBR(f.get('value')),accountId:cardId?Number(card?.accountId||0):+f.get('accountId'),cardId:cardId||undefined,cardHolder:cardId?(f.get('cardHolder')||'principal'):undefined,merchant:cardId?(String(f.get('merchant')||'').trim()||undefined):undefined,categoryId:+f.get('categoryId'),confirmed:f.get('confirmed')==='on'});
   save();closeModal();toast(cardId?'Compra lançada no cartão':'Movimentação cadastrada');render();
 }
 
@@ -3864,7 +3922,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v90',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v92',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
