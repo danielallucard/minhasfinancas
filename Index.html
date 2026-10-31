@@ -794,9 +794,10 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 .rec-range-error{border-color:#f3c2bd;background:#fdf3f2;color:#a3372c;font-weight:600}
 @media(max-width:1180px){#recStartIdxInput{max-width:100%}}
 </style>
-<style id="invoice-cycle-v94">
+<style id="invoice-cycle-v95">
 .rec-invoice-info{margin-top:9px;padding:10px 12px;border:1px solid #cfe0ff;border-left:4px solid var(--primary);border-radius:10px;background:#f5f9ff;color:#2f4a7a;font-size:12.5px;line-height:1.5}
 .rec-invoice-warn,.card-close-warn{margin-top:9px;padding:10px 12px;border:1px solid #f0d9a8;border-left:4px solid var(--amber);border-radius:10px;background:#fffaf0;color:#8a5a00;font-size:12.5px;line-height:1.5}
+#recStartRefWrap[hidden]{display:none!important}
 </style>
 <style id="automation-filter-v86">
 .tx-origin-pill{display:inline-block;margin-top:4px;background:#eef3ff;color:#3159bb;font-size:11px;font-weight:650;white-space:nowrap}
@@ -1731,7 +1732,12 @@ function recStartIdx(r){
   const n=Number(r.startIdx);
   return Number.isFinite(n)&&n>=1?Math.floor(n):1;
 }
-function recOccurrenceDate(r,n){return addMonthsSafe(r.start,Number(n)-recStartIdx(r));}
+// Índice da parcela à qual a data informada se refere.
+function recAnchorIdx(r){
+  if(!r||isRecurring(r))return 1;
+  return r.startRef==='first'?1:recStartIdx(r);
+}
+function recOccurrenceDate(r,n){return addMonthsSafe(r.start,Number(n)-recAnchorIdx(r));}
 function recurrenceHorizonIdx(r){
   const s=new Date(r.start+'T12:00:00');
   const now=new Date();
@@ -1852,7 +1858,11 @@ function openRecurrence(id){
   </div>
   <div id="recStartIdxWrap">
     <label>Começar na parcela nº<input type="number" inputmode="numeric" min="1" max="1200" name="startIdx" id="recStartIdxInput" value="${r&&!isRecurring(r)?recStartIdx(r):1}" placeholder="1" oninput="updateInstallmentRangeHint()"></label>
-    <p class="muted" id="recStartIdxHint">Use <b>1</b> para uma compra nova. Para uma compra <b>já em andamento</b>, informe a próxima parcela a vencer: as anteriores não são lançadas.</p>
+    <p class="muted" id="recStartIdxHint">Use <b>1</b> para uma compra nova. Para uma compra <b>já em andamento</b>, informe a próxima parcela a lançar: as anteriores não são criadas.</p>
+    <label id="recStartRefWrap" hidden>A data informada acima é<select name="startRef" id="recStartRefSelect" onchange="updateInstallmentRangeHint()">
+      <option value="first" ${(r&&!isRecurring(r)&&recAnchorIdx(r)!==1)?'':'selected'}>📅 Da compra original (parcela 1)</option>
+      <option value="current" ${(r&&!isRecurring(r)&&recAnchorIdx(r)!==1)?'selected':''}>⏭️ Da próxima parcela a lançar</option>
+    </select></label>
     <div class="rec-range-hint" id="recRangeHint" hidden></div>
   </div>
   <label>Forma de lançamento<select name="paymentMethod" id="recPaymentSelect" onchange="toggleRecurrencePayment()" required>
@@ -1901,38 +1911,30 @@ function toggleRecurrenceMode(){
   const h=document.getElementById('recRecurringHint');if(h)h.style.display=rec?'':'none';
 }
 
-// Mostra em qual fatura a parcela inicial vai cair, considerando o dia de fechamento do cartão.
-// Compra feita depois do fechamento entra na fatura do mês seguinte.
-function installmentInvoicePreview(){
-  if(document.getElementById('recPaymentSelect')?.value!=='card')return '';
-  const date=document.getElementById('recStartDateInput')?.value;
-  const card=db.cards.find(c=>String(c.id)===document.getElementById('recCardSelect')?.value);
-  if(!date||!card)return '';
-  if(!Number(card.close))
-    return `<div class="rec-invoice-warn">⚠️ O cartão <b>${esc(card.name)}</b> está sem o <b>dia de fechamento</b>. Sem ele, toda compra entra na fatura do próprio mês. Cadastre o fechamento em <b>Cartões › Editar</b>.</div>`;
-  const recurring=document.getElementById('recModeSelect')?.value==='recurring';
-  const n=recurring?1:(Number(document.getElementById('recStartIdxInput')?.value)||1);
-  const cycle=cardBillingMonth(date,card);
-  const due=cardStatementDueDate(card,cycle);
-  const rolou=monthKey(date)!==cycle;
-  return `<div class="rec-invoice-info">💳 ${recurring?'A primeira cobrança':`A parcela <b>${n}</b>`}, em ${fmtDate(date)}, entra na <b>fatura de ${monthLabel(cycle)}</b> — fecha dia ${card.close}, vence ${fmtDate(due)}.${rolou?' A compra é posterior ao fechamento, por isso caiu na fatura seguinte.':''} As próximas seguem faturas mensais consecutivas.</div>`;
-}
 function updateInstallmentRangeHint(){
   const box=document.getElementById('recRangeHint');if(!box)return;
   const recurring=document.getElementById('recModeSelect')?.value==='recurring';
   const total=Number(document.getElementById('recCountInput')?.value);
   const startIdx=Number(document.getElementById('recStartIdxInput')?.value)||1;
-  // Rótulo da data acompanha a parcela inicial escolhida.
-  const dateLabel=document.getElementById('recDateLabel');
   const useCard=document.getElementById('recPaymentSelect')?.value==='card';
+  const anchorFirst=(document.getElementById('recStartRefSelect')?.value||'first')!=='current';
+  const date=document.getElementById('recStartDateInput')?.value||'';
+  const card=useCard?db.cards.find(c=>String(c.id)===document.getElementById('recCardSelect')?.value):null;
+  // O seletor de âncora só faz sentido quando a série já está em andamento.
+  const refWrap=document.getElementById('recStartRefWrap');
+  if(refWrap)refWrap.hidden=recurring||startIdx<=1;
+  // Rótulo da data acompanha o significado escolhido.
+  const dateLabel=document.getElementById('recDateLabel');
   if(dateLabel&&!recurring){
     dateLabel.textContent=startIdx>1
-      ? (useCard?`Data da parcela nº ${startIdx}`:`Vencimento da parcela nº ${startIdx}`)
-      : (useCard?'Data da primeira compra/cobrança':'Primeiro vencimento');
+      ? (anchorFirst?'Data da compra original (parcela 1)':(useCard?`Data da parcela nº ${startIdx}`:`Vencimento da parcela nº ${startIdx}`))
+      : (useCard?'Data da compra':'Primeiro vencimento');
   }
-  const invoice=installmentInvoicePreview();
+  const avisoCartao=(useCard&&card&&!Number(card.close))
+    ? `<div class="rec-invoice-warn">⚠️ O cartão <b>${esc(card.name)}</b> está sem o <b>dia de fechamento</b>. Sem ele, toda compra entra na fatura do próprio mês. Cadastre-o em <b>Cartões › Editar</b>.</div>`
+    : '';
   if(recurring||!Number.isFinite(total)||total<1){
-    box.hidden=!invoice;box.className='rec-range-hint';box.innerHTML=invoice;return;
+    box.hidden=!avisoCartao;box.className='rec-range-hint';box.innerHTML=avisoCartao;return;
   }
   if(startIdx>total){
     box.hidden=false;box.className='rec-range-hint rec-range-error';
@@ -1940,10 +1942,21 @@ function updateInstallmentRangeHint(){
     return;
   }
   const qtd=total-startIdx+1;
-  box.hidden=false;box.className='rec-range-hint';
-  box.innerHTML=(startIdx>1
+  let html=startIdx>1
     ? `Serão lançadas as parcelas <b>${startIdx}/${total}</b> até <b>${total}/${total}</b> — ${qtd} lançamento(s). As ${startIdx-1} parcelas anteriores não serão criadas.`
-    : `Serão lançadas as parcelas <b>1/${total}</b> até <b>${total}/${total}</b> — ${qtd} lançamento(s).`)+invoice;
+    : `Serão lançadas as parcelas <b>1/${total}</b> até <b>${total}/${total}</b> — ${qtd} lançamento(s).`;
+  // Confirmação explícita de quando cada ponta da série cai, para evitar erro de mês.
+  if(date){
+    const fake={start:date,startIdx,startRef:anchorFirst?'first':'current',mode:'installments'};
+    const dIni=recOccurrenceDate(fake,startIdx), dFim=recOccurrenceDate(fake,total);
+    if(useCard&&card&&Number(card.close)){
+      const cIni=cardBillingMonth(dIni,card), cFim=cardBillingMonth(dFim,card);
+      html+=`<div class="rec-invoice-info">💳 A parcela <b>${startIdx}/${total}</b> é de ${fmtDate(dIni)} e entra na <b>fatura de ${monthLabel(cIni)}</b> (fecha dia ${card.close}, vence ${fmtDate(cardStatementDueDate(card,cIni))}). A última, <b>${total}/${total}</b>, cai na fatura de ${monthLabel(cFim)}.</div>`;
+    }else{
+      html+=`<div class="rec-invoice-info">📅 A parcela <b>${startIdx}/${total}</b> vence em ${fmtDate(dIni)} e a última, <b>${total}/${total}</b>, em ${fmtDate(dFim)}.</div>`;
+    }
+  }
+  box.hidden=false;box.className='rec-range-hint';box.innerHTML=html+avisoCartao;
 }
 function toggleRecurrencePayment(){
   const method=document.getElementById('recPaymentSelect'),type=document.getElementById('recTypeSelect');
@@ -1988,7 +2001,7 @@ function recurrenceOccurrencePayment(r,n,date){
   const card=db.cards.find(c=>String(c.id)===String(r.cardId));
   const first=cardBillingMonth(r.start,card);
   const [y,m]=first.split('-').map(Number);
-  const offset=Number(n)-recStartIdx(r);
+  const offset=Number(n)-recAnchorIdx(r);
   return {...payment,automationBillingMonth:monthKeyFromDate(new Date(y,m-1+offset,1)),automationBillingDate:date,automationBillingCardId:card.id};
 }
 function saveRecurrence(e,id){
@@ -2008,7 +2021,8 @@ function saveRecurrence(e,id){
   if(!f.get('categoryId'))return toast('Selecione a categoria.');
   const data={mode,type:f.get('type'),start:String(f.get('start')||''),description:String(f.get('description')||'').trim(),
     value:parseDecimalBR(f.get('value')),count:mode==='recurring'?null:+f.get('count'),
-    startIdx:mode==='recurring'?null:Math.max(1,Math.floor(Number(f.get('startIdx'))||1)),accountId:card?(Number(card.accountId)||0):+f.get('accountId'),categoryId:+f.get('categoryId'),cardId:card?card.id:null,cardHolder:card?f.get('cardHolder'):undefined,merchant:card?(String(f.get('merchant')||'').trim()||undefined):undefined};
+    startIdx:mode==='recurring'?null:Math.max(1,Math.floor(Number(f.get('startIdx'))||1)),
+    startRef:mode==='recurring'?null:(f.get('startRef')==='current'?'current':'first'),accountId:card?(Number(card.accountId)||0):+f.get('accountId'),categoryId:+f.get('categoryId'),cardId:card?card.id:null,cardHolder:card?f.get('cardHolder'):undefined,merchant:card?(String(f.get('merchant')||'').trim()||undefined):undefined};
   if(!data.start)return toast('Informe o primeiro vencimento.');
   if(!(data.value>0))return toast('Informe um valor maior que zero.');
   if(mode==='installments'&&!(data.count>=1))return toast('Informe o número total de parcelas.');
@@ -2026,7 +2040,7 @@ function saveRecurrence(e,id){
   }
   const r=db.recurrences.find(x=>x.id==id);if(!r)return;
   const serie=()=>db.transactions.filter(t=>t.recurrenceId===r.id);
-  const antes={start:String(r.start||''),startIdx:recStartIdx(r),count:Number(r.count||0)};
+  const antes={start:String(r.start||''),startIdx:recStartIdx(r),anchor:recAnchorIdx(r),count:Number(r.count||0)};
   const pending=serie().filter(t=>t.confirmed!==true);
   const confirmedCount=serie().filter(t=>t.confirmed===true).length;
   let apply=false;
@@ -2049,9 +2063,7 @@ function saveRecurrence(e,id){
         confirmed:(!rec&&!!r.cardId)?true:t.confirmed});
     });
   }
-  // ===== Faixa de parcelas e cronograma (v94) =====
-  // Parcelas no cartão nascem CONFIRMADAS. Sem tratá-las aqui, mudar a parcela inicial
-  // não apagava as anteriores nem recalculava as datas e as faturas da série.
+  // ===== Faixa e cronograma (v95) =====
   let removidas=0,reposicionadas=0;
   if(mode==='installments'){
     const first=recStartIdx(r);
@@ -2065,21 +2077,25 @@ function saveRecurrence(e,id){
         removidas=fora.length;
       }
     }
-    const cronograma=antes.start!==String(r.start||'')||antes.startIdx!==first||antes.count!==Number(r.count||0);
+    const mudou=antes.start!==String(r.start||'')||antes.startIdx!==first||antes.anchor!==recAnchorIdx(r)||antes.count!==Number(r.count||0);
     const dentro=serie();
-    if(cronograma&&dentro.length&&confirm(`REPOSICIONAR AS PARCELAS\n\nO cronograma mudou: a parcela ${first} passa a vencer em ${fmtDate(r.start)}.\n\nOK = recalcular data, numeração e fatura das ${dentro.length} parcela(s) existentes.\nCancelar = manter as datas atuais.`)){
-      dentro.forEach(t=>{
-        const n=Number(t.installment)||first;
-        const occ=recOccurrenceDate(r,n);
-        Object.assign(t,{date:occ,...recurrenceOccurrencePayment(r,n,occ),
-          description:installmentDescription(r.description,n,r.count),totalInstallments:r.count});
-      });
-      reposicionadas=dentro.length;
+    if(mudou&&dentro.length){
+      const amostra=dentro.sort((a,b)=>(Number(a.installment)||0)-(Number(b.installment)||0))[0];
+      const nova=recOccurrenceDate(r,Number(amostra.installment)||first);
+      if(confirm(`REPOSICIONAR AS PARCELAS\n\nO cronograma mudou: a parcela ${amostra.installment} passa de ${fmtDate(amostra.date)} para ${fmtDate(nova)}.\n\nOK = recalcular data, numeração e fatura das ${dentro.length} parcela(s) existentes.\nCancelar = manter as datas atuais.`)){
+        dentro.forEach(t=>{
+          const n=Number(t.installment)||first;
+          const occ=recOccurrenceDate(r,n);
+          Object.assign(t,{date:occ,...recurrenceOccurrencePayment(r,n,occ),
+            description:installmentDescription(r.description,n,r.count),totalInstallments:r.count});
+        });
+        reposicionadas=dentro.length;
+      }
     }
   }
   const added=generateRecurrence(r);
   save();closeModal();
-  toast(`Automatização alterada${apply?` · ${pending.length} pendente(s) atualizado(s)`:''}${removidas?` · ${removidas} fora da faixa removida(s)`:''}${reposicionadas?` · ${reposicionadas} reposicionada(s)`:''}${added?` · ${added} novo(s) lançamento(s)`:''}`);
+  toast(`Automatização alterada${apply?` · ${pending.length} pendente(s) atualizado(s)`:''}${removidas?` · ${removidas} removida(s)`:''}${reposicionadas?` · ${reposicionadas} reposicionada(s)`:''}${added?` · ${added} novo(s)`:''}`);
   render();
 }
 function endRecurrence(id){
@@ -3479,7 +3495,7 @@ function cards(){
       <span class="pill">${esc(c.brand||'Cartão')}</span><h2>💳 ${esc(c.name)}</h2>
       <p>Limite: <b>${money(c.limit)}</b></p>
       <p>Fechamento: dia ${c.close||'—'} · Vencimento: dia ${c.due||'—'} · Conta: ${esc(accountName(c.accountId))}</p>
-      ${c.close?'':'<div class="card-close-warn">⚠️ Sem o <b>dia de fechamento</b>, todas as compras entram na fatura do próprio mês, mesmo as feitas após o fechamento real. Toque em <b>Editar</b> para informá-lo.</div>'}
+      ${c.close?'':'<div class="card-close-warn">⚠️ Sem o <b>dia de fechamento</b>, todas as compras entram na fatura do próprio mês. Toque em <b>Editar</b> para informá-lo.</div>'}
       <div class="grid g2" style="margin-top:12px">
         <div><div class="muted">Fatura de ${monthLabel(k)}</div><div class="value red">${money(total)}</div></div>
         <div><div class="muted">Disponível estimado</div><div class="value blue">${money(remaining)}</div></div>
@@ -4080,7 +4096,7 @@ openModal(c?'Editar cartão':'Novo cartão',`<form class="form" onsubmit="saveCa
 <label>Nome do cartão<input name="name" value="${esc(c?.name||'')}" required placeholder="Meu cartão"></label>
 <div class="row"><label>Bandeira<input name="brand" value="${esc(c?.brand||'')}"></label><label>Limite<input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" name="limit" value="${decimalInputValue(c?.limit||0)}"></label></div>
 <div class="row"><label>Dia de fechamento<input type="number" name="close" min="1" max="31" value="${c?.close||''}" required></label><label>Dia de vencimento<input type="number" name="due" min="1" max="31" value="${c?.due||''}" required></label></div>
-<p class="muted">O dia de fechamento define em qual fatura cada compra entra: feita <b>até</b> o fechamento, vai para a fatura do mês; feita <b>depois</b>, vai para a do mês seguinte. Sem esse dia, toda compra cai na fatura do próprio mês.</p>
+<p class="muted">O fechamento define em qual fatura cada compra entra: feita <b>até</b> esse dia, vai para a fatura do mês; <b>depois</b>, para a do mês seguinte.</p>
 <label>Conta vinculada<select name="accountId"><option value="">Nenhuma</option>${[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0)).map(a=>`<option value="${a.id}" ${String(c?.accountId||'')===String(a.id)?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>
 <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="hasAdditional" ${c?.hasAdditional?'checked':''}> Possui cartão adicional</label>
 <label>Nome do adicional<input name="additionalName" value="${esc(c?.additionalName||'')}" placeholder="Ex.: Esposa"></label>
@@ -4197,7 +4213,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v94',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v95',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
