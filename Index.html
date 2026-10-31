@@ -797,7 +797,6 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 <style id="invoice-cycle-v95">
 .rec-invoice-info{margin-top:9px;padding:10px 12px;border:1px solid #cfe0ff;border-left:4px solid var(--primary);border-radius:10px;background:#f5f9ff;color:#2f4a7a;font-size:12.5px;line-height:1.5}
 .rec-invoice-warn,.card-close-warn{margin-top:9px;padding:10px 12px;border:1px solid #f0d9a8;border-left:4px solid var(--amber);border-radius:10px;background:#fffaf0;color:#8a5a00;font-size:12.5px;line-height:1.5}
-#recStartRefWrap[hidden]{display:none!important}
 </style>
 <style id="automation-filter-v86">
 .tx-origin-pill{display:inline-block;margin-top:4px;background:#eef3ff;color:#3159bb;font-size:11px;font-weight:650;white-space:nowrap}
@@ -944,6 +943,22 @@ function normalizeOrders(){
   if(!db.settings || typeof db.settings!=='object') db.settings={};
   normalizeBudget();
   normalizeGoals();
+  normalizeInstallmentAnchor();
+}
+// Até a v95, a data de um parcelamento iniciado no meio da série significava o
+// vencimento dessa parcela. A partir da v96 ela é sempre a da compra original.
+// A conversão recalcula a data equivalente da parcela 1 para que nenhum
+// lançamento já existente mude de lugar.
+function normalizeInstallmentAnchor(){
+  (db.recurrences||[]).forEach(r=>{
+    if(!r||r.anchorFixed===true)return;
+    if(isRecurring(r)){r.anchorFixed=true;delete r.startRef;return;}
+    const first=recStartIdx(r);
+    // r.startRef==='first' já estava na semântica nova; as demais precisam recuar.
+    if(first>1&&r.startRef!=='first'&&r.start)r.start=addMonthsSafe(r.start,-(first-1));
+    r.anchorFixed=true;
+    delete r.startRef;
+  });
 }
 // Metas de alocação: objetivos concretos (viagem, equipamento) com aportes registrados ao longo do tempo.
 // Não confundir com a divisão do orçamento: aqui o dinheiro é guardado para um objetivo específico.
@@ -1732,12 +1747,10 @@ function recStartIdx(r){
   const n=Number(r.startIdx);
   return Number.isFinite(n)&&n>=1?Math.floor(n):1;
 }
-// Índice da parcela à qual a data informada se refere.
-function recAnchorIdx(r){
-  if(!r||isRecurring(r))return 1;
-  return r.startRef==='first'?1:recStartIdx(r);
-}
-function recOccurrenceDate(r,n){return addMonthsSafe(r.start,Number(n)-recAnchorIdx(r));}
+// A data gravada em r.start é sempre a da compra original (parcela 1).
+// Automatizações criadas antes da v96 usavam a data da parcela inicial; elas são
+// convertidas uma única vez em normalizeInstallmentAnchor(), preservando os lançamentos.
+function recOccurrenceDate(r,n){return addMonthsSafe(r.start,Number(n)-1);}
 function recurrenceHorizonIdx(r){
   const s=new Date(r.start+'T12:00:00');
   const now=new Date();
@@ -1858,11 +1871,7 @@ function openRecurrence(id){
   </div>
   <div id="recStartIdxWrap">
     <label>Começar na parcela nº<input type="number" inputmode="numeric" min="1" max="1200" name="startIdx" id="recStartIdxInput" value="${r&&!isRecurring(r)?recStartIdx(r):1}" placeholder="1" oninput="updateInstallmentRangeHint()"></label>
-    <p class="muted" id="recStartIdxHint">Use <b>1</b> para uma compra nova. Para uma compra <b>já em andamento</b>, informe a próxima parcela a lançar: as anteriores não são criadas.</p>
-    <label id="recStartRefWrap" hidden>A data informada acima é<select name="startRef" id="recStartRefSelect" onchange="updateInstallmentRangeHint()">
-      <option value="first" ${(r&&!isRecurring(r)&&recAnchorIdx(r)!==1)?'':'selected'}>📅 Da compra original (parcela 1)</option>
-      <option value="current" ${(r&&!isRecurring(r)&&recAnchorIdx(r)!==1)?'selected':''}>⏭️ Da próxima parcela a lançar</option>
-    </select></label>
+    <p class="muted" id="recStartIdxHint">Use <b>1</b> para uma compra nova. Para uma compra <b>já em andamento</b>, informe a próxima parcela a lançar — as anteriores não são criadas. A data acima continua sendo a da <b>compra original</b>, como aparece no app do cartão.</p>
     <div class="rec-range-hint" id="recRangeHint" hidden></div>
   </div>
   <label>Forma de lançamento<select name="paymentMethod" id="recPaymentSelect" onchange="toggleRecurrencePayment()" required>
@@ -1917,17 +1926,13 @@ function updateInstallmentRangeHint(){
   const total=Number(document.getElementById('recCountInput')?.value);
   const startIdx=Number(document.getElementById('recStartIdxInput')?.value)||1;
   const useCard=document.getElementById('recPaymentSelect')?.value==='card';
-  const anchorFirst=(document.getElementById('recStartRefSelect')?.value||'first')!=='current';
   const date=document.getElementById('recStartDateInput')?.value||'';
   const card=useCard?db.cards.find(c=>String(c.id)===document.getElementById('recCardSelect')?.value):null;
-  // O seletor de âncora só faz sentido quando a série já está em andamento.
-  const refWrap=document.getElementById('recStartRefWrap');
-  if(refWrap)refWrap.hidden=recurring||startIdx<=1;
-  // Rótulo da data acompanha o significado escolhido.
+  // A data é sempre a da compra original; o rótulo apenas reforça isso.
   const dateLabel=document.getElementById('recDateLabel');
   if(dateLabel&&!recurring){
     dateLabel.textContent=startIdx>1
-      ? (anchorFirst?'Data da compra original (parcela 1)':(useCard?`Data da parcela nº ${startIdx}`:`Vencimento da parcela nº ${startIdx}`))
+      ? 'Data da compra original (parcela 1)'
       : (useCard?'Data da compra':'Primeiro vencimento');
   }
   const avisoCartao=(useCard&&card&&!Number(card.close))
@@ -1947,7 +1952,7 @@ function updateInstallmentRangeHint(){
     : `Serão lançadas as parcelas <b>1/${total}</b> até <b>${total}/${total}</b> — ${qtd} lançamento(s).`;
   // Confirmação explícita de quando cada ponta da série cai, para evitar erro de mês.
   if(date){
-    const fake={start:date,startIdx,startRef:anchorFirst?'first':'current',mode:'installments'};
+    const fake={start:date,startIdx,mode:'installments'};
     const dIni=recOccurrenceDate(fake,startIdx), dFim=recOccurrenceDate(fake,total);
     if(useCard&&card&&Number(card.close)){
       const cIni=cardBillingMonth(dIni,card), cFim=cardBillingMonth(dFim,card);
@@ -2001,7 +2006,7 @@ function recurrenceOccurrencePayment(r,n,date){
   const card=db.cards.find(c=>String(c.id)===String(r.cardId));
   const first=cardBillingMonth(r.start,card);
   const [y,m]=first.split('-').map(Number);
-  const offset=Number(n)-recAnchorIdx(r);
+  const offset=Number(n)-1;
   return {...payment,automationBillingMonth:monthKeyFromDate(new Date(y,m-1+offset,1)),automationBillingDate:date,automationBillingCardId:card.id};
 }
 function saveRecurrence(e,id){
@@ -2022,7 +2027,7 @@ function saveRecurrence(e,id){
   const data={mode,type:f.get('type'),start:String(f.get('start')||''),description:String(f.get('description')||'').trim(),
     value:parseDecimalBR(f.get('value')),count:mode==='recurring'?null:+f.get('count'),
     startIdx:mode==='recurring'?null:Math.max(1,Math.floor(Number(f.get('startIdx'))||1)),
-    startRef:mode==='recurring'?null:(f.get('startRef')==='current'?'current':'first'),accountId:card?(Number(card.accountId)||0):+f.get('accountId'),categoryId:+f.get('categoryId'),cardId:card?card.id:null,cardHolder:card?f.get('cardHolder'):undefined,merchant:card?(String(f.get('merchant')||'').trim()||undefined):undefined};
+    anchorFixed:true,accountId:card?(Number(card.accountId)||0):+f.get('accountId'),categoryId:+f.get('categoryId'),cardId:card?card.id:null,cardHolder:card?f.get('cardHolder'):undefined,merchant:card?(String(f.get('merchant')||'').trim()||undefined):undefined};
   if(!data.start)return toast('Informe o primeiro vencimento.');
   if(!(data.value>0))return toast('Informe um valor maior que zero.');
   if(mode==='installments'&&!(data.count>=1))return toast('Informe o número total de parcelas.');
@@ -2040,7 +2045,7 @@ function saveRecurrence(e,id){
   }
   const r=db.recurrences.find(x=>x.id==id);if(!r)return;
   const serie=()=>db.transactions.filter(t=>t.recurrenceId===r.id);
-  const antes={start:String(r.start||''),startIdx:recStartIdx(r),anchor:recAnchorIdx(r),count:Number(r.count||0)};
+  const antes={start:String(r.start||''),startIdx:recStartIdx(r),count:Number(r.count||0)};
   const pending=serie().filter(t=>t.confirmed!==true);
   const confirmedCount=serie().filter(t=>t.confirmed===true).length;
   let apply=false;
@@ -2077,7 +2082,7 @@ function saveRecurrence(e,id){
         removidas=fora.length;
       }
     }
-    const mudou=antes.start!==String(r.start||'')||antes.startIdx!==first||antes.anchor!==recAnchorIdx(r)||antes.count!==Number(r.count||0);
+    const mudou=antes.start!==String(r.start||'')||antes.startIdx!==first||antes.count!==Number(r.count||0);
     const dentro=serie();
     if(mudou&&dentro.length){
       const amostra=dentro.sort((a,b)=>(Number(a.installment)||0)-(Number(b.installment)||0))[0];
@@ -4213,7 +4218,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v95',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v96',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
