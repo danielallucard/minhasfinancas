@@ -794,6 +794,21 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 .rec-range-error{border-color:#f3c2bd;background:#fdf3f2;color:#a3372c;font-weight:600}
 @media(max-width:1180px){#recStartIdxInput{max-width:100%}}
 </style>
+<style id="tx-sections-v97">
+/* Saída de caixa (vermelho) × compromisso futuro (âmbar): diferenças visuais evitam leitura duplicada. */
+.tx-section-pay{border-bottom-color:#e8a0a0}
+.tx-bill-card{border-left-color:var(--red)!important;background:#fffafa!important}
+.tx-bill-card:hover{border-color:var(--red)!important}
+.tx-bill-due{background:#fdecea!important;color:#a3372c!important}
+.tx-bill-cycle{margin-top:7px;color:var(--muted);font-size:12px;line-height:1.45}
+.tx-bill-foot{border-top:1px dashed var(--border);padding-top:8px}
+.tx-pay-total{margin:0 0 6px;padding:10px 12px;border:1px solid #f0c9c4;border-radius:10px;background:#fff6f5;color:#8a2f24;font-size:13px}
+.tx-invoice-card-value{font-size:22px!important;color:#9a6200!important}
+.tx-invoice-card-cycle{margin:7px 0 0!important;padding:7px 9px;border-radius:8px;background:#fff8ec;color:#8a5a00}
+.tx-invoice-card-cta{color:#9a6200!important}
+.tx-invoice-card-sub{font-size:11px;opacity:.85}
+@media(max-width:1180px){.tx-invoice-card-value{font-size:21px!important}}
+</style>
 <style id="invoice-cycle-v95">
 .rec-invoice-info{margin-top:9px;padding:10px 12px;border:1px solid #cfe0ff;border-left:4px solid var(--primary);border-radius:10px;background:#f5f9ff;color:#2f4a7a;font-size:12.5px;line-height:1.5}
 .rec-invoice-warn,.card-close-warn{margin-top:9px;padding:10px 12px;border:1px solid #f0d9a8;border-left:4px solid var(--amber);border-radius:10px;background:#fffaf0;color:#8a5a00;font-size:12.5px;line-height:1.5}
@@ -1513,9 +1528,27 @@ function suggestedCardStatementMonth(cardId,calendarMonth=selectedMonthKey()){
 }
 function shiftStatementMonth(month,delta){const [y,m]=String(month).split('-').map(Number);return monthKeyFromDate(new Date(y,m-1+delta,1));}
 // ===== Regime de caixa do cartão de crédito (v85) =====
-function cardStatementDueDate(card,statementMonth){
+// Último dia de compras que entrou na fatura informada.
+// Ex.: cartão que fecha dia 28 → a fatura de novembro reúne compras até 28/10.
+function cardCycleCloseDate(card,statementMonth){
+  const close=Number(card?.close||0);
+  if(!close)return '';
   const [y,m]=String(statementMonth||'').split('-').map(Number);
   if(!y||!m)return '';
+  const last=new Date(y,m,0).getDate();
+  return `${y}-${String(m).padStart(2,'0')}-${String(Math.min(close,last)).padStart(2,'0')}`;
+}
+// Quantos meses o vencimento fica depois do fechamento do ciclo.
+// Vencimento posterior ao fechamento = mesmo mês; anterior ou igual = mês seguinte.
+function cardDueOffset(card){
+  const close=Number(card?.close||0),due=Number(card?.due||0);
+  return (close&&due&&due<=close)?1:0;
+}
+function cardStatementDueDate(card,statementMonth){
+  let [y,m]=String(statementMonth||'').split('-').map(Number);
+  if(!y||!m)return '';
+  m+=cardDueOffset(card);
+  if(m>12){m-=12;y+=1;}
   const last=new Date(y,m,0).getDate();
   const due=Number(card?.due||0);
   const day=due?Math.min(due,last):last;
@@ -1602,14 +1635,13 @@ function confirmAllInvoice(cardId,statementMonth){
   openCardStatement(cardId,statementMonth);
   toast(`${pending.length} despesa(s) confirmada(s).`);
 }
-function cardStatementRows(statementMonth){
+// dueMonth = mês em que o dinheiro sai da conta. O ciclo correspondente pode ser o anterior.
+function cardStatementRows(dueMonth){
   return db.cards.map(c=>{
-    const total=cardStatementTotal(c.id,statementMonth);
-    const due=Number(c.due||0);
-    const [y,m]=statementMonth.split('-').map(Number);
-    let dueDate='';
-    if(due){const last=new Date(y,m,0).getDate();const d=new Date(y,m-1,Math.min(due,last));dueDate=d.toISOString().slice(0,10);}
-    return {id:`card-statement-${c.id}-${statementMonth}`,virtualCardStatement:true,cardId:c.id,date:dueDate||`${statementMonth}-01`,description:`${c.name} — fatura`,value:total,type:'despesa',confirmed:false,accountId:0,categoryId:0};
+    const cycle=shiftStatementMonth(dueMonth,-cardDueOffset(c));
+    const total=cardStatementTotal(c.id,cycle);
+    const dueDate=cardStatementDueDate(c,cycle);
+    return {id:`card-statement-${c.id}-${cycle}`,virtualCardStatement:true,cardId:c.id,statementCycle:cycle,date:dueDate||`${dueMonth}-01`,description:`${c.name} — fatura`,value:total,type:'despesa',confirmed:false,accountId:0,categoryId:0};
   }).filter(Boolean);
 }
 function toggleCardAccountFields(){
@@ -3014,26 +3046,30 @@ function transactions(){
         </div>
       </div>
       ${statementRows.length?`
-      <div class="tx-section-head"><h2>🧾 Pagamento de faturas</h2><span class="muted">Valor que sai da conta neste mês para quitar as faturas fechadas.</span></div>
+      <div class="tx-section-head tx-section-pay"><h2>💸 A pagar neste mês</h2><span class="muted">Faturas já fechadas que vencem em ${monthLabel(k)}. Este valor <b>sai da conta</b> agora.</span></div>
       <div class="tx-bill-cards">
       ${statementRows.map(t=>{
-        // A linha da fatura já corresponde ao ciclo do mês exibido.
-        const cycle=k;
+        const cycle=t.statementCycle||k;
         const items=cardTransactions(t.cardId,cycle);
         const pend=items.filter(x=>x.confirmed!==true).length;
+        // O ciclo fecha no mês anterior ao do vencimento quando o cartão tem dia de fechamento.
+        const card=db.cards.find(c=>String(c.id)===String(t.cardId));
+        const compras=card&&Number(card.close)?`compras até ${fmtDate(cardCycleCloseDate(card,cycle))}`:'compras do ciclo';
         return `<button type="button" class="tx-bill-card" onclick="openCardStatement('${t.cardId}','${cycle}')" aria-label="Abrir fatura de ${esc(cardName(t.cardId))}">
           <div class="tx-bill-top">
             <span class="tx-bill-name">💳 ${esc(cardName(t.cardId))}</span>
-            <span class="tx-bill-due">Vence ${fmtDate(t.date)}</span>
+            <span class="tx-bill-due">⏱ Vence ${fmtDate(t.date)}</span>
           </div>
           <div class="tx-bill-value">${money(t.value)}</div>
+          <div class="tx-bill-cycle">Fatura fechada · ${items.length} ${items.length===1?'compra':'compras'} (${compras})</div>
           <div class="tx-bill-foot">
-            <span class="muted">${items.length} ${items.length===1?'compra':'compras'} no ciclo${pend?` · ${pend} pendente${pend===1?'':'s'}`:''}</span>
-            <span class="tx-bill-cta">🔍 Abrir fatura</span>
+            <span class="muted">${pend?`${pend} despesa${pend===1?'':'s'} ainda pendente${pend===1?'':'s'}`:'Todas as despesas confirmadas'}</span>
+            <span class="tx-bill-cta">🔍 Conferir fatura</span>
           </div>
         </button>`;
       }).join('')}
-      </div>`:''}
+      </div>
+      <div class="tx-pay-total">Total que sai da conta em ${monthLabel(k)}: <b>${money(statementRows.reduce((sum,t)=>sum+Number(t.value||0),0))}</b></div>`:''}
       <div class="tx-section-head"><h2>🏦 Conta bancária</h2><span class="muted">Receitas e despesas que movimentam a conta diretamente neste mês.</span></div>
       <div class="table-wrap"><table class="table">
         <tr class="sortable-header">
@@ -3052,13 +3088,13 @@ function transactions(){
           <td>${t.virtualCardStatement?'—':'<span class="cat-dot" style="background:'+categoryColor(t.categoryId)+'"></span><span class="category-icon">'+esc(categoryIcon(t.categoryId))+'</span>'+esc(catName(t.categoryId))}</td>
           <td>${t.type==='receita'?'Receita':'Despesa'}</td>
           <td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td>
-          <td>${t.virtualCardStatement?`<button class="btn" onclick="openCardStatement('${t.cardId}',suggestedCardStatementMonth('${t.cardId}','${k}'))">🔍 Ver</button>`:'<button class="btn" onclick="openTx('+t.id+')">✎</button>'}</td>
+          <td>${t.virtualCardStatement?`<button class="btn" onclick="openCardStatement('${t.cardId}','${t.statementCycle||k}')">🔍 Ver</button>`:'<button class="btn" onclick="openTx('+t.id+')">✎</button>'}</td>
           <td class="confirm-cell">${t.virtualCardStatement?'—':'<input type="checkbox" class="confirm-check" '+(t.confirmed?'checked':'')+' onchange="toggleTxConfirmed('+t.id+')">'}</td>
           <td>${t.virtualCardStatement?'—':'<button class="btn danger" onclick="deleteTransaction('+t.id+')">Excluir</button>'}</td>
         </tr>`).join('') || '<tr><td colspan="9" class="empty">Nenhuma movimentação na conta neste mês.</td></tr>'}
       </table></div>
 
-      <div class="tx-section-head tx-section-card"><h2>💳 Faturas do cartão</h2><span class="muted">As compras deste mês ficam dentro da fatura. Toque no card para abrir e ver cada despesa.</span></div>
+      <div class="tx-section-head tx-section-card"><h2>🛒 Compras feitas neste mês</h2><span class="muted">O que você gastou no cartão em ${monthLabel(k)}. <b>Ainda não sai da conta</b>: entra em uma fatura futura.</span></div>
       ${cardGroupList.length?`
       <div class="tx-invoice-cards">
       ${cardGroupList.map(g=>`
@@ -3067,13 +3103,13 @@ function transactions(){
             <span class="tx-invoice-card-name">💳 ${esc(cardName(g.cardId))}</span>
             <span class="tx-invoice-card-count">${g.items.length} ${g.items.length===1?'compra':'compras'}</span>
           </div>
-          <div class="tx-invoice-card-cycle">Fatura de ${monthLabel(g.cycle)} · vence ${fmtDate(g.due)}</div>
           <div class="tx-invoice-card-value">${money(g.total)}</div>
+          <div class="tx-invoice-card-cycle">📅 Você paga em <b>${fmtDate(g.due)}</b><br><span class="tx-invoice-card-sub">Fatura que fecha ${fmtDate(cardCycleCloseDate(db.cards.find(c=>String(c.id)===String(g.cardId)),g.cycle))||'no ciclo de '+monthLabel(g.cycle)}</span></div>
           <div class="tx-invoice-card-split">${g.pending>0?`<span class="tx-chip tx-chip-pending">Pendente ${money(g.pending)}</span>`:''}${g.confirmed>0?`<span class="tx-chip tx-chip-ok">Confirmado ${money(g.confirmed)}</span>`:''}</div>
-          <span class="tx-invoice-card-cta">🔍 Abrir fatura</span>
+          <span class="tx-invoice-card-cta">🔍 Ver essas compras</span>
         </button>`).join('')}
       </div>
-      <div class="tx-card-total">Total comprado no cartão em ${monthLabel(k)}: <b>${money(cardPurchasesTotal)}</b> — não sai da conta agora; entra na fatura do ciclo correspondente.</div>`
+      <div class="tx-card-total">Total comprado em ${monthLabel(k)}: <b>${money(cardPurchasesTotal)}</b> — não afeta o saldo deste mês; será cobrado no vencimento da fatura correspondente.</div>`
       :'<div class="empty">Nenhuma compra no cartão neste mês.</div>'}
     </div>`;
 
@@ -4218,7 +4254,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v96',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v97',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
