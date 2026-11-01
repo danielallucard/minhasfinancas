@@ -819,8 +819,24 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 .report-detail-table td:nth-child(6){white-space:nowrap}
 @media(max-width:1180px){.tx-origin-pill{white-space:normal}}
 </style>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<style>
+#cloudGate{position:fixed;inset:0;background:#f5f7fb;z-index:200;display:grid;place-items:center;padding:20px;overflow:auto}
+#cloudGate[hidden]{display:none}#cloudGate .card{width:min(440px,100%)}
+#cloudStatus{position:fixed;bottom:8px;right:12px;z-index:45;border:1px solid #dbe3ef;background:#fff;border-radius:20px;padding:5px 10px;font-size:11px;max-width:90vw}
+@media(max-width:1180px){#cloudStatus{bottom:calc(var(--bnav) + 6px + env(safe-area-inset-bottom))}}
+</style>
 </head>
-<body>
+<body><div id="cloudGate"><div class="card"><h2>💰 Ricas Finanças</h2><p>Entre com a mesma conta no computador e no celular.</p>
+<form class="form" onsubmit="cloudLogin(event)"><label>E-mail<input id="cloudEmail" type="email" autocomplete="username" required></label>
+<label>Senha<input id="cloudPassword" type="password" autocomplete="current-password" required></label>
+<label><input id="cloudTrusted" type="checkbox"> Este dispositivo é particular. Permitir cache financeiro offline.</label>
+<button id="cloudLoginButton" class="btn primary">Entrar</button><button type="button" class="btn" onclick="cloudResetPassword()">Esqueci minha senha</button></form>
+<p id="cloudLoginMessage" role="status">Carregando conexão…</p></div></div><div id="cloudStatus" role="status">Conectando…</div>
+
 <div class="app">
 <aside class="sidebar"><div class="brand">💰 Ricas Finanças</div><div class="nav" id="nav"></div></aside>
 <main class="main">
@@ -1808,7 +1824,7 @@ function generateRecurrence(r){
     const date=recOccurrenceDate(r,n);
     if(!recurring&&existingDates.has(date))continue;
     db.transactions.push({
-      id:uid(),type:r.type,date,description:recurring?String(r.description||'').trim():installmentDescription(r.description,n,r.count),
+      id:cloudRecurrenceId(r.id,n),type:r.type,date,description:recurring?String(r.description||'').trim():installmentDescription(r.description,n,r.count),
       value:+r.value,...recurrenceOccurrencePayment(r,n,date),categoryId:+r.categoryId,
       // Parcelamento no cartão já foi efetivado na compra: nasce confirmado.
       // Recorrentes (assinaturas, mensalidades) nascem pendentes, pois a cobrança ainda vai ocorrer.
@@ -3596,7 +3612,7 @@ document.getElementById('content').innerHTML=`<div class="card section">
 </form>
 </div>`+sqlitePanel+`<div class="card">
 <h2>Backup completo e restauração</h2>
-<p>O backup completo gera um único ZIP com o estado JSON e uma cópia real do banco SQLite conectado. Para evitar um backup incompleto, é necessário conectar o banco antes de gerar o ZIP. Guarde o arquivo em outro local, fora da pasta principal do aplicativo.</p>
+<p>O backup completo gera um único ZIP com o estado JSON e uma cópia real do banco SQLite conectado. Entre na sua conta antes de gerar o ZIP. O SQLite de backup é criado a partir dos dados carregados. Guarde o arquivo em outro local, fora da pasta principal do aplicativo.</p>
 <div class="actions">
 <button class="btn primary" onclick="exportFullBackupZIP()">📦 Gerar backup completo (.ZIP)</button>
 <button class="btn" onclick="document.getElementById('restoreZipFile').click()">♻️ Restaurar backup completo (.ZIP)</button>
@@ -3605,7 +3621,7 @@ document.getElementById('content').innerHTML=`<div class="card section">
 <button class="btn" onclick="document.getElementById('importFile').click()">Restaurar JSON antigo</button>
 <input id="importFile" type="file" accept=".json,application/json" hidden onchange="importJSON(this)"/>
 </div>
-<p class="muted">O ZIP inclui backup.json, ricas-financas.sqlite e manifest.json. A restauração completa exige que um banco SQLite de destino esteja conectado; o conteúdo do banco conectado será substituído após a validação e a confirmação.</p>
+<p class="muted">O ZIP inclui backup.json, ricas-financas.sqlite e manifest.json. A restauração substituirá os dados da conta conectada na nuvem após validação e confirmação. Faça uma cópia de segurança antes.</p>
 </div>`
 }
 function openModal(title,body){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=body;document.getElementById('modal').classList.add('show')}
@@ -4227,7 +4243,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v98',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v99-firebase',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
@@ -4323,28 +4339,71 @@ async function resetAll(){
   render();
 })();
 </script>
+
+
 <script>
-window.addEventListener('load',()=>{
-  if(!window.initSqlJs){
-    toast('SQLite indisponível. Abra o aplicativo com internet na primeira execução.');
-    return;
-  }
-  initSqlJs({locateFile:file=>'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/'+file})
-    .then(async mod=>{
-      SQL=mod;
-      const connected=await reconnectSavedSQLite();
-      render();
-      if(!connected){
-        setTimeout(()=>{
-          toast(hasFsApi()?'🔴 Banco SQLite não conectado. Abra Configurações e toque em “Conectar banco SQLite”.':'🔴 Base local indisponível. Abra Configurações.');
-        },300);
-      }
-    })
-    .catch(err=>{
-      console.error(err);
-      toast('Falha ao carregar SQLite. Verifique a conexão e recarregue o aplicativo.');
-    });
-});
+const firebaseConfig={apiKey:"AIzaSyDzEX54GLd-YX_jgdUS3VgmCzJ_v-JNWCI",authDomain:"ricasfinancas-6ba9f.firebaseapp.com",projectId:"ricasfinancas-6ba9f",storageBucket:"ricasfinancas-6ba9f.firebasestorage.app",messagingSenderId:"117935260957",appId:"1:117935260957:web:102d70dffde05aa35b8df4"};
+let cloudAuth,cloudStore,cloudUser,cloudCollection,cloudUnsubscribe;
+let cloudBaseline=new Map(),cloudPending=0,cloudFailed=false,cloudCache=false,cloudInitialized=false;
+let cloudSQLPromise,cloudRenderPending=false;
+let cloudRecovery=null;
+const cloudOriginalSettings=settings;
+uid=function(){const a=new Uint32Array(2);crypto.getRandomValues(a);return (a[0]&0xfffff)*4294967296+a[1];};
+function cloudRecurrenceId(id,n){let h=2166136261;for(const c of String(id)+':'+n){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return 4000000000000000+(h>>>0)*10000+(Number(n)%10000);}
+function cloudMessage(text){document.getElementById('cloudLoginMessage').textContent=text;}
+function cloudStatusUpdate(){const text=cloudFailed?'⚠ Falha de sincronização: veja Configurações':!cloudUser?'Entre para sincronizar':!cloudInitialized?'Carregando dados…':cloudPending?'⏳ Alterações aguardando envio':cloudCache||!navigator.onLine?'☁ Cache local · aguardando conexão':'✓ Sincronizado';document.getElementById('cloudStatus').textContent=text;}
+function cloudError(e){console.error('Firebase:',e);const codes={'auth/invalid-credential':'E-mail ou senha incorretos.','auth/wrong-password':'E-mail ou senha incorretos.','auth/user-not-found':'E-mail ou senha incorretos.','auth/invalid-api-key':'A chave do projeto não foi aceita. Confira firebaseConfig.','auth/network-request-failed':'Sem conexão com o serviço. Confira a internet.','auth/too-many-requests':'Muitas tentativas. Aguarde antes de tentar novamente.','permission-denied':'Acesso negado. Confira as regras publicadas do Firestore.','auth/unauthorized-domain':'Domínio não autorizado no Firebase.'};return codes[e.code]||('Não foi possível concluir: '+(e.message||e));}
+async function cloudLogin(e){e.preventDefault();const btn=document.getElementById('cloudLoginButton');btn.disabled=true;try{try{localStorage.setItem('ricas_cloud_trusted',document.getElementById('cloudTrusted').checked?'yes':'no');}catch(_){}await cloudBoot();await cloudAuth.setPersistence(document.getElementById('cloudTrusted').checked?firebase.auth.Auth.Persistence.LOCAL:firebase.auth.Auth.Persistence.SESSION);cloudMessage('Autenticando…');await cloudAuth.signInWithEmailAndPassword(document.getElementById('cloudEmail').value.trim(),document.getElementById('cloudPassword').value);document.getElementById('cloudPassword').value='';}catch(err){cloudMessage(cloudError(err));}finally{btn.disabled=false;}}
+async function cloudResetPassword(){const email=document.getElementById('cloudEmail').value.trim();if(!email)return cloudMessage('Informe seu e-mail no campo acima.');try{await cloudBoot();await cloudAuth.sendPasswordResetEmail(email);cloudMessage('Se houver uma conta elegível, você receberá instruções por e-mail.');}catch(e){cloudMessage(cloudError(e));}}
+let cloudBootPromise;
+function cloudBoot(){if(cloudBootPromise)return cloudBootPromise;cloudBootPromise=(async()=>{if(!window.firebase)throw new Error('Não foi possível carregar o Firebase. Confira a conexão e recarregue.');firebase.initializeApp(firebaseConfig);cloudAuth=firebase.auth();cloudStore=firebase.firestore();
+// Persistent cache is opt-in and contains financial information.
+if(document.getElementById('cloudTrusted').checked){try{await cloudStore.enablePersistence({synchronizeTabs:true});}catch(e){console.warn('Cache persistente indisponível:',e.code);}}
+cloudAuth.onAuthStateChanged(cloudSession);})();return cloudBootPromise;}
+async function cloudSession(user){if(cloudUnsubscribe)cloudUnsubscribe();cloudUser=user;cloudInitialized=false;cloudBaseline=new Map();dbReady=false;document.getElementById('cloudGate').hidden=false;
+if(!user){db=JSON.parse(JSON.stringify(base));normalizeOrders();render();cloudMessage('Use o e-mail e a senha cadastrados no Firebase.');cloudStatusUpdate();return;}
+cloudMessage('Carregando seus dados…');cloudCollection=cloudStore.collection('users').doc(user.uid).collection('records');
+cloudUnsubscribe=cloudCollection.onSnapshot({includeMetadataChanges:true},snap=>{
+if(cloudUser?.uid!==user.uid)return;cloudCache=snap.metadata.fromCache;
+if(!cloudInitialized&&snap.empty&&cloudCache){cloudMessage('Aguardando conexão para verificar sua base. Não será criada uma base vazia offline.');cloudStatusUpdate();return;}
+const next=JSON.parse(JSON.stringify(base));const baseline=new Map();
+snap.forEach(doc=>{const v=doc.data();if(!SQLITE_TABLES.includes(v.collection)||typeof v.json!=='string')return;try{const value=JSON.parse(v.json);baseline.set(doc.id,{collection:v.collection,json:v.json});if(v.collection==='settings'){next.settings[v.key]=value;}else if(value&&typeof value==='object'&&value.id!=null){if(!next[v.collection]._cloudStarted){next[v.collection]=[];next[v.collection]._cloudStarted=true;}next[v.collection].push(value);}}catch(e){console.warn('Registro inválido',doc.id);}});
+// Empty collections must not reintroduce default categories in an existing cloud base.
+if(!snap.empty)for(const key of SQLITE_TABLES)if(key!=='settings'&&!Array.from(baseline.values()).some(v=>v.collection===key))next[key]=[];
+for(const key of SQLITE_TABLES)if(Array.isArray(next[key]))delete next[key]._cloudStarted;
+db=next;normalizeCardData();normalizeOrders();normalizeTransfers();cloudBaseline=baseline;cloudInitialized=true;dbReady=true;dbStorageMode='cloud';document.getElementById('cloudGate').hidden=true;
+if(document.getElementById('modal').classList.contains('show')||document.querySelector('#content input:focus,#content select:focus,#content textarea:focus')){cloudRenderPending=true;}else render();cloudStatusUpdate();
+},e=>{cloudFailed=true;cloudMessage(cloudError(e));toast(cloudError(e));cloudStatusUpdate();});}
+function cloudStateRecords(){const out=new Map();for(const key of SQLITE_TABLES){if(key==='settings'){for(const [k,v]of Object.entries(db.settings||{}))out.set('settings_'+encodeURIComponent(k),{collection:key,key:k,json:JSON.stringify(v)});}else for(const row of db[key]||[]){if(row?.id==null)continue;out.set(key+'_'+encodeURIComponent(String(row.id)),{collection:key,json:JSON.stringify(row)});}}return out;}
+// Queue per-record deltas, never replace a whole account snapshot. Firestore persists queued writes when enabled.
+function cloudSave(){if(!storageConnected()){toast('Entre e aguarde o carregamento antes de salvar.');return Promise.resolve(false);}const desired=cloudStateRecords(),ops=[];
+for(const [id,v]of desired)if(cloudBaseline.get(id)?.json!==v.json)ops.push({id,value:v});for(const id of cloudBaseline.keys())if(!desired.has(id))ops.push({id,value:null});if(!ops.length)return Promise.resolve(true);
+cloudRecovery=JSON.stringify(db);cloudBaseline=new Map(desired);cloudFailed=false;
+for(let i=0;i<ops.length;i+=400){const batch=cloudStore.batch();for(const op of ops.slice(i,i+400)){const ref=cloudCollection.doc(op.id);if(op.value)batch.set(ref,op.value);else batch.delete(ref);}cloudPending++;cloudStatusUpdate();batch.commit().then(()=>{cloudPending--;cloudStatusUpdate();}).catch(e=>{cloudPending--;cloudFailed=true;toast(cloudError(e)+' Exporte o JSON de recuperação em Configurações.');cloudStatusUpdate();});}
+return Promise.resolve(true);}
+storageConnected=function(){return !!(cloudUser&&cloudInitialized&&dbReady);};
+save=async function(){normalizeCardData();return cloudSave();};
+persistSQLite=async function(){return cloudSave();};
+writeSQLiteBytes=async function(){if(!await cloudSave())throw new Error('Base da nuvem não conectada.');};
+databaseStatus=function(){return document.getElementById('cloudStatus').textContent;};
+connectSQLite=function(){toast('O armazenamento principal agora é o Firebase. Use Importar .sqlite para migrar sua base.');return Promise.resolve(false);};
+chooseDatabaseFolder=connectSQLite;createCleanSQLite=function(){toast('Criação de base vazia desativada para proteger seus dados na nuvem.');};
+async function cloudEnsureSQL(){if(SQL)return SQL;if(!cloudSQLPromise)cloudSQLPromise=initSqlJs({locateFile:f=>'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/'+f}).then(mod=>SQL=mod);return cloudSQLPromise;}
+async function cloudSQLiteSnapshot(){await cloudEnsureSQL();sqliteDb=new SQL.Database();createSQLiteDatabase();writeStateToSQLite();return sqliteDb.export();}
+importSQLiteFile=async function(inp){const file=inp.files?.[0];if(!file)return;try{if(!storageConnected())throw new Error('Entre primeiro na sua conta.');if(!navigator.onLine||cloudPending)throw new Error('Aguarde a conexão e a sincronização antes de importar.');await cloudEnsureSQL();const check=new SQL.Database(new Uint8Array(await file.arrayBuffer()));let imported;try{const r=check.exec('SELECT key,data FROM app_state');if(!r.length)throw new Error('Base inválida.');imported=Object.fromEntries(r[0].values.map(([k,v])=>[k,JSON.parse(v)]));validateBackupJSON(imported);}finally{check.close();}if(!confirm('IMPORTAR PARA A NUVEM\n\nO arquivo original NÃO será alterado. Os dados atuais desta conta no Firebase serão substituídos. Exporte um backup antes, se já houver dados na nuvem. Continuar?'))return;db=Object.assign(JSON.parse(JSON.stringify(base)),imported);normalizeCardData();normalizeOrders();normalizeTransfers();await cloudSave();render();toast('Importação enfileirada. Aguarde o indicador Sincronizado.');}catch(e){toast(cloudError(e));}finally{inp.value='';}};
+exportSQLiteFile=async function(){try{if(!storageConnected())throw new Error('Entre primeiro.');const bytes=await cloudSQLiteSnapshot();await deliverFile(new Blob([bytes],{type:'application/x-sqlite3'}),'ricas-financas-'+stampForFile()+'.sqlite');}catch(e){toast(cloudError(e));}};
+const cloudOldBackup=exportFullBackupZIP;
+exportFullBackupZIP=async function(){try{await cloudSQLiteSnapshot();return cloudOldBackup();}catch(e){toast(cloudError(e));}};
+const cloudOldRestore=restoreFullBackupZIP;
+restoreFullBackupZIP=async function(inp){try{if(!navigator.onLine||cloudPending)throw new Error('Aguarde a conexão e a sincronização antes de restaurar.');await cloudEnsureSQL();return await cloudOldRestore(inp);}catch(e){toast(cloudError(e));}};
+function cloudRecoveryExport(){if(!cloudRecovery)return exportJSON();downloadBlob(new Blob([cloudRecovery],{type:'application/json'}),'ricas-financas-recuperacao.json');}
+async function cloudLogout(){if(cloudPending||cloudFailed){toast('Resolva a sincronização e exporte um backup antes de sair.');return;}await cloudAuth.signOut();location.reload();}
+settings=function(){cloudOriginalSettings();const content=document.getElementById('content');const panels=[...content.querySelectorAll(':scope > .card')];for(const p of panels)if(p.querySelector('h2')?.textContent==='Banco de dados SQLite')p.remove();const p=document.createElement('div');p.className='card section';p.innerHTML='<h2>☁ Sincronização entre dispositivos</h2><p id="cloudAccountLabel"></p><p>As alterações são enviadas automaticamente. O indicador inferior informa se ainda há envios pendentes. Edições simultâneas do mesmo registro seguem a última gravação recebida pelo serviço.</p><div class="actions"><button class="btn primary" onclick="document.getElementById(\'cloudImport\').click()">📥 Importar SQLite para a nuvem</button><input type="file" id="cloudImport" accept=".sqlite,.db" hidden onchange="importSQLiteFile(this)"><button class="btn" onclick="exportSQLiteFile()">📤 Exportar SQLite</button><button class="btn" onclick="cloudRecoveryExport()">Salvar JSON de recuperação</button><button class="btn" onclick="cloudLogout()">Sair da conta</button></div><p class="muted">A importação é necessária somente uma vez. Nunca envie seus arquivos financeiros ao GitHub. Sem internet, alterações aguardam conexão; cache persistente depende da opção de dispositivo particular e do suporte do navegador. Esta versão não garante abertura do site sem internet.</p>';content.prepend(p);document.getElementById('cloudAccountLabel').textContent=cloudUser?.email||'';};
+const cloudCloseModal=closeModal;closeModal=function(){cloudCloseModal();if(cloudRenderPending){cloudRenderPending=false;render();}};
+resetAll=function(){toast('Exclusão geral desativada nesta versão para proteger a base sincronizada.');};
+window.addEventListener('online',cloudStatusUpdate);window.addEventListener('offline',cloudStatusUpdate);
+// Start after the user chooses whether this is a trusted device; restore session without enabling disk cache by default.
+window.addEventListener('load',()=>{cloudMessage('Informe sua conta para entrar.');document.getElementById('cloudStatus').textContent='Entre para sincronizar';try{if(localStorage.getItem('ricas_cloud_trusted')==='yes'){document.getElementById('cloudTrusted').checked=true;cloudBoot().catch(e=>cloudMessage(cloudError(e)));}}catch(_){} });
 </script>
 </body>
 </html>
