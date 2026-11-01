@@ -829,6 +829,15 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 #cloudStatus{position:fixed;bottom:8px;right:12px;z-index:45;border:1px solid #dbe3ef;background:#fff;border-radius:20px;padding:5px 10px;font-size:11px;max-width:90vw}
 @media(max-width:1180px){#cloudStatus{bottom:calc(var(--bnav) + 6px + env(safe-area-inset-bottom))}}
 </style>
+<style id="filters-groups-v105">
+#content .tx-filter-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end;margin-bottom:18px}
+#content .tx-filter-grid>label{display:grid!important;grid-template-columns:minmax(0,1fr);gap:6px;min-width:0!important;font-size:12px;color:var(--muted);line-height:1.4}
+#content .tx-filter-grid>label:first-child{grid-column:span 2}
+#content .tx-filter-grid input,#content .tx-filter-grid select{width:100%;height:44px;min-width:0;font:inherit;font-size:14px}
+#content .tx-filter-grid>.btn{height:44px;align-self:end}
+@media(max-width:1180px){#content .tx-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#content .tx-filter-grid>label{flex:none!important}#content .tx-filter-grid #txClearFilters{grid-column:span 1}}
+@media(max-width:560px){#content .tx-filter-grid{grid-template-columns:minmax(0,1fr)}#content .tx-filter-grid>label:first-child{grid-column:auto}}
+</style>
 </head>
 <body><div id="cloudGate"><div class="card"><h2>💰 Ricas Finanças</h2><p>Entre com a mesma conta no computador e no celular.</p>
 <form class="form" onsubmit="cloudLogin(event)"><label>E-mail<input id="cloudEmail" type="email" autocomplete="username" required></label>
@@ -913,12 +922,36 @@ const BUDGET_GROUPS_DEFAULT=[
   {key:'investimentos',name:'Investimentos',percent:25,color:'#22c55e',icon:'📈',hint:'Liberdade financeira: aportes para construção de patrimônio.'},
   {key:'conhecimento',name:'Conhecimento',percent:5,color:'#3b82f6',icon:'📚',hint:'Cursos, livros, idiomas e capacitação.'}
 ];
-function budgetGroupDef(key){return BUDGET_GROUPS_DEFAULT.find(g=>g.key===key)||null;}
+function budgetGroups(){
+  const custom=Array.isArray(db.settings?.customBudgetGroups)?db.settings.customBudgetGroups:[];
+  const seen=new Set(BUDGET_GROUPS_DEFAULT.map(g=>g.key));
+  return [...BUDGET_GROUPS_DEFAULT,...custom.filter(g=>g&&/^custom_[a-zA-Z0-9_]+$/.test(g.key)&&!seen.has(g.key)&&(seen.add(g.key),true)).map(g=>({...g,percent:Number(g.percent)||0}))];
+}
+function openExpenseGroup(){
+  openModal('Novo grupo de despesas',`<form class="form" onsubmit="saveExpenseGroup(event)">
+    <label>Nome do grupo<input name="name" required minlength="2" maxlength="60" placeholder="Ex.: Cuidados pessoais"></label>
+    <div class="row"><label>Ícone<select name="icon">${categoryIconOptionsHtml('📁')}</select></label><label>Cor<input name="color" type="color" value="#8b5cf6"></label></div>
+    <label>Percentual da receita<input name="percent" type="number" min="0" max="100" step="0.1" value="0" required></label>
+    <p class="muted">O grupo ficará disponível nas categorias, no Resumo e nos filtros. Os percentuais existentes não serão alterados. Ajuste a divisão do orçamento para manter a soma desejada.</p>
+    <button class="btn primary">Criar grupo</button></form>`);
+}
+async function saveExpenseGroup(e){
+  e.preventDefault();if(!storageConnected())return toast('Aguarde o carregamento da sua conta.');
+  const f=new FormData(e.target),name=String(f.get('name')||'').trim(),percent=Number(f.get('percent'));
+  if(name.length<2||!Number.isFinite(percent)||percent<0||percent>100)return toast('Informe nome e percentual válidos.');
+  const normalized=v=>String(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim();
+  if(budgetGroups().some(g=>normalized(g.name)===normalized(name)))return toast('Já existe um grupo com esse nome.');
+  const group={key:'custom_'+String(uid()),name,percent,color:String(f.get('color')||'#8b5cf6'),icon:String(f.get('icon')||'📁'),hint:'Grupo de despesas personalizado.'};
+  if(!Array.isArray(db.settings.customBudgetGroups))db.settings.customBudgetGroups=[];
+  db.settings.customBudgetGroups.push(group);normalizeBudget();
+  await save();closeModal();render();toast('Grupo criado. Vincule as categorias ao novo grupo.');
+}
+function budgetGroupDef(key){return budgetGroups().find(g=>g.key===key)||null;}
 function normalizeBudget(){
   if(!db.settings||typeof db.settings!=='object') db.settings={};
   const b=(db.settings.budget&&typeof db.settings.budget==='object')?db.settings.budget:{};
   const saved=Array.isArray(b.groups)?b.groups:[];
-  b.groups=BUDGET_GROUPS_DEFAULT.map(g=>{
+  b.groups=budgetGroups().map(g=>{
     const x=saved.find(y=>y&&y.key===g.key);
     const p=Number(x?.percent);
     return {key:g.key,percent:Number.isFinite(p)&&p>=0?p:g.percent};
@@ -2058,6 +2091,19 @@ function recurrenceOccurrencePayment(r,n,date){
   const offset=Number(n)-1;
   return {...payment,automationBillingMonth:monthKeyFromDate(new Date(y,m-1+offset,1)),automationBillingDate:date,automationBillingCardId:card.id};
 }
+function syncRecurrenceCategory(r){
+  if(!r||r.id==null)return 0;
+  const category=db.categories.find(c=>String(c.id)===String(r.categoryId));
+  if(!category)return 0;
+  let updated=0;
+  for(const tx of db.transactions){
+    if(tx.recurrenceId==null||String(tx.recurrenceId)!==String(r.id))continue;
+    if(String(tx.categoryId)===String(category.id))continue;
+    tx.categoryId=category.id;
+    updated++;
+  }
+  return updated;
+}
 function saveRecurrence(e,id){
   e.preventDefault();
   const f=new FormData(e.target);
@@ -2099,7 +2145,7 @@ function saveRecurrence(e,id){
   const confirmedCount=serie().filter(t=>t.confirmed===true).length;
   let apply=false;
   if(pending.length){
-    apply=confirm(`APLICAR AOS LANÇAMENTOS JÁ GERADOS?\n\nExistem ${pending.length} lançamento(s) pendente(s) desta automatização${confirmedCount?` e ${confirmedCount} confirmado(s)`:''}.\n\nOK = atualizar também os ${pending.length} pendente(s) (tipo, descrição, valor, conta, categoria e datas).\nCancelar = alterar somente a regra; os próximos meses gerados seguirão os novos dados.\n\nLançamentos confirmados nunca são alterados.`);
+    apply=confirm(`APLICAR AOS LANÇAMENTOS JÁ GERADOS?\n\nExistem ${pending.length} lançamento(s) pendente(s) desta automatização${confirmedCount?` e ${confirmedCount} confirmado(s)`:''}.\n\nOK = atualizar também os ${pending.length} pendente(s) (tipo, descrição, valor, conta, categoria e datas).\nCancelar = manter os demais dados dos lançamentos existentes; somente a categoria será sincronizada. Os próximos meses seguirão os novos dados.\n\nValores, datas e status dos confirmados são preservados. A categoria será sincronizada em todos os lançamentos vinculados, inclusive confirmados.`);
   }
   const wasRecurring=isRecurring(r);
   Object.assign(r,data);
@@ -2147,9 +2193,10 @@ function saveRecurrence(e,id){
       }
     }
   }
+  const categoriesUpdated=syncRecurrenceCategory(r);
   const added=generateRecurrence(r);
   save();closeModal();
-  toast(`Automatização alterada${apply?` · ${pending.length} pendente(s) atualizado(s)`:''}${removidas?` · ${removidas} removida(s)`:''}${reposicionadas?` · ${reposicionadas} reposicionada(s)`:''}${added?` · ${added} novo(s)`:''}`);
+  toast(`Automatização alterada${categoriesUpdated?` · ${categoriesUpdated} categoria(s) sincronizada(s)`:""}${apply?` · ${pending.length} pendente(s) atualizado(s)`:''}${removidas?` · ${removidas} removida(s)`:''}${reposicionadas?` · ${reposicionadas} reposicionada(s)`:''}${added?` · ${added} novo(s)`:''}`);
   render();
 }
 function endRecurrence(id){
@@ -2395,7 +2442,7 @@ function txGroupName(t){
 }
 function groupFilterOptions(gf){
   return `<option value="all" ${(!gf||gf==='all')?'selected':''}>Todos os grupos</option>`+
-    BUDGET_GROUPS_DEFAULT.map(g=>`<option value="${g.key}" ${gf===g.key?'selected':''}>${g.icon} ${esc(g.name)}</option>`).join('')+
+    budgetGroups().map(g=>`<option value="${g.key}" ${gf===g.key?'selected':''}>${g.icon} ${esc(g.name)}</option>`).join('')+
     `<option value="none" ${gf==='none'?'selected':''}>❔ Sem grupo</option>`;
 }
 function categoryInGroup(c,gf){
@@ -2418,7 +2465,7 @@ function budgetReportData(r,af){
   const months=reportMonthsInRange(r);
   const empty=()=>({confirmed:0,total:0});
   const perMonth={};
-  months.forEach(m=>{perMonth[m]={income:budgetIncome(m),g:{}};BUDGET_GROUPS_DEFAULT.forEach(g=>perMonth[m].g[g.key]=empty());perMonth[m].g['']=empty();});
+  months.forEach(m=>{perMonth[m]={income:budgetIncome(m),g:{}};budgetGroups().forEach(g=>perMonth[m].g[g.key]=empty());perMonth[m].g['']=empty();});
   (db.transactions||[]).filter(t=>t.type==='despesa'&&!t.transfer&&reportDateInRange(txCashDate(t),r)&&(af==='all'||String(t.accountId)===String(af))).forEach(t=>{
     const m=txCashMonth(t);if(!perMonth[m])return;
     const x=perMonth[m].g[budgetGroupOfTx(t)],v=Number(t.value||0);
@@ -2432,7 +2479,7 @@ function budgetReportData(r,af){
     const v=Number(tr.value||0);perMonth[m].g.investimentos.total+=v;perMonth[m].g.investimentos.confirmed+=v;
   });
   const income=months.reduce((s,m)=>s+perMonth[m].income,0);
-  const groups=BUDGET_GROUPS_DEFAULT.map(g=>{
+  const groups=budgetGroups().map(g=>{
     const pct=budgetPercent(g.key);
     const planned=months.reduce((s,m)=>s+perMonth[m].income*pct/100,0);
     const confirmed=months.reduce((s,m)=>s+perMonth[m].g[g.key].confirmed,0);
@@ -2991,6 +3038,7 @@ function transactions(){
   const cf=String(window.txCategoryFilter ?? 'all');
   const cardf=String(window.txFilterCard ?? 'all');
   const autof=String(window.txFilterAutomation ?? 'all');
+  const gf=String(window.txGroupFilter ?? 'all');
   const query=String(window.txSearch ?? '');
   const normalizeSearch=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
   const matchesSearch=t=>!query.trim()||normalizeSearch(t.description+' '+merchantLabel(t)).includes(normalizeSearch(query.trim()));
@@ -3003,7 +3051,8 @@ function transactions(){
     .filter(t=>cf==='all' || String(t.categoryId)===cf)
     .filter(t=>matchesCardFilter(t,cardf))
     .filter(t=>matchesAutomationFilter(t,autof))
-    .filter(matchesSearch);
+    .filter(matchesSearch)
+    .filter(t=>matchesGroupFilter(t,gf));
   // Separação por natureza do dinheiro, para que nada pareça contado duas vezes:
   //  • Conta bancária: receitas, despesas em conta e o pagamento das faturas.
   //  • Compras no cartão: não debitam a conta agora; apenas compõem a fatura de um ciclo futuro.
@@ -3015,7 +3064,7 @@ function transactions(){
   const rows=sortTransactions(bankRows);
   const cardRows=sortTransactions(actualRows.filter(t=>t.cardId&&!t.virtualCardStatement));
   const cardTotal=cardRows.reduce((sum,t)=>sum+Number(t.value||0),0);
-  const showCardDetails=cardf!=='none'&&(cardf!=='all'||cf!=='all'||autof!=='all'||query.trim());
+  const showCardDetails=cardf!=='none'&&(cardf!=='all'||cf!=='all'||autof!=='all'||query.trim()||gf!=='all');
   // Cada cartão aparece UMA única vez no mês: a fatura que vence aqui, com todas as
   // compras do ciclo. Compras cujo ciclo vence em outro mês aparecem naquele mês.
   const statementTotalMonth=statementRows.reduce((sum,t)=>sum+Number(t.value||0),0);
@@ -3036,8 +3085,8 @@ function transactions(){
   document.getElementById('content').innerHTML=`
     ${monthNav()}
     <div class="card">
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-        <label style="flex:1;min-width:220px">Pesquisar despesa ou estabelecimento<input id="txSearchInput" type="search" placeholder="Nome da despesa ou nome na fatura" value="${esc(query)}" autocomplete="off"></label>
+      <div class="tx-filter-grid">
+        <label style="flex:1;min-width:220px">Pesquisar despesa / estabelecimento<input id="txSearchInput" type="search" placeholder="Descrição ou estabelecimento" value="${esc(query)}" autocomplete="off"></label>
         <label style="flex:1;min-width:220px">Movimentação
           <select id="txTypeSelect">${typeOptions}</select>
         </label>
@@ -3051,6 +3100,7 @@ function transactions(){
           </select>
         </label>
         <label style="flex:1;min-width:220px">Cartão de crédito<select id="txCardFilter">${cardFilterOptions(cardf)}</select></label>
+        <label style="flex:1;min-width:220px">Grupo de despesas<select id="txGroupFilter">${groupFilterOptions(gf)}</select></label>
         <label style="flex:1;min-width:220px">Origem do lançamento<select id="txAutomationFilter">${automationFilterOptions(autof)}</select></label>${cardf!=='all'&&cardf!=='none'?`<button class="btn" onclick="openCardStatement('${cardf}',suggestedCardStatementMonth('${cardf}','${k}'))">💳 Abrir fatura</button>`:''}<button class="btn" id="txClearFilters">Limpar filtros</button>
       </div>
       <div class="muted" style="margin-bottom:12px">
@@ -3091,8 +3141,8 @@ function transactions(){
       :'<div class="empty">Nenhuma fatura de cartão vence neste mês.</div>'}
       ${showCardDetails?`<div class="tx-section-head tx-section-card"><h2>💳 Despesas do cartão filtradas</h2><span class="muted">Compras da fatura com vencimento em ${monthLabel(k)}. Detalhamento informativo, sem novo débito no saldo bancário.</span></div>
       <div class="tx-card-total">${cardRows.length} despesa(s) encontrada(s) · Total filtrado: <b>${money(cardTotal)}</b></div>
-      <div class="table-wrap"><table class="table"><tr><th>Data da compra</th><th>Descrição / estabelecimento</th><th>Cartão</th><th>Categoria</th><th>Origem</th><th>Vencimento</th><th>Valor</th><th>Confirmado</th><th>Ações</th></tr>
-      ${cardRows.map(t=>`<tr class="${t.confirmed?'':'pending-row'}"><td>${fmtDate(t.date)}</td><td>${esc(t.description)}${merchantLabel(t)?`<br><span class="invoice-merchant">${esc(merchantLabel(t))}</span>`:''}</td><td>${esc(cardName(t.cardId))}</td><td>${esc(catName(t.categoryId))}</td><td>${esc(txAutomationLabel(t))}</td><td>${fmtDate(txCashDate(t))}</td><td class="red">${money(t.value)}</td><td class="confirm-cell"><input type="checkbox" class="confirm-check" aria-label="Confirmar despesa" ${t.confirmed?'checked':''} onchange="toggleTxConfirmed(${t.id})"></td><td><button class="btn" onclick="openTx(${t.id})">Editar</button> <button class="btn danger" onclick="deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')||'<tr><td colspan="9" class="empty">Nenhuma despesa do cartão corresponde aos filtros neste mês de vencimento.</td></tr>'}</table></div>`:''}
+      <div class="table-wrap"><table class="table"><tr><th>Data da compra</th><th>Descrição / estabelecimento</th><th>Cartão</th><th>Categoria</th><th>Grupo</th><th>Origem</th><th>Vencimento</th><th>Valor</th><th>Confirmado</th><th>Ações</th></tr>
+      ${cardRows.map(t=>`<tr class="${t.confirmed?'':'pending-row'}"><td>${fmtDate(t.date)}</td><td>${esc(t.description)}${merchantLabel(t)?`<br><span class="invoice-merchant">${esc(merchantLabel(t))}</span>`:''}</td><td>${esc(cardName(t.cardId))}</td><td>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td>${esc(txAutomationLabel(t))}</td><td>${fmtDate(txCashDate(t))}</td><td class="red">${money(t.value)}</td><td class="confirm-cell"><input type="checkbox" class="confirm-check" aria-label="Confirmar despesa" ${t.confirmed?'checked':''} onchange="toggleTxConfirmed(${t.id})"></td><td><button class="btn" onclick="openTx(${t.id})">Editar</button> <button class="btn danger" onclick="deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')||'<tr><td colspan="10" class="empty">Nenhuma despesa do cartão corresponde aos filtros neste mês de vencimento.</td></tr>'}</table></div>`:''}
       <div class="tx-section-head"><h2>🏦 Conta bancária</h2><span class="muted">Receitas e despesas que movimentam a conta diretamente neste mês.</span></div>
       <div class="table-wrap"><table class="table">
         <tr class="sortable-header">
@@ -3125,6 +3175,7 @@ function transactions(){
   const cs=document.getElementById('txCategorySelect');
   const cardSel=document.getElementById('txCardFilter');
 
+  document.getElementById('txGroupFilter').onchange=e=>{window.txGroupFilter=e.target.value;transactions();};
   const search=document.getElementById('txSearchInput');
   search.oninput=()=>{const start=search.selectionStart;window.txSearch=search.value;transactions();const next=document.getElementById('txSearchInput');next.focus();try{next.setSelectionRange(start,start);}catch(e){}};
   ts.onchange=()=>{window.txTypeFilter=ts.value; transactions();};
@@ -3133,7 +3184,7 @@ function transactions(){
   cardSel.onchange=()=>{window.txFilterCard=cardSel.value;transactions();};
   const autoSel=document.getElementById('txAutomationFilter');
   if(autoSel)autoSel.onchange=()=>{window.txFilterAutomation=autoSel.value;transactions();};
-  clear.onclick=()=>{window.txTypeFilter='all';window.txAccountFilter='all';window.txCategoryFilter='all';window.txFilterCard='all';window.txFilterAutomation='all';window.txSearch='';transactions();};
+  clear.onclick=()=>{window.txTypeFilter='all';window.txAccountFilter='all';window.txCategoryFilter='all';window.txFilterCard='all';window.txFilterAutomation='all';window.txSearch='';window.txGroupFilter='all';transactions();};
 }
 
 async function confirmAccountMonthPending(accountId, monthKeyValue){
@@ -3190,7 +3241,7 @@ function budgetIncome(month){
 }
 function budgetSpending(month){
   // Realizado = despesas confirmadas; Comprometido = confirmadas + pendentes do mês.
-  const out={};BUDGET_GROUPS_DEFAULT.forEach(g=>out[g.key]={confirmed:0,total:0});out['']={confirmed:0,total:0};
+  const out={};budgetGroups().forEach(g=>out[g.key]={confirmed:0,total:0});out['']={confirmed:0,total:0};
   (db.transactions||[]).filter(t=>t.type==='despesa'&&!t.transfer&&txCashMonth(t)===month).forEach(t=>{
     const c=db.categories.find(x=>String(x.id)===String(t.categoryId));
     const k=(c&&c.budgetGroup&&out[c.budgetGroup])?c.budgetGroup:'';
@@ -3210,7 +3261,7 @@ function budgetPanelHtml(month){
   const spend=budgetSpending(month);
   const sumPct=b.groups.reduce((s,g)=>s+Number(g.percent||0),0);
   const pctOk=Math.abs(sumPct-100)<0.005;
-  const rows=BUDGET_GROUPS_DEFAULT.map(g=>{
+  const rows=budgetGroups().map(g=>{
     const pct=budgetPercent(g.key), planned=income*pct/100, sp=spend[g.key];
     const left=planned-sp.total, use=planned>0?sp.total/planned*100:(sp.total>0?100:0);
     const barColor=use>100?'var(--red)':(use>85?'var(--amber)':g.color);
@@ -3280,7 +3331,7 @@ function saveBudgetSettings(e){
 }
 function resetBudgetDefaults(){
   if(!confirm('Restaurar os percentuais padrão?\n\nCustos fixos 30% · Conforto 15% · Metas 15% · Prazeres 10% · Investimentos 25% · Conhecimento 5%'))return;
-  db.settings.budget.groups=BUDGET_GROUPS_DEFAULT.map(g=>({key:g.key,percent:g.percent}));
+  db.settings.budget.groups=budgetGroups().map(g=>({key:g.key,percent:g.percent}));
   save();toast('Percentuais padrão restaurados');render();
 }
 function setCategoryBudgetGroup(id,key){
@@ -3308,17 +3359,17 @@ function suggestBudgetGroups(){
   save();toast(`${sug.length} categoria(s) vinculada(s)`);render();
 }
 function budgetGroupSelect(c){
-  return `<select title="Grupo do orçamento" onchange="setCategoryBudgetGroup(${c.id},this.value)"><option value="">❔ Sem grupo</option>${BUDGET_GROUPS_DEFAULT.map(g=>`<option value="${g.key}" ${c.budgetGroup===g.key?'selected':''}>${g.icon} ${esc(g.name)}</option>`).join('')}</select>`;
+  return `<select title="Grupo do orçamento" onchange="setCategoryBudgetGroup(${c.id},this.value)"><option value="">❔ Sem grupo</option>${budgetGroups().map(g=>`<option value="${g.key}" ${c.budgetGroup===g.key?'selected':''}>${g.icon} ${esc(g.name)}</option>`).join('')}</select>`;
 }
 function categoryRowHtml(c,withGroup){
   return `<div class="budget-cat-row"><span class="pill"><span class="cat-dot" style="background:${c.color||'#246bfe'}"></span><span class="category-icon">${esc(categoryIcon(c.id))}</span>${esc(c.name)}</span> ${withGroup?budgetGroupSelect(c):''} ${orderButtons('categories',c.id)} <button class="btn" onclick="openCategory(${c.id})">Editar</button> <button class="btn danger" onclick="delCat(${c.id})">Excluir</button></div>`;
 }
 function categories(){
-  document.getElementById('topActions').innerHTML=`<button class="btn primary" onclick="openCategory()">+ Nova categoria</button>`;
+  document.getElementById('topActions').innerHTML=`<button class="btn primary" onclick="openCategory()">+ Nova categoria</button><button class="btn" onclick="openExpenseGroup()">+ Novo grupo de despesas</button>`;
   const month=selectedMonthKey();
   const exp=[...db.categories].filter(c=>c.type==='despesa').sort((a,b)=>(a.order??0)-(b.order??0));
   const inc=[...db.categories].filter(c=>c.type==='receita').sort((a,b)=>(a.order??0)-(b.order??0));
-  const groupsHtml=[...BUDGET_GROUPS_DEFAULT,{key:'',name:'Sem grupo',icon:'❔',color:'#9ca3af'}].map(g=>{
+  const groupsHtml=[...budgetGroups(),{key:'',name:'Sem grupo',icon:'❔',color:'#9ca3af'}].map(g=>{
     const list=exp.filter(c=>(c.budgetGroup||'')===g.key);
     if(!list.length&&g.key==='')return '';
     return `<div class="budget-group-head"><span class="cat-dot" style="background:${g.color}"></span>${g.icon} ${esc(g.name)} ${g.key?`<span class="muted">${budgetPercent(g.key)}% da receita</span>`:''}</div>${list.map(c=>categoryRowHtml(c,true)).join('')||'<div class="muted" style="padding:6px 0">Nenhuma categoria neste grupo.</div>'}`;
@@ -3912,7 +3963,7 @@ function categoryPickerHtml(selectedId){
         <label>Cor<input type="color" id="txQuickCategoryColor" value="#246bfe"></label>
       </div>
       <div class="quick-icon-preview"><span id="txQuickCategoryIconPreview">📁</span><span class="muted">Pré-visualização</span></div>
-      <label id="txQuickCategoryGroupWrap">Grupo do orçamento<select id="txQuickCategoryGroup"><option value="">❔ Sem grupo</option>${BUDGET_GROUPS_DEFAULT.map(g=>`<option value="${g.key}">${g.icon} ${esc(g.name)}</option>`).join('')}</select></label>
+      <label id="txQuickCategoryGroupWrap">Grupo do orçamento<select id="txQuickCategoryGroup"><option value="">❔ Sem grupo</option>${budgetGroups().map(g=>`<option value="${g.key}">${g.icon} ${esc(g.name)}</option>`).join('')}</select></label>
       <div class="tx-quick-category-actions"><button type="button" class="btn" onclick="toggleQuickCategoryForm(false)">Cancelar</button><button type="button" class="btn primary" onclick="createQuickTransactionCategory()">Criar e selecionar</button></div>
     </div>
   </div>`;
@@ -4101,7 +4152,7 @@ openModal(c?'Editar categoria':'Nova categoria',`<form class="form" onsubmit="sa
 <label>Ícone<select name="icon" id="categoryIconSelect" onchange="updateCategoryIconPreview()">${categoryIconOptionsHtml(c?.icon||defaultCategoryIcon(c?.name))}</select></label>
 <div class="category-icon-preview"><span id="categoryIconPreview">${esc(c?.icon||defaultCategoryIcon(c?.name))}</span><span class="muted">Pré-visualização do ícone selecionado</span></div>
 <label>Cor<input type="color" name="color" value="${c?.color||'#246bfe'}"></label>
-<label>Grupo do orçamento (somente despesas)<select name="budgetGroup"><option value="">❔ Sem grupo</option>${BUDGET_GROUPS_DEFAULT.map(g=>`<option value="${g.key}" ${c?.budgetGroup===g.key?'selected':''}>${g.icon} ${esc(g.name)}</option>`).join('')}</select></label>
+<label>Grupo do orçamento (somente despesas)<select name="budgetGroup"><option value="">❔ Sem grupo</option>${budgetGroups().map(g=>`<option value="${g.key}" ${c?.budgetGroup===g.key?'selected':''}>${g.icon} ${esc(g.name)}</option>`).join('')}</select></label>
 <button class="btn primary">${c?'Salvar alterações':'Salvar'}</button></form>`)
 }
 function saveCategory(e,id){
