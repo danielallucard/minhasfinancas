@@ -2968,8 +2968,8 @@ function transactions(){
   const af=String(window.txAccountFilter ?? 'all');
   const tf=String(window.txTypeFilter ?? 'all');
   const cf=String(window.txCategoryFilter ?? 'all');
-  const cardf=String(window.txCardFilter ?? 'all');
-  const autof=String(window.txAutomationFilter ?? 'all');
+  const cardf=String(window.txFilterCard ?? 'all');
+  const autof=String(window.txFilterAutomation ?? 'all');
 
   const accounts=[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0));
   const actualRows=[...db.transactions]
@@ -2985,22 +2985,12 @@ function transactions(){
   const statementRows=(af==='all'&&cardf==='all'&&autof==='all'?cardStatementRows(k):[])
     .filter(t=>(tf==='all'||tf==='despesa')&&Number(t.value||0)>0);
   const bankRows=actualRows.filter(t=>!t.cardId);
-  const cardPurchases=actualRows.filter(t=>t.cardId);
   // A fatura não é uma movimentação comum: não tem conta, categoria nem confirmação individual.
   // Por isso sai da tabela genérica e ganha um card próprio, com apenas o que faz sentido.
   const rows=sortTransactions(bankRows);
-  // Agrupa as compras pelo ciclo de fatura que elas compõem.
-  const cardGroups={};
-  cardPurchases.forEach(t=>{
-    const key=`${t.cardId}|${txStatementMonth(t)}`;
-    if(!cardGroups[key])cardGroups[key]={cardId:t.cardId,cycle:txStatementMonth(t),due:txCashDate(t),items:[],total:0,confirmed:0,pending:0};
-    cardGroups[key].items.push(t);
-    const v=Number(t.value||0);
-    cardGroups[key].total+=v;
-    if(t.confirmed===true)cardGroups[key].confirmed+=v; else cardGroups[key].pending+=v;
-  });
-  const cardGroupList=Object.values(cardGroups).sort((a,b)=>String(a.cycle).localeCompare(String(b.cycle)));
-  const cardPurchasesTotal=cardPurchases.reduce((s,t)=>s+Number(t.value||0),0);
+  // Cada cartão aparece UMA única vez no mês: a fatura que vence aqui, com todas as
+  // compras do ciclo. Compras cujo ciclo vence em outro mês aparecem naquele mês.
+  const statementTotalMonth=statementRows.reduce((sum,t)=>sum+Number(t.value||0),0);
 
   const accountOptions='<option value="all">Todas as contas</option>'+
     accounts.map(a=>`<option value="${String(a.id)}" ${af===String(a.id)?'selected':''}>${esc(a.name)}</option>`).join('');
@@ -3035,7 +3025,7 @@ function transactions(){
         <label style="flex:1;min-width:220px">Origem do lançamento<select id="txAutomationFilter">${automationFilterOptions(autof)}</select></label>${cardf!=='all'&&cardf!=='none'?`<button class="btn" onclick="openCardStatement('${cardf}',suggestedCardStatementMonth('${cardf}','${k}'))">💳 Abrir fatura</button>`:''}<button class="btn" id="txClearFilters">Limpar filtros</button>
       </div>
       <div class="muted" style="margin-bottom:12px">
-        ${rows.length} lançamento(s) na conta${statementRows.length?`, ${statementRows.length} fatura(s) a pagar`:''} e ${cardPurchases.length} compra(s) no cartão em ${monthLabel(k)}.
+        ${rows.length} lançamento(s) na conta${statementRows.length?` e ${statementRows.length} fatura(s) de cartão`:''} em ${monthLabel(k)}.
       </div>
       <div class="grid g2">
         <div class="card metric"><div class="label">Saldo confirmado</div>
@@ -3045,31 +3035,31 @@ function transactions(){
           <div class="value ${estimated<0?'red':'blue'}">${estimated<0?'− ':''}${money(Math.abs(estimated))}</div>
         </div>
       </div>
+      <div class="tx-section-head tx-section-pay"><h2>💳 Faturas do cartão</h2><span class="muted">A fatura de cada cartão que vence em ${monthLabel(k)}, com todas as compras do ciclo. Toque para abrir.</span></div>
       ${statementRows.length?`
-      <div class="tx-section-head tx-section-pay"><h2>💸 A pagar neste mês</h2><span class="muted">Faturas já fechadas que vencem em ${monthLabel(k)}. Este valor <b>sai da conta</b> agora.</span></div>
       <div class="tx-bill-cards">
       ${statementRows.map(t=>{
         const cycle=t.statementCycle||k;
         const items=cardTransactions(t.cardId,cycle);
-        const pend=items.filter(x=>x.confirmed!==true).length;
-        // O ciclo fecha no mês anterior ao do vencimento quando o cartão tem dia de fechamento.
+        const pendTotal=items.filter(x=>x.confirmed!==true).reduce((s,x)=>s+Number(x.value||0),0);
         const card=db.cards.find(c=>String(c.id)===String(t.cardId));
-        const compras=card&&Number(card.close)?`compras até ${fmtDate(cardCycleCloseDate(card,cycle))}`:'compras do ciclo';
+        const fecha=card&&Number(card.close)?cardCycleCloseDate(card,cycle):'';
         return `<button type="button" class="tx-bill-card" onclick="openCardStatement('${t.cardId}','${cycle}')" aria-label="Abrir fatura de ${esc(cardName(t.cardId))}">
           <div class="tx-bill-top">
             <span class="tx-bill-name">💳 ${esc(cardName(t.cardId))}</span>
             <span class="tx-bill-due">⏱ Vence ${fmtDate(t.date)}</span>
           </div>
           <div class="tx-bill-value">${money(t.value)}</div>
-          <div class="tx-bill-cycle">Fatura fechada · ${items.length} ${items.length===1?'compra':'compras'} (${compras})</div>
+          <div class="tx-bill-cycle">${items.length} ${items.length===1?'compra':'compras'} no ciclo${fecha?` · fecha ${fmtDate(fecha)}`:''}</div>
           <div class="tx-bill-foot">
-            <span class="muted">${pend?`${pend} despesa${pend===1?'':'s'} ainda pendente${pend===1?'':'s'}`:'Todas as despesas confirmadas'}</span>
-            <span class="tx-bill-cta">🔍 Conferir fatura</span>
+            <span class="muted">${pendTotal>0?`${money(pendTotal)} ainda pendente`:'Todas as despesas confirmadas'}</span>
+            <span class="tx-bill-cta">🔍 Abrir fatura</span>
           </div>
         </button>`;
       }).join('')}
       </div>
-      <div class="tx-pay-total">Total que sai da conta em ${monthLabel(k)}: <b>${money(statementRows.reduce((sum,t)=>sum+Number(t.value||0),0))}</b></div>`:''}
+      <div class="tx-pay-total">Total das faturas que vencem em ${monthLabel(k)}: <b>${money(statementTotalMonth)}</b> — é o que sai da conta para quitar os cartões.</div>`
+      :'<div class="empty">Nenhuma fatura de cartão vence neste mês.</div>'}
       <div class="tx-section-head"><h2>🏦 Conta bancária</h2><span class="muted">Receitas e despesas que movimentam a conta diretamente neste mês.</span></div>
       <div class="table-wrap"><table class="table">
         <tr class="sortable-header">
@@ -3094,23 +3084,6 @@ function transactions(){
         </tr>`).join('') || '<tr><td colspan="9" class="empty">Nenhuma movimentação na conta neste mês.</td></tr>'}
       </table></div>
 
-      <div class="tx-section-head tx-section-card"><h2>🛒 Compras feitas neste mês</h2><span class="muted">O que você gastou no cartão em ${monthLabel(k)}. <b>Ainda não sai da conta</b>: entra em uma fatura futura.</span></div>
-      ${cardGroupList.length?`
-      <div class="tx-invoice-cards">
-      ${cardGroupList.map(g=>`
-        <button type="button" class="tx-invoice-card" onclick="openCardStatement('${g.cardId}','${g.cycle}')" aria-label="Abrir fatura de ${esc(cardName(g.cardId))} de ${monthLabel(g.cycle)}">
-          <div class="tx-invoice-card-top">
-            <span class="tx-invoice-card-name">💳 ${esc(cardName(g.cardId))}</span>
-            <span class="tx-invoice-card-count">${g.items.length} ${g.items.length===1?'compra':'compras'}</span>
-          </div>
-          <div class="tx-invoice-card-value">${money(g.total)}</div>
-          <div class="tx-invoice-card-cycle">📅 Você paga em <b>${fmtDate(g.due)}</b><br><span class="tx-invoice-card-sub">Fatura que fecha ${fmtDate(cardCycleCloseDate(db.cards.find(c=>String(c.id)===String(g.cardId)),g.cycle))||'no ciclo de '+monthLabel(g.cycle)}</span></div>
-          <div class="tx-invoice-card-split">${g.pending>0?`<span class="tx-chip tx-chip-pending">Pendente ${money(g.pending)}</span>`:''}${g.confirmed>0?`<span class="tx-chip tx-chip-ok">Confirmado ${money(g.confirmed)}</span>`:''}</div>
-          <span class="tx-invoice-card-cta">🔍 Ver essas compras</span>
-        </button>`).join('')}
-      </div>
-      <div class="tx-card-total">Total comprado em ${monthLabel(k)}: <b>${money(cardPurchasesTotal)}</b> — não afeta o saldo deste mês; será cobrado no vencimento da fatura correspondente.</div>`
-      :'<div class="empty">Nenhuma compra no cartão neste mês.</div>'}
     </div>`;
 
   const ts=document.getElementById('txTypeSelect');
@@ -3122,10 +3095,10 @@ function transactions(){
   ts.onchange=()=>{window.txTypeFilter=ts.value; transactions();};
   as.onchange=()=>{window.txAccountFilter=as.value; transactions();};
   cs.onchange=()=>{window.txCategoryFilter=cs.value; transactions();};
-  cardSel.onchange=()=>{window.txCardFilter=cardSel.value;transactions();};
+  cardSel.onchange=()=>{window.txFilterCard=cardSel.value;transactions();};
   const autoSel=document.getElementById('txAutomationFilter');
-  if(autoSel)autoSel.onchange=()=>{window.txAutomationFilter=autoSel.value;transactions();};
-  clear.onclick=()=>{window.txTypeFilter='all';window.txAccountFilter='all';window.txCategoryFilter='all';window.txCardFilter='all';window.txAutomationFilter='all';transactions();};
+  if(autoSel)autoSel.onchange=()=>{window.txFilterAutomation=autoSel.value;transactions();};
+  clear.onclick=()=>{window.txTypeFilter='all';window.txAccountFilter='all';window.txCategoryFilter='all';window.txFilterCard='all';window.txFilterAutomation='all';transactions();};
 }
 
 async function confirmAccountMonthPending(accountId, monthKeyValue){
@@ -4254,7 +4227,7 @@ async function exportFullBackupZIP(){
     const sqliteBytes=sqliteDb.export(),jsonText=JSON.stringify(db,null,2),stamp=new Date().toISOString();
     const safeStamp=stamp.replace(/[:.]/g,'-').replace('Z','');
     const filename='ricas-financas-backup-completo-'+safeStamp+'.zip';
-    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v97',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
+    const manifest={application:'Ricas Finanças',formatVersion:1,appVersion:'v98',createdAt:stamp,files:['backup.json','ricas-financas.sqlite'],databaseIncluded:true,jsonIncluded:true,compression:'ZIP Store (sem compactação adicional)'};
     const zip=createStoreZIP([
       {name:'backup.json',data:new TextEncoder().encode(jsonText)},
       {name:SQLITE_FILE,data:sqliteBytes},
