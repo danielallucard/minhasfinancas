@@ -2814,7 +2814,7 @@ function summaryPieGeometry(items){
 function renderSummaryPie(items, selectedCat){
   const allItems=items||[];
   const activeItems=allItems.filter(x=>Number(x.v||0)>0);
-  if(!activeItems.length) return '<div class="summary-pie-empty">Nenhuma despesa confirmada no mês.</div>';
+  if(!activeItems.length) return '<div class="summary-pie-empty">Nenhuma despesa no mês para o grupo selecionado.</div>';
   const geom=summaryPieGeometry(activeItems);
   const paths=geom.map((g,i)=>`<path d="${g.path}" fill="${g.c.color||categoryColor(g.c.id)}" onclick="filterSummaryCategory(${g.c.id})" title="${esc(g.c.name)} — ${money(g.v)} (${g.percent.toFixed(1)}%)" ${String(selectedCat)===String(g.c.id)?'opacity="0.72"':''}></path>`).join('');
   const legend=allItems.map(x=>{
@@ -2838,6 +2838,10 @@ function dashboard(){
   const selectedCat=String(window.dashboardCategoryFilter||'all');
   const gf=String(window.dashboardGroupFilter||'all');
   const actualMonth=data.rows;
+  const expenseRows=actualMonth.filter(x=>x.type==='despesa'&&matchesGroupFilter(x,gf));
+  const expenseTotal=expenseRows.reduce((sum,x)=>sum+Number(x.value||0),0);
+  const expenseConfirmed=expenseRows.filter(x=>x.confirmed===true).reduce((sum,x)=>sum+Number(x.value||0),0);
+  const expensePending=expenseTotal-expenseConfirmed;
   let recent=actualMonth
     .filter(x=>matchesGroupFilter(x,gf))
     .filter(x=>selectedCat==='all'||String(x.categoryId)===selectedCat)
@@ -2847,7 +2851,7 @@ function dashboard(){
     .filter(c=>c.type==='despesa'&&categoryInGroup(c,gf))
     .sort((a,b)=>(a.order??0)-(b.order??0))
     .map(c=>{
-      const movements=actualMonth.filter(x=>x.categoryId==c.id&&x.type==='despesa');
+      const movements=expenseRows.filter(x=>x.categoryId==c.id);
       return {c,movements:movements.sort((a,b)=>String(b.date).localeCompare(String(a.date))),v:movements.reduce((s,x)=>s+Number(x.value||0),0)};
     }).sort((a,b)=>b.v-a.v);
   const summaryPie=renderSummaryPie(cats, selectedCat);
@@ -2875,7 +2879,7 @@ function dashboard(){
       ${planned?`<div class="budget-bar" style="margin-top:12px"><i style="width:${Math.min(100,use)}%;background:${use>100?'var(--red)':(def?.color||'var(--primary)')}"></i></div><div class="muted" style="font-size:12px;margin-top:4px">${use.toFixed(1)}% do planejado utilizado</div>`:''}
     </div>`;
   }
-  const recentHtml=recent.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr>${recent.map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${esc(x.description)}<br><span class="muted"><span class="category-icon">${esc(categoryIcon(x.categoryId))}</span>${esc(catName(x.categoryId))}</span></td><td class="${x.type==='despesa'?'red':'blue'}">${x.type==='despesa'?'−':'+'} ${money(x.value)}</td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhuma movimentação confirmada encontrada para esta categoria neste mês.</div>';
+  const recentHtml=recent.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr>${recent.map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${esc(x.description)}<br><span class="muted"><span class="category-icon">${esc(categoryIcon(x.categoryId))}</span>${esc(catName(x.categoryId))}</span></td><td class="${x.type==='despesa'?'red':'blue'}">${x.type==='despesa'?'−':'+'} ${money(x.value)}</td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhuma movimentação encontrada para esta categoria neste mês.</div>';
 
   const overdueBills=overdueBillsForSummary().filter(x=>matchesGroupFilter(x,gf));
   const overdueTotal=overdueBills.reduce((s,x)=>s+Number(x.value||0),0);
@@ -2891,15 +2895,15 @@ function dashboard(){
     <div class="card group-filter-bar">
       <label>Filtrar por grupo do orçamento<select id="dashGroupSelect" onchange="setDashboardGroupFilter(this.value)">${groupFilterOptions(gf)}</select></label>
       ${gf!=='all'?`<button class="btn" onclick="setDashboardGroupFilter('all')">Limpar filtro</button>`:''}
-      <div class="muted">${gf==='all'?'Selecione um grupo para ver o gráfico, as movimentações e as contas vencidas somente daquele grupo. Os indicadores do Resumo Mensal continuam considerando todas as contas do Resumo.':`Mostrando somente despesas do grupo <b>${esc(groupFilterLabel(gf))}</b>${gf==='investimentos'?' (inclui transferências para contas de investimentos)':''}. Os indicadores do Resumo Mensal continuam gerais.`}</div>
+      <div class="muted">${gf==='all'?'Selecione um grupo para ver o gráfico, as movimentações e as contas vencidas somente daquele grupo. O total de despesas, o gráfico e os detalhes respeitam o grupo selecionado. Os saldos bancários permanecem gerais.':`Mostrando somente despesas do grupo <b>${esc(groupFilterLabel(gf))}</b>${gf==='investimentos'?' (inclui transferências para contas de investimentos)':''}. O total de despesas, o gráfico e os detalhes mostram esse grupo, incluindo confirmadas e pendentes. Receitas e saldos permanecem gerais.`}</div>
     </div>
-    <p class="muted">O Resumo Mensal considera exclusivamente receitas e despesas <b>confirmadas</b>. Transferências entre contas são consideradas nos lançamentos das contas: a transferência recebida entra como receita e a enviada como despesa. Quando ambas as contas aparecem no Resumo, o efeito líquido é zero. O Saldo Geral Acumulado incorpora o resultado dos meses anteriores.</p>
+    <p class="muted">O total de despesas do Resumo Mensal inclui <b>confirmadas e pendentes</b>, respeitando o grupo selecionado. Receitas e saldo mensal confirmado continuam considerando apenas lançamentos confirmados. O saldo bancário não é alterado por este filtro. Transferências entre contas são consideradas nos lançamentos das contas: a transferência recebida entra como receita e a enviada como despesa. Quando ambas as contas aparecem no Resumo, o efeito líquido é zero. O Saldo Geral Acumulado incorpora o resultado dos meses anteriores.</p>
     <div class="card section">
       <h2>Resumo Mensal — ${monthLabel(month)}</h2>
       <div class="grid g3">
         <div class="card metric"><div class="label">Receitas confirmadas</div><div class="value blue">${money(data.income)}</div></div>
-        <div class="card metric"><div class="label">Despesas confirmadas</div><div class="value red">${money(data.expense)}</div></div>
-        <div class="card metric"><div class="label">Saldo mensal</div><div class="value ${data.balance<0?'red':'blue'}">${data.balance<0?'− ':''}${money(Math.abs(data.balance))}</div></div>
+        <div class="card metric"><div class="label">Despesas totais${gf!=='all'?` · ${esc(groupFilterLabel(gf))}`:''}</div><div class="value red">${money(expenseTotal)}</div><div class="muted" style="margin-top:6px">Confirmadas: ${money(expenseConfirmed)}<br>Pendentes: ${money(expensePending)}</div></div>
+        <div class="card metric"><div class="label">Saldo mensal confirmado (geral)</div><div class="value ${data.balance<0?'red':'blue'}">${data.balance<0?'− ':''}${money(Math.abs(data.balance))}</div></div>
       </div>
     </div>
     <div class="grid g4 section">
@@ -2912,10 +2916,10 @@ function dashboard(){
     <div class="card section"><h2>Como você deve fechar o mês</h2><div style="font-size:16px;line-height:1.55">${projectionText}</div><div class="muted" style="margin-top:8px">Projeção calculada a partir do saldo existente e das movimentações já lançadas para o restante do mês. Não há extrapolação por ritmo diário.</div></div>
     <div class="card section overdue-card"><div class="overdue-head"><div><h2>Contas vencidas</h2><div class="muted">Despesas com vencimento anterior a hoje que ainda não foram confirmadas${gf!=='all'?` — somente ${esc(groupFilterLabel(gf))}`:''}.</div></div><strong class="red">${overdueBills.length} pendente${overdueBills.length===1?'':'s'}</strong></div>${overdueHtml}</div>
     <div class="grid g2 section">
-      <div class="card"><h2>Despesas por classificação — ${monthLabel(month)}${gf!=='all'?` · ${esc(groupFilterLabel(gf))}`:''}</h2><div class="muted">Todas as classificações aparecem na legenda. Clique em uma fatia do gráfico ou em uma classificação para ver os gastos detalhados abaixo.</div>${summaryPie}${selectedCat!=='all'?`<button class="btn" style="margin-top:10px" onclick="clearSummaryCategoryFilter()">Mostrar todas as classificações</button>`:''}</div>
+      <div class="card"><h2>Despesas por classificação — ${monthLabel(month)}${gf!=='all'?` · ${esc(groupFilterLabel(gf))}`:''}</h2><div class="muted">Despesas confirmadas e pendentes do grupo selecionado. Total: <b>${money(expenseTotal)}</b>. Clique em uma fatia ou classificação para ver os detalhes.</div>${summaryPie}${selectedCat!=='all'?`<button class="btn" style="margin-top:10px" onclick="clearSummaryCategoryFilter()">Mostrar todas as classificações</button>`:''}</div>
       <div class="card"><h2>Movimentações — ${filterLabel}</h2>${recentHtml}</div>
     </div>
-    <div class="card section"><h2>Detalhamento dos gastos${selectedCat!=='all'?` — ${esc(catName(selectedCat))}`:''}</h2>${selectedCat==='all'?'<div class="muted">Clique em uma fatia do gráfico ou em uma classificação na legenda para listar os gastos confirmados.</div>':(()=>{const cc=cats.find(x=>String(x.c.id)===selectedCat);const rows=cc?.movements||[];return rows.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Valor</th></tr>${rows.map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${esc(x.description)}</td><td>${esc(txAccountLabel(x))}</td><td class="red">− ${money(x.value)}</td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhum lançamento confirmado nesta categoria para este mês.</div>';})()}</div>
+    <div class="card section"><h2>Detalhamento dos gastos${selectedCat!=='all'?` — ${esc(catName(selectedCat))}`:''}</h2>${selectedCat==='all'?'<div class="muted">Clique em uma fatia do gráfico ou em uma classificação na legenda para listar os gastos confirmados e pendentes.</div>':(()=>{const cc=cats.find(x=>String(x.c.id)===selectedCat);const rows=cc?.movements||[];return rows.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Status</th><th>Valor</th></tr>${rows.map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${esc(x.description)}</td><td>${esc(txAccountLabel(x))}</td><td>${x.confirmed?'Confirmada':'Pendente'}</td><td class="red">− ${money(x.value)}</td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhum lançamento nesta categoria para este mês.</div>';})()}</div>
     <div class="card section"><h2>Contas</h2><div class="grid g3">${[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0)).map(a=>`<div><span class="pill">${esc(a.name)}</span><h3>${money(balance(a.id))}</h3></div>`).join('')||'<div class="empty">Cadastre sua primeira conta.</div>'}</div></div></div>`;
 }
 
@@ -2987,15 +2991,19 @@ function transactions(){
   const cf=String(window.txCategoryFilter ?? 'all');
   const cardf=String(window.txFilterCard ?? 'all');
   const autof=String(window.txFilterAutomation ?? 'all');
+  const query=String(window.txSearch ?? '');
+  const normalizeSearch=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
+  const matchesSearch=t=>!query.trim()||normalizeSearch(t.description+' '+merchantLabel(t)).includes(normalizeSearch(query.trim()));
 
   const accounts=[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0));
   const actualRows=[...db.transactions]
-    .filter(t=>monthKey(t.date)===k)
+    .filter(t=>(t.cardId?txCashMonth(t):monthKey(t.date))===k)
     .filter(t=>af==='all' || String(t.accountId)===af)
     .filter(t=>tf==='all' || String(t.type)===tf)
     .filter(t=>cf==='all' || String(t.categoryId)===cf)
     .filter(t=>matchesCardFilter(t,cardf))
-    .filter(t=>matchesAutomationFilter(t,autof));
+    .filter(t=>matchesAutomationFilter(t,autof))
+    .filter(matchesSearch);
   // Separação por natureza do dinheiro, para que nada pareça contado duas vezes:
   //  • Conta bancária: receitas, despesas em conta e o pagamento das faturas.
   //  • Compras no cartão: não debitam a conta agora; apenas compõem a fatura de um ciclo futuro.
@@ -3005,6 +3013,9 @@ function transactions(){
   // A fatura não é uma movimentação comum: não tem conta, categoria nem confirmação individual.
   // Por isso sai da tabela genérica e ganha um card próprio, com apenas o que faz sentido.
   const rows=sortTransactions(bankRows);
+  const cardRows=sortTransactions(actualRows.filter(t=>t.cardId&&!t.virtualCardStatement));
+  const cardTotal=cardRows.reduce((sum,t)=>sum+Number(t.value||0),0);
+  const showCardDetails=cardf!=='none'&&(cardf!=='all'||cf!=='all'||autof!=='all'||query.trim());
   // Cada cartão aparece UMA única vez no mês: a fatura que vence aqui, com todas as
   // compras do ciclo. Compras cujo ciclo vence em outro mês aparecem naquele mês.
   const statementTotalMonth=statementRows.reduce((sum,t)=>sum+Number(t.value||0),0);
@@ -3026,6 +3037,7 @@ function transactions(){
     ${monthNav()}
     <div class="card">
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+        <label style="flex:1;min-width:220px">Pesquisar despesa ou estabelecimento<input id="txSearchInput" type="search" placeholder="Nome da despesa ou nome na fatura" value="${esc(query)}" autocomplete="off"></label>
         <label style="flex:1;min-width:220px">Movimentação
           <select id="txTypeSelect">${typeOptions}</select>
         </label>
@@ -3077,6 +3089,10 @@ function transactions(){
       </div>
       <div class="tx-pay-total">Total das faturas que vencem em ${monthLabel(k)}: <b>${money(statementTotalMonth)}</b> — é o que sai da conta para quitar os cartões.</div>`
       :'<div class="empty">Nenhuma fatura de cartão vence neste mês.</div>'}
+      ${showCardDetails?`<div class="tx-section-head tx-section-card"><h2>💳 Despesas do cartão filtradas</h2><span class="muted">Compras da fatura com vencimento em ${monthLabel(k)}. Detalhamento informativo, sem novo débito no saldo bancário.</span></div>
+      <div class="tx-card-total">${cardRows.length} despesa(s) encontrada(s) · Total filtrado: <b>${money(cardTotal)}</b></div>
+      <div class="table-wrap"><table class="table"><tr><th>Data da compra</th><th>Descrição / estabelecimento</th><th>Cartão</th><th>Categoria</th><th>Origem</th><th>Vencimento</th><th>Valor</th><th>Confirmado</th><th>Ações</th></tr>
+      ${cardRows.map(t=>`<tr class="${t.confirmed?'':'pending-row'}"><td>${fmtDate(t.date)}</td><td>${esc(t.description)}${merchantLabel(t)?`<br><span class="invoice-merchant">${esc(merchantLabel(t))}</span>`:''}</td><td>${esc(cardName(t.cardId))}</td><td>${esc(catName(t.categoryId))}</td><td>${esc(txAutomationLabel(t))}</td><td>${fmtDate(txCashDate(t))}</td><td class="red">${money(t.value)}</td><td class="confirm-cell"><input type="checkbox" class="confirm-check" aria-label="Confirmar despesa" ${t.confirmed?'checked':''} onchange="toggleTxConfirmed(${t.id})"></td><td><button class="btn" onclick="openTx(${t.id})">Editar</button> <button class="btn danger" onclick="deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')||'<tr><td colspan="9" class="empty">Nenhuma despesa do cartão corresponde aos filtros neste mês de vencimento.</td></tr>'}</table></div>`:''}
       <div class="tx-section-head"><h2>🏦 Conta bancária</h2><span class="muted">Receitas e despesas que movimentam a conta diretamente neste mês.</span></div>
       <div class="table-wrap"><table class="table">
         <tr class="sortable-header">
@@ -3109,13 +3125,15 @@ function transactions(){
   const cs=document.getElementById('txCategorySelect');
   const cardSel=document.getElementById('txCardFilter');
 
+  const search=document.getElementById('txSearchInput');
+  search.oninput=()=>{const start=search.selectionStart;window.txSearch=search.value;transactions();const next=document.getElementById('txSearchInput');next.focus();try{next.setSelectionRange(start,start);}catch(e){}};
   ts.onchange=()=>{window.txTypeFilter=ts.value; transactions();};
   as.onchange=()=>{window.txAccountFilter=as.value; transactions();};
   cs.onchange=()=>{window.txCategoryFilter=cs.value; transactions();};
   cardSel.onchange=()=>{window.txFilterCard=cardSel.value;transactions();};
   const autoSel=document.getElementById('txAutomationFilter');
   if(autoSel)autoSel.onchange=()=>{window.txFilterAutomation=autoSel.value;transactions();};
-  clear.onclick=()=>{window.txTypeFilter='all';window.txAccountFilter='all';window.txCategoryFilter='all';window.txFilterCard='all';window.txFilterAutomation='all';transactions();};
+  clear.onclick=()=>{window.txTypeFilter='all';window.txAccountFilter='all';window.txCategoryFilter='all';window.txFilterCard='all';window.txFilterAutomation='all';window.txSearch='';transactions();};
 }
 
 async function confirmAccountMonthPending(accountId, monthKeyValue){
