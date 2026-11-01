@@ -1678,6 +1678,7 @@ function toggleCardAccountFields(){
       holder.value=current;
     }else holder.innerHTML='';
   }
+  updateTxDateHint();
 }
 
 // Partida dobrada simplificada: receita = crédito/entrada (+); despesa = débito/saída (-); transferência não altera o resultado líquido.
@@ -3978,15 +3979,33 @@ function selectTxCategory(id){
   value.value=String(cat.id);
   if(box)box.style.display='none';
 }
+
+// A data gravada continua sendo a da transação. A competência de caixa do
+// crédito é calculada por txCashDate(), sem substituir a data original.
+function updateTxDateHint(){
+  const box=document.getElementById('txDateHint');if(!box)return;
+  const date=document.querySelector('#modalBody .tx-form [name="date"]')?.value||'';
+  const cardId=document.getElementById('txCardSelect')?.value||'';
+  if(!cardId){box.textContent='Débito / conta: a movimentação confirmada afeta o saldo na data da transação. Desmarque a confirmação somente para manter um lançamento pendente.';return;}
+  const card=db.cards.find(c=>String(c.id)===String(cardId));
+  if(!card||!Number(card.close)||!Number(card.due)){box.textContent='Crédito: informe a data da compra. Cadastre o fechamento e o vencimento do cartão para calcular corretamente a fatura.';return;}
+  if(!date){box.textContent='Crédito: informe a data da compra. A saída de caixa será considerada no vencimento da fatura, conforme o fechamento do cartão.';return;}
+  const editing=document.querySelector('#modalBody .tx-form')?.dataset.transactionId;
+  const existing=editing?db.transactions.find(t=>String(t.id)===String(editing)):null;
+  const tx={...(existing||{}),date,cardId:card.id};
+  const cycle=transactionCardBillingMonth(tx,card),due=cardStatementDueDate(card,cycle);
+  box.textContent='Crédito: compra em '+fmtDate(date)+' · fatura com fechamento em '+fmtDate(cardCycleCloseDate(card,cycle))+' · vencimento em '+fmtDate(due)+'. A saída de caixa é considerada no vencimento da fatura; a compra não debita diretamente o saldo da conta.';
+}
+
 function openTx(id){
   const t=id?db.transactions.find(x=>x.id==id):null;
-  const today=t?.date||'';
+  const today=t?.date||localDateKey();
   const title=t?'Editar movimentação':'Nova movimentação';
   const cardId=t?.cardId||'';
-  openModal(title,`<form class="form tx-form" onsubmit="${t?`saveTransactionEdit(event,${id})`:`addTx(event)`}">
+  openModal(title,`<form class="form tx-form" data-transaction-id="${t?.id||''}" onsubmit="${t?`saveTransactionEdit(event,${id})`:`addTx(event)`}">
     <div class="row">
       <label>Tipo<select name="type" required><option value="" disabled ${t?'':'selected'}>Selecione…</option><option value="despesa" ${t?.type==='despesa'?'selected':''}>Despesa</option><option value="receita" ${t?.type==='receita'?'selected':''}>Receita</option></select></label>
-      <label>Data de vencimento<input type="date" name="date" value="${today}" required></label>
+      <label>Data da transação<input type="date" name="date" value="${today}" required oninput="updateTxDateHint()"></label>
     </div>
     <label>Descrição<input name="description" value="${esc(t?.description||'')}" required placeholder="Ex.: Supermercado"></label>
     <label>Valor<input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" data-min="0.01" name="value" value="${decimalInputValue(t?.value||'')}" required placeholder="0,00"></label>
@@ -3997,11 +4016,12 @@ function openTx(id){
       <label class="tx-account-field">Conta<select name="accountId" id="txAccountSelectModal" required><option value="" ${t?'':'selected'}>Selecione uma conta</option>${[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0)).map(a=>`<option value="${a.id}" ${!cardId&&t?.accountId==a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>
       ${categoryPickerHtml(t?.categoryId??'')}
     </div>
-    <label class="tx-confirmed"><input type="checkbox" name="confirmed" ${t?.confirmed?'checked':''}> <span>Movimentação confirmada</span></label>
-    <p class="muted tx-card-help"><b>Compra no cartão:</b> a despesa entra na fatura e não reduz o saldo da conta bancária. A fatura é exibida automaticamente no cartão.</p>
+    <label class="tx-confirmed"><input type="checkbox" name="confirmed" ${(!t||t.confirmed)?'checked':''}> <span>Movimentação confirmada</span></label>
+    <p id="txDateHint" class="muted tx-card-help" aria-live="polite"><b>Compra no cartão:</b> a despesa entra na fatura e não reduz o saldo da conta bancária. A fatura é exibida automaticamente no cartão.</p>
     <button class="btn primary">${t?'Salvar alterações':'Salvar movimentação'}</button>
   </form>`);
   if(cardId){const hs=document.getElementById("txHolderSelect");if(hs)hs.dataset.current=t?.cardHolder||'principal';toggleCardAccountFields();}
+  updateTxDateHint();
   const picker=document.getElementById('txCategoryPicker');
   if(picker){
     picker.addEventListener('focusout',()=>setTimeout(()=>{const box=document.getElementById('txCategoryOptions');if(box&&!picker.contains(document.activeElement)&&document.getElementById('txQuickCategory')?.hidden!==false)box.style.display='none';},150));
