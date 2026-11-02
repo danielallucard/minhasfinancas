@@ -455,7 +455,7 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 .distribution-group{min-width:0;border:1px solid var(--border);border-left:4px solid var(--group-color);border-radius:10px;padding:12px;background:#fff}
 .distribution-group h3{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:15px;line-height:1.4;word-break:normal;overflow-wrap:normal}
 .distribution-dot{width:9px;height:9px;border-radius:50%;background:var(--group-color);flex:0 0 auto}
-.distribution-group dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
+.distribution-group dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0}
 .distribution-group dl>div{min-width:0}
 .distribution-group dt{font-size:11px;color:var(--muted);line-height:1.4;word-break:normal;overflow-wrap:normal;margin:0 0 5px}
 .distribution-group dd{font-size:14px;font-weight:600;line-height:1.4;margin:0;white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -1884,9 +1884,62 @@ function recurrenceCategoryPickerHtml(selectedId){
       <input type="hidden" name="categoryId" id="recurrenceCategoryValue" value="${selectedId??''}">
     </label>
     <div id="recurrenceCategoryOptions" class="category-options" style="display:none">
-      ${cats.map(c=>`<button type="button" class="category-option" data-id="${c.id}" data-name="${esc(c.name)}" onclick="selectRecurrenceCategory(${c.id})"><span><span class="category-icon">${esc(c.icon||defaultCategoryIcon(c.name))}</span>${esc(c.name)}</span> <span class="muted">${c.type==='receita'?'Receita':'Despesa'}</span></button>`).join('')}
+      ${recurrenceCategoryOptionsHtml()}
+    </div>
+    <button type="button" class="btn tx-new-category-btn" onclick="toggleRecQuickCategory(true)">＋ Criar nova categoria</button>
+    <div id="recQuickCategory" class="tx-quick-category" hidden>
+      <div class="tx-quick-category-head"><b>Nova categoria</b><button type="button" class="close" onclick="toggleRecQuickCategory(false)" aria-label="Fechar">×</button></div>
+      <div class="row">
+        <label>Nome<input type="text" id="recQuickCategoryName" minlength="3" placeholder="Ex.: Assinaturas"></label>
+        <label>Tipo<select id="recQuickCategoryType" onchange="toggleRecQuickCategoryGroup()"><option value="despesa">Despesa</option><option value="receita">Receita</option></select></label>
+      </div>
+      <div class="row">
+        <label>Ícone<select id="recQuickCategoryIcon" onchange="document.getElementById('recQuickCategoryIconPreview').textContent=this.value||'📁'">${categoryIconOptionsHtml('📁')}</select></label>
+        <label>Cor<input type="color" id="recQuickCategoryColor" value="#246bfe"></label>
+      </div>
+      <div class="quick-icon-preview"><span id="recQuickCategoryIconPreview">📁</span><span class="muted">Pré-visualização</span></div>
+      <label id="recQuickCategoryGroupWrap">Grupo do orçamento<select id="recQuickCategoryGroup"><option value="">❔ Sem grupo</option>${budgetGroups().map(g=>`<option value="${g.key}">${g.icon} ${esc(g.name)}</option>`).join('')}</select></label>
+      <div class="tx-quick-category-actions"><button type="button" class="btn" onclick="toggleRecQuickCategory(false)">Cancelar</button><button type="button" class="btn primary" onclick="createQuickRecurrenceCategory()">Criar e selecionar</button></div>
     </div>
   </div>`;
+}
+function recurrenceCategoryOptionsHtml(){
+  return [...db.categories].sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR',{sensitivity:'base'})).map(c=>`<button type="button" class="category-option" data-id="${c.id}" data-name="${esc(c.name)}" onclick="selectRecurrenceCategory(${c.id})"><span><span class="category-icon">${esc(c.icon||defaultCategoryIcon(c.name))}</span>${esc(c.name)}</span> <span class="muted">${c.type==='receita'?'Receita':'Despesa'}</span></button>`).join('');
+}
+function toggleRecQuickCategory(show){
+  const box=document.getElementById('recQuickCategory');if(!box)return;
+  box.hidden=!show;
+  const row=document.getElementById('recAccountCategoryRow');if(row)row.classList.toggle('quick-category-open',!!show);
+  if(show){
+    const opts=document.getElementById('recurrenceCategoryOptions');if(opts)opts.style.display='none';
+    const recType=document.getElementById('recTypeSelect')?.value;
+    const type=document.getElementById('recQuickCategoryType');if(type)type.value=recType==='receita'?'receita':'despesa';
+    const typed=String(document.getElementById('recurrenceCategorySearch')?.value||'').trim();
+    const name=document.getElementById('recQuickCategoryName');if(name&&!name.value&&typed)name.value=typed;
+    toggleRecQuickCategoryGroup();
+    setTimeout(()=>name?.focus(),30);
+  }
+}
+function toggleRecQuickCategoryGroup(){
+  const wrap=document.getElementById('recQuickCategoryGroupWrap');
+  if(wrap)wrap.hidden=document.getElementById('recQuickCategoryType')?.value!=='despesa';
+}
+function createQuickRecurrenceCategory(){
+  const name=String(document.getElementById('recQuickCategoryName')?.value||'').trim();
+  const type=document.getElementById('recQuickCategoryType')?.value||'despesa';
+  const icon=document.getElementById('recQuickCategoryIcon')?.value||'📁';
+  const color=document.getElementById('recQuickCategoryColor')?.value||'#246bfe';
+  const group=type==='despesa'?(document.getElementById('recQuickCategoryGroup')?.value||''):'';
+  if(name.length<3)return toast('Informe um nome com pelo menos 3 caracteres.');
+  let cat=db.categories.find(c=>String(c.name||'').trim().toLocaleLowerCase('pt-BR')===name.toLocaleLowerCase('pt-BR')&&c.type===type);
+  if(!cat){
+    cat={id:uid(),name,type,color,icon,order:db.categories.length,...(type==='despesa'?{budgetGroup:budgetGroupDef(group)?group:''}:{})};
+    db.categories.push(cat);normalizeOrders();save();
+    toast('Categoria criada e selecionada.');
+  }else toast('Categoria existente selecionada.');
+  const opts=document.getElementById('recurrenceCategoryOptions');if(opts)opts.innerHTML=recurrenceCategoryOptionsHtml();
+  selectRecurrenceCategory(cat.id);
+  toggleRecQuickCategory(false);
 }
 function showRecurrenceCategories(){
   const box=document.getElementById('recurrenceCategoryOptions');
@@ -2520,7 +2573,7 @@ function budgetReportHtml(r,af,gf){
     const hl=gf!=='all'&&String(x.c.id)===(gf==='none'?'':gf);
     return `<section class="distribution-group${hl?' distribution-selected':''}" style="--group-color:${x.c.color}">
       <h3><span class="distribution-dot"></span><span>${x.icon} ${esc(x.c.name)}</span></h3>
-      <dl><div><dt>Real / receita</dt><dd>${fmtPct(real)}</dd></div><div><dt>Meta</dt><dd>${x.meta==null?'—':fmtPct(x.meta)}</dd></div><div><dt>Desvio</dt><dd class="${dev==null?'':dev>0?'red':'blue'}">${dev==null?'—':(dev>0?'+':'')+dev.toFixed(1)+' p.p.'}</dd></div></dl>
+      <dl><div><dt>Real / receita</dt><dd>${fmtPct(real)}</dd></div><div><dt>Meta</dt><dd>${x.meta==null?'—':fmtPct(x.meta)}</dd></div></dl>
     </section>`;
   }).join('')}</div>`;
   const monthUse=bd.months.map(m=>{
@@ -2690,8 +2743,8 @@ function generateReportPDF(){
     groups.forEach(g=>{
       ensure(22);
       const use=g.planned>0?g.total/g.planned*100:(g.total>0?100:0);
-      const goal=['investimentos','metas','conhecimento'].includes(g.key);
-      const ucol=goal?(use>=100?C.green:use>=70?'#d98c00':C.red):(use>100?C.red:use>85?'#d98c00':C.green);
+      // Verde = dentro do orçamento (até 100%); vermelho = estourou.
+      const ucol=use>100?C.red:C.green;
       let x=M;
       pdf.rect(x+4,y+3,6,6,g.color);pdf.text(g.name,x+14,y+1,{size:9,maxW:cols[0][1]-16});x+=cols[0][1];
       pdf.text(g.pct.toFixed(0)+'%',x+cols[1][1]-4,y+1,{size:9,align:'right'});x+=cols[1][1];
@@ -2923,7 +2976,7 @@ function dashboard(){
         <div class="card metric"><div class="label">Comprometido (+ pendentes)</div><div class="value">${money(sp.total)}</div></div>
         <div class="card metric"><div class="label">Disponível</div><div class="value ${left!=null&&left<0?'red':'blue'}">${left==null?'—':(left<0?'− ':'')+money(Math.abs(left))}</div></div>
       </div>
-      ${planned?`<div class="budget-bar" style="margin-top:12px"><i style="width:${Math.min(100,use)}%;background:${use>100?'var(--red)':(def?.color||'var(--primary)')}"></i></div><div class="muted" style="font-size:12px;margin-top:4px">${use.toFixed(1)}% do planejado utilizado</div>`:''}
+      ${planned?`<div class="budget-bar" style="margin-top:12px"><i style="width:${Math.min(100,use)}%;background:${use>100?'var(--red)':'var(--green)'}"></i></div><div class="muted" style="font-size:12px;margin-top:4px">${use.toFixed(1)}% do planejado utilizado</div>`:''}
     </div>`;
   }
   const recentHtml=recent.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr>${recent.map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${esc(x.description)}<br><span class="muted"><span class="category-icon">${esc(categoryIcon(x.categoryId))}</span>${esc(catName(x.categoryId))}</span></td><td class="${x.type==='despesa'?'red':'blue'}">${x.type==='despesa'?'−':'+'} ${money(x.value)}</td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhuma movimentação encontrada para esta categoria neste mês.</div>';
@@ -3264,7 +3317,7 @@ function budgetPanelHtml(month){
   const rows=budgetGroups().map(g=>{
     const pct=budgetPercent(g.key), planned=income*pct/100, sp=spend[g.key];
     const left=planned-sp.total, use=planned>0?sp.total/planned*100:(sp.total>0?100:0);
-    const barColor=use>100?'var(--red)':(use>85?'var(--amber)':g.color);
+    const barColor=use>100?'var(--red)':'var(--green)';
     const nCats=db.categories.filter(c=>c.type==='despesa'&&c.budgetGroup===g.key).length;
     return `<tr>
       <td><span class="cat-dot" style="background:${g.color}"></span><span class="category-icon">${g.icon}</span><b>${esc(g.name)}</b><br><span class="muted" style="white-space:normal;font-size:12px">${esc(g.hint)}</span><br><span class="muted" style="font-size:12px">${nCats} categoria(s) vinculada(s)${g.key==='investimentos'?' + transferências para contas de investimentos':''}</span></td>
