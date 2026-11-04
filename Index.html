@@ -854,16 +854,14 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 .tx-bill-card.invoice-paid .tx-bill-value{color:#166534!important}
 @media(max-width:1180px){table.table td.payment-cell{grid-column:1/-1!important;text-align:center!important}}
 </style>
-<style id="summary-v113-style">
-.summary-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.summary-kpi{box-shadow:none;position:relative;overflow:hidden;padding:15px!important}
-.summary-kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--kpi-color,#246bfe)}
-.summary-kpi-income{--kpi-color:#246bfe}.summary-kpi-expense{--kpi-color:#d92d20}.summary-kpi-balance{--kpi-color:#159447}
-.summary-kpi-balance.negative{--kpi-color:#d92d20}
-.summary-kpi .label{font-size:12px}.summary-kpi .value{font-size:clamp(20px,3vw,29px)!important}
-.summary-support{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
-.summary-support .card{box-shadow:none}
-@media(max-width:560px){.summary-kpis{grid-template-columns:minmax(0,1fr)}.summary-support{grid-template-columns:minmax(0,1fr)}}
+<style id="sum114">
+.sum114{display:grid;gap:12px;margin-top:4px}
+.sum114-card{background:#fff;border:1px solid var(--border);border-left:5px solid var(--c);border-radius:14px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;box-shadow:var(--shadow)}
+.sum114-card span{color:var(--muted);font-size:15px}
+.sum114-card b{font-size:clamp(20px,5.5vw,28px);color:var(--c);white-space:nowrap;font-variant-numeric:tabular-nums}
+.sum114-card.inc{--c:#246bfe}.sum114-card.exp{--c:#d92d20}.sum114-card.bal{--c:#159447}.sum114-card.bal.neg{--c:#d92d20}
+.sum114-card.bal{background:#f6fdf9}.sum114-card.bal.neg{background:#fff6f5}
+.sum114-ver{text-align:center;color:var(--muted);font-size:11px;margin-top:14px}
 </style></head>
 <body><div id="cloudGate"><div class="card"><h2>💰 Ricas Finanças</h2><p>Entre com a mesma conta no computador e no celular.</p>
 <form class="form" onsubmit="cloudLogin(event)"><label>E-mail<input id="cloudEmail" type="email" autocomplete="username" required></label>
@@ -2900,6 +2898,7 @@ function summaryClosingProjection(month){
   const currentKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   const visibleIds=new Set(summaryAccounts().map(a=>String(a.id)));
   const signed=t=>((t.type==='receita'?1:-1)*Number(t.value||0));
+  const existing=summaryExistingBalance(month);
 
   if(month!==currentKey){
     const monthRows=(db.transactions||[]).filter(t=>txCashMonth(t)===month && visibleIds.has(String(t.accountId)));
@@ -2956,90 +2955,20 @@ function renderSummaryPie(items, selectedCat){
 function dashboard(){
   document.getElementById('topActions').innerHTML='<button class="btn primary" onclick="openTx()">+ Nova movimentação</button>';
   const month=selectedMonthKey();
-  const data=summaryMonthlyData(month);
-  const existing=summaryExistingBalance(month);
-  const selectedCat=String(window.dashboardCategoryFilter||'all');
-  const gf=String(window.dashboardGroupFilter||'all');
-  const actualMonth=data.rows;
-  // Resumo v113: visão mensal simples. Receita e despesa incluem lançamentos pagos e a pagar do mês.
-  // Transferências internas são excluídas para não inflar receita/despesa.
-  const summaryRows=actualMonth.filter(x=>!x.transfer);
-  const incomeTotal=summaryRows.filter(x=>x.type==='receita').reduce((sum,x)=>sum+Number(x.value||0),0);
-  const expenseRows=summaryRows.filter(x=>x.type==='despesa'&&matchesGroupFilter(x,gf));
-  const expenseTotal=expenseRows.reduce((sum,x)=>sum+Number(x.value||0),0);
-  const expenseConfirmed=expenseRows.filter(x=>x.confirmed===true).reduce((sum,x)=>sum+Number(x.value||0),0);
-  const expensePending=expenseTotal-expenseConfirmed;
-  const simpleBalance=incomeTotal-expenseTotal;
-  let recent=actualMonth
-    .filter(x=>matchesGroupFilter(x,gf))
-    .filter(x=>selectedCat==='all'||String(x.categoryId)===selectedCat)
-    .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-
-  const cats=[...db.categories]
-    .filter(c=>c.type==='despesa'&&categoryInGroup(c,gf))
-    .sort((a,b)=>(a.order??0)-(b.order??0))
-    .map(c=>{
-      const movements=expenseRows.filter(x=>x.categoryId==c.id);
-      return {c,movements:movements.sort((a,b)=>String(b.date).localeCompare(String(a.date))),v:movements.reduce((s,x)=>s+Number(x.value||0),0)};
-    }).sort((a,b)=>b.v-a.v);
-  const summaryPie=renderSummaryPie(cats, selectedCat);
-
-  const filterLabel=selectedCat==='all'?(gf==='all'?'Todas as categorias':esc(groupFilterLabel(gf))):`Categoria: ${esc(catName(selectedCat))}`;
-  // Painel do grupo selecionado (planejado × realizado no mês)
-  let groupPanel='';
-  if(gf!=='all'){
-    const sp=budgetSpending(month)[gf==='none'?'':gf]||{confirmed:0,total:0};
-    const def=budgetGroupDef(gf);
-    const inc=budgetIncome(month);
-    const planned=def?inc*budgetPercent(gf)/100:null;
-    const use=planned?sp.total/planned*100:null;
-    const goal=['investimentos','metas','conhecimento'].includes(gf);
-    const st=use==null?'':(goal?(use>=100?'✅ meta atingida':use>=70?'🟡 em andamento':'🔴 abaixo da meta'):(use>100?'🔴 acima do limite':use>85?'🟡 próximo do limite':'✅ dentro do limite'));
-    const left=planned!=null?planned-sp.total:null;
-    groupPanel=`<div class="card section group-panel" style="border-left:4px solid ${def?.color||'#9ca3af'}">
-      <div class="group-panel-head"><h2>${esc(groupFilterLabel(gf))} — ${monthLabel(month)}</h2>${st?`<span class="pill">${st}</span>`:''}</div>
-      <div class="grid g4">
-        <div class="card metric"><div class="label">Planejado${def?` (${budgetPercent(gf)}% da receita)`:''}</div><div class="value">${planned!=null?money(planned):'—'}</div></div>
-        <div class="card metric"><div class="label">Realizado (confirmado)</div><div class="value red">${money(sp.confirmed)}</div></div>
-        <div class="card metric"><div class="label">Comprometido (+ pendentes)</div><div class="value">${money(sp.total)}</div></div>
-        <div class="card metric"><div class="label">Disponível</div><div class="value ${left!=null&&left<0?'red':'blue'}">${left==null?'—':(left<0?'− ':'')+money(Math.abs(left))}</div></div>
-      </div>
-      ${planned?`<div class="budget-bar" style="margin-top:12px"><i style="width:${Math.min(100,use)}%;background:${use>100?'var(--red)':'var(--green)'}"></i></div><div class="muted" style="font-size:12px;margin-top:4px">${use.toFixed(1)}% do planejado utilizado</div>`:''}
-    </div>`;
-  }
-  const recentHtml=recent.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr>${recent.map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${esc(x.description)}<br><span class="muted"><span class="category-icon">${esc(categoryIcon(x.categoryId))}</span>${esc(catName(x.categoryId))}</span></td><td class="${x.type==='despesa'?'red':'blue'}">${x.type==='despesa'?'−':'+'} ${money(x.value)}</td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhuma movimentação encontrada para esta categoria neste mês.</div>';
-
-  const overdueBills=overdueBillsForSummary().filter(x=>matchesGroupFilter(x,gf));
-  const overdueTotal=overdueBills.reduce((s,x)=>s+Number(x.value||0),0);
-  const overdueHtml=overdueBills.length?`<div class="table-wrap"><table class="table"><tr><th>Vencimento</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Valor</th></tr>${overdueBills.map(x=>`<tr><td class="red">${fmtDate(x.date)}${String(x.date)===new Date().toISOString().slice(0,10)?' <span class="pill">Hoje</span>':''}</td><td>${esc(x.description||'Sem descrição')}</td><td>${esc((db.accounts.find(a=>String(a.id)===String(x.accountId))||{}).name||'—')}</td><td><span class="cat-dot" style="background:${categoryColor(x.categoryId)}"></span><span class="category-icon">${esc(categoryIcon(x.categoryId))}</span>${esc(catName(x.categoryId))}</td><td class="red">− ${money(x.value)}</td></tr>`).join('')}</table></div><div class="overdue-total"><b>Total vencido / vence hoje:</b> <span class="red">− ${money(overdueTotal)}</span></div>`:'<div class="empty">Nenhuma conta vencida ou com vencimento hoje e pendente.</div>';
-
-
+  // v114: Resumo enxuto. Receita, despesa e saldo do mês (pagos + a pagar), sem transferências internas.
+  const rows=summaryMonthlyData(month).rows.filter(t=>!t.transfer&&!t.virtualCardStatement);
+  const sum=type=>rows.filter(t=>t.type===type).reduce((s,t)=>s+Number(t.value||0),0);
+  const income=sum('receita'), expense=sum('despesa'), bal=income-expense;
   document.getElementById('content').innerHTML=`<div class="summary-page">
     ${monthNav()}
-    <div class="card group-filter-bar">
-      <label>Filtrar por grupo do orçamento<select id="dashGroupSelect" onchange="setDashboardGroupFilter(this.value)">${groupFilterOptions(gf)}</select></label>
-      ${gf!=='all'?`<button class="btn" onclick="setDashboardGroupFilter('all')">Limpar filtro</button>`:''}
-      <div class="muted">${gf==='all'?'Use este filtro quando quiser analisar somente um grupo de despesas.':`Mostrando despesas de <b>${esc(groupFilterLabel(gf))}</b>. A receita continua sendo a receita total do mês.`}</div>
+    <div class="sum114">
+      <div class="sum114-card inc"><span>Receita total</span><b>${money(income)}</b></div>
+      <div class="sum114-card exp"><span>Despesa total</span><b>${money(expense)}</b></div>
+      <div class="sum114-card bal ${bal<0?'neg':''}"><span>Saldo do mês</span><b>${bal<0?'− ':''}${money(Math.abs(bal))}</b></div>
     </div>
-    <div class="card section">
-      <h2>Resumo Mensal — ${monthLabel(month)}</h2>
-      <div class="summary-kpis">
-        <div class="card metric summary-kpi summary-kpi-income"><div class="label">Receita total</div><div class="value blue">${money(incomeTotal)}</div></div>
-        <div class="card metric summary-kpi summary-kpi-expense"><div class="label">Despesa total${gf!=='all'?` · ${esc(groupFilterLabel(gf))}`:''}</div><div class="value red">${money(expenseTotal)}</div></div>
-        <div class="card metric summary-kpi summary-kpi-balance ${simpleBalance<0?'negative':''}"><div class="label">Saldo do mês</div><div class="value ${simpleBalance<0?'red':'green'}">${simpleBalance<0?'− ':''}${money(Math.abs(simpleBalance))}</div></div>
-      </div>
-      <div class="muted" style="font-size:12px;margin-top:10px">Saldo do mês = receita total − despesa total. Os totais incluem lançamentos pagos e a pagar; transferências entre suas contas não alteram este resultado.</div>
-    </div>
-    ${groupPanel}
-    <div class="card section overdue-card"><div class="overdue-head"><div><h2>Contas vencidas</h2><div class="muted">Despesas com vencimento anterior a hoje que ainda não foram confirmadas${gf!=='all'?` — somente ${esc(groupFilterLabel(gf))}`:''}.</div></div><strong class="red">${overdueBills.length} pendente${overdueBills.length===1?'':'s'}</strong></div>${overdueHtml}</div>
-    <div class="grid g2 section">
-      <div class="card"><h2>Despesas por classificação — ${monthLabel(month)}${gf!=='all'?` · ${esc(groupFilterLabel(gf))}`:''}</h2><div class="muted">Despesas confirmadas e pendentes do grupo selecionado. Total: <b>${money(expenseTotal)}</b>. Clique em uma fatia ou classificação para ver os detalhes.</div>${summaryPie}${selectedCat!=='all'?`<button class="btn" style="margin-top:10px" onclick="clearSummaryCategoryFilter()">Mostrar todas as classificações</button>`:''}</div>
-      <div class="card"><h2>Movimentações — ${filterLabel}</h2>${recentHtml}</div>
-    </div>
-    <div class="card section"><h2>Detalhamento dos gastos${selectedCat!=='all'?` — ${esc(catName(selectedCat))}`:''}</h2>${selectedCat==='all'?'<div class="muted">Clique em uma fatia do gráfico ou em uma classificação na legenda para listar os gastos confirmados e pendentes.</div>':(()=>{const cc=cats.find(x=>String(x.c.id)===selectedCat);const rows=cc?.movements||[];return rows.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Status</th><th>Valor</th></tr>${rows.map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${esc(x.description)}</td><td>${esc(txAccountLabel(x))}</td><td>${x.type==='despesa'?(txIsPaid(x)?'Paga':'A pagar'):(x.confirmed?'Recebida':'A receber')}</td><td class="red">− ${money(x.value)}</td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhum lançamento nesta categoria para este mês.</div>';})()}</div>
-    <div class="card section"><h2>Contas</h2><div class="grid g3">${[...summaryAccounts()].sort((a,b)=>(a.order??0)-(b.order??0)).map(a=>`<div><span class="pill">${esc(a.name)}</span><h3>${money(balance(a.id))}</h3></div>`).join('')||'<div class="empty">Cadastre sua primeira conta.</div>'}</div></div></div>`;
+    <div class="sum114-ver">Ricas Finanças v114</div>
+  </div>`;
 }
-
 function filterSummaryCategory(categoryId){
   window.dashboardCategoryFilter=String(categoryId);
   dashboard();
