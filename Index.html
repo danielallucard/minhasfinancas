@@ -3044,7 +3044,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v118</div>
+    <div class="sum114-ver">Ricas Finanças v119</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -3159,8 +3159,10 @@ function transactions(){
   // Compras de cartão não debitam a conta no mês da compra; quem debita é a fatura.
   const cashRows=bankRows;
   const statementTotal=statementRows.reduce((s,t)=>s+Number(t.value||0),0);
+  // v119: faturas marcadas como pagas também saem do saldo confirmado.
+  const paidStatementTotal=statementRows.filter(t=>invoiceIsPaid(t.cardId,t.statementCycle||k)).reduce((s,t)=>s+Number(t.value||0),0);
   const confirmed=cashRows.filter(t=>t.confirmed===true)
-    .reduce((s,t)=>s+(t.type==='receita'?1:-1)*Number(t.value||0),0);
+    .reduce((s,t)=>s+(t.type==='receita'?1:-1)*Number(t.value||0),0)-paidStatementTotal;
   const estimated=cashRows.reduce((s,t)=>s+(t.type==='receita'?1:-1)*Number(t.value||0),0)-statementTotal;
 
   document.getElementById('content').innerHTML=`
@@ -3189,10 +3191,10 @@ function transactions(){
         ${rows.length} lançamento(s) na conta${statementRows.length?` e ${statementRows.length} fatura(s) de cartão`:''} em ${monthLabel(k)}.
       </div>
       <div class="grid g2">
-        <div class="card metric"><div class="label">Saldo confirmado</div>
+        <div class="card metric"><div class="label">Saldo confirmado <span class="muted" style="font-size:11px">(pago/recebido + faturas pagas)</span></div>
           <div class="value ${confirmed<0?'red':'blue'}">${confirmed<0?'− ':''}${money(Math.abs(confirmed))}</div>
         </div>
-        <div class="card metric"><div class="label">Saldo estimado</div>
+        <div class="card metric"><div class="label">Saldo estimado <span class="muted" style="font-size:11px">(tudo do mês, pago ou não)</span></div>
           <div class="value ${estimated<0?'red':'blue'}">${estimated<0?'− ':''}${money(Math.abs(estimated))}</div>
         </div>
       </div>
