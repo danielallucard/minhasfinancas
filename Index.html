@@ -15,7 +15,13 @@
 :root{--bg:#f5f7fb;--card:#fff;--text:#17202a;--muted:#6b7280;--primary:#246bfe;--green:#159447;--red:#d92d20;--amber:#d98c00;--border:#e6e9ef;--shadow:0 8px 24px #17202a12}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
 button,input,select,textarea{font:inherit}button{cursor:pointer}.app{display:flex;min-height:100vh}.sidebar{width:250px;background:#17202a;color:#fff;padding:18px 12px;position:fixed;inset:0 auto 0 0;z-index:20}.brand{font-weight:800;font-size:20px;padding:8px 12px 20px}.nav button{width:100%;border:0;background:transparent;color:#dbe4ee;text-align:left;padding:12px;border-radius:10px;margin:2px 0}.nav button:hover,.nav button.active{background:#ffffff16;color:#fff}.main{margin-left:250px;width:calc(100% - 250px);padding:92px 22px 22px}.top{position:fixed;top:0;left:250px;right:0;z-index:40;display:flex;justify-content:space-between;align-items:center;gap:15px;margin:0;padding:14px 22px;background:var(--bg);box-shadow:0 3px 12px rgba(0,0,0,.08);min-height:70px}.top>div:first-child{flex:1;text-align:center}.top h1{margin:0;font-size:25px;display:inline-flex;align-items:center;justify-content:center;gap:9px}.top h1 .page-icon{font-size:1em;line-height:1}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--border);background:#fff;border-radius:9px;padding:9px 13px}.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}.btn.danger{color:var(--red)}.grid{display:grid;gap:14px}.g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:var(--shadow)}.metric .label{color:var(--muted);font-size:13px}.metric .value{font-size:25px;font-weight:800;margin-top:7px}.green{color:var(--green)}.red{color:var(--red)}.blue{color:var(--primary)}.muted{color:var(--muted)}.section{margin-top:16px}.section h2{font-size:17px;margin:0 0 10px}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:11px 9px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}.table th{font-size:12px;color:var(--muted);text-transform:uppercase}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef3ff;color:#3159bb;font-size:12px}.empty{text-align:center;padding:35px;color:var(--muted)}.form{display:grid;gap:11px}.form label{font-size:12px;color:var(--muted);display:grid;gap:5px}.form input,.form select,.form textarea{width:100%;border:1px solid var(--border);border-radius:8px;padding:9px;background:#fff}.row{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;z-index:50;padding:16px}.modal.show{display:flex}.modalbox{background:#fff;width:min(620px,100%);max-height:90vh;overflow:auto;border-radius:15px;padding:18px}.modalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.modalhead h3{margin:0}.close{border:0;background:transparent;font-size:22px}.chart{height:230px;display:flex;align-items:end;gap:8px;padding:15px 5px 0}.bar{flex:1;background:#246bfe88;border-radius:5px 5px 0 0;min-width:12px;position:relative}.bar span{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--muted)}.progress{height:10px;background:#edf0f4;border-radius:99px;overflow:hidden}.progress>i{display:block;height:100%;background:var(--primary)}.mobilebar{display:none}.order-buttons{display:inline-flex;gap:4px;margin-left:6px}.order-buttons .btn{padding:4px 8px;min-width:30px}
-.pending-row{opacity:.82}.account-card{margin-bottom:16px}.confirm-cell{white-space:nowrap;text-align:center}.confirm-check{width:20px;height:20px;cursor:pointer;accent-color:var(--primary)}.edit-btn{margin-right:5px}.cat-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;border:1px solid rgba(0,0,0,.15)}
+.pending-row{opacity:.82}
+.paid-row{background:#f0fdf4!important;border-left:4px solid var(--green)!important}
+.payment-status{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:750;white-space:nowrap}
+.payment-status-paid{background:#dcfce7;color:#166534}
+.payment-status-pending{background:#fff4e2;color:#9a6200}
+.payment-btn-paid{background:#e9f7ef!important;color:#126c3c!important;border-color:#a7d7bb!important}
+.account-card{margin-bottom:16px}.confirm-cell{white-space:nowrap;text-align:center}.confirm-check{width:20px;height:20px;cursor:pointer;accent-color:var(--primary)}.edit-btn{margin-right:5px}.cat-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;border:1px solid rgba(0,0,0,.15)}
 .mobile-menu-btn,.mobile-drawer,.mobile-overlay{display:none}
 @media(max-width:1180px){
   .mobile-menu-btn{display:block;position:fixed;top:10px;left:10px;z-index:80;border:0;background:#17202a;color:#fff;border-radius:9px;padding:9px 11px;font-size:20px;box-shadow:0 2px 8px #0002}
@@ -1664,7 +1670,7 @@ function openCardStatement(cardId,m){
    <div class="invoice-head"><div><span class="pill">💳 ${esc(c.brand||'Cartão')}</span><h2>${esc(c.name)}</h2><div class="muted">Fecha dia ${c.close||'—'} · Vence dia ${c.due||'—'}</div></div><div class="invoice-total"><span>Total da fatura</span><b>${money(total)}</b><small>Confirmadas + pendentes</small></div></div>
    <div class="grid g4 invoice-metrics"><div class="card metric"><div class="label">Principal</div><div class="value red">${money(sum(rows.filter(t=>(t.cardHolder||'principal')==='principal')))}</div></div><div class="card metric"><div class="label">${esc(c.additionalName||'Adicional')}</div><div class="value red">${money(sum(rows.filter(t=>t.cardHolder==='additional')))}</div></div><div class="card metric"><div class="label">Confirmado</div><div class="value blue">${money(confirmed)}</div></div><div class="card metric"><div class="label">Pendente</div><div class="value red">${money(pending)}</div></div></div>
    ${rows.length?`<div class="invoice-note"><b>${rows.length} despesa(s) no ciclo.</b> Os valores entram na fatura mesmo quando ainda estão pendentes. Use a caixa de seleção na coluna <b>Status</b> para confirmar cada despesa.${pending>0?`<div class="invoice-bulk"><button class="btn primary" onclick="confirmAllInvoice('${c.id}','${m}')">✓ Confirmar todas as ${rows.filter(t=>t.confirmed!==true).length} pendentes</button></div>`:''}</div>`:''}
-   <div class="table-wrap invoice-table-wrap"><table class="table invoice-table"><tr><th>Data</th><th>Descrição</th><th>Titular</th><th>Categoria</th><th>Grupo</th><th>Valor</th><th>Status</th><th>Ações</th></tr>${rows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}${merchantLabel(t)?`<br><span class="invoice-merchant">${esc(merchantLabel(t))}</span>`:''}</td><td>${esc(cardHolderLabel(t))}</td><td>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td class="red">− ${money(t.value)}</td><td class="invoice-status-cell"><label class="invoice-confirm"><input type="checkbox" class="confirm-check" ${t.confirmed?'checked':''} onchange="toggleInvoiceConfirmed(${t.id},'${c.id}','${m}')"><span>${t.confirmed?'Confirmada':'Pendente'}</span></label></td><td class="invoice-actions-cell"><button class="btn" onclick="closeModal();openTx(${t.id})">Editar</button><button class="btn danger" onclick="closeModal();deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')||`<tr><td colspan="8" class="empty"><b>Nenhuma despesa nesta fatura.</b><br><span class="muted">Use as setas acima para consultar outro ciclo. Compras feitas após o fechamento aparecem na fatura do mês seguinte.</span></td></tr>`}</table></div></div>`);enhanceResponsiveTables(modalBody);
+   <div class="table-wrap invoice-table-wrap"><table class="table invoice-table"><tr><th>Data</th><th>Descrição</th><th>Titular</th><th>Categoria</th><th>Grupo</th><th>Valor</th><th>Status</th><th>Ações</th></tr>${rows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}${merchantLabel(t)?`<br><span class="invoice-merchant">${esc(merchantLabel(t))}</span>`:''}</td><td>${esc(cardHolderLabel(t))}</td><td>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td class="red">− ${money(t.value)}</td><td class="invoice-status-cell"><label class="invoice-confirm"><input type="checkbox" class="confirm-check" ${t.confirmed?'checked':''} onchange="toggleInvoiceConfirmed(${t.id},'${c.id}','${m}')"><span>${t.type==='despesa'?(t.confirmed?'Paga':'A pagar'):(t.confirmed?'Confirmada':'Pendente')}</span></label></td><td class="invoice-actions-cell"><button class="btn" onclick="closeModal();openTx(${t.id})">Editar</button><button class="btn danger" onclick="closeModal();deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')||`<tr><td colspan="8" class="empty"><b>Nenhuma despesa nesta fatura.</b><br><span class="muted">Use as setas acima para consultar outro ciclo. Compras feitas após o fechamento aparecem na fatura do mês seguinte.</span></td></tr>`}</table></div></div>`);enhanceResponsiveTables(modalBody);
 }
 // Confirma/desconfirma uma despesa sem fechar a fatura: o modal é redesenhado na mesma posição.
 function toggleInvoiceConfirmed(id,cardId,statementMonth){
@@ -2276,13 +2282,14 @@ function recurrences(){
   const overdueTotal=overdueBills.reduce((s,x)=>s+Number(x.value||0),0);
   const overdueHtml=overdueBills.length
     ? `<div class="table-wrap"><table class="table">
-        <tr><th>Vencimento</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Valor</th></tr>
+        <tr><th>Vencimento</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Valor</th><th>Pagamento</th></tr>
         ${overdueBills.map(x=>`<tr>
           <td class="red">${fmtDate(x.date)}</td>
           <td>${esc(x.description||'Sem descrição')}</td>
           <td>${esc((db.accounts.find(a=>String(a.id)===String(x.accountId))||{}).name||'—')}</td>
           <td><span class="cat-dot" style="background:${categoryColor(x.categoryId)}"></span><span class="category-icon">${esc(categoryIcon(x.categoryId))}</span>${esc(catName(x.categoryId))}</td>
           <td class="red">− ${money(x.value)}</td>
+          <td>${paymentButtonHtml(x)}</td>
         </tr>`).join('')}
       </table></div>
       <div class="overdue-total"><b>Total vencido / vence hoje:</b> <span class="red">− ${money(overdueTotal)}</span></div>`
@@ -2449,9 +2456,9 @@ ${sec.evolution?`<div class="card section"><h2>Evolução por mês</h2><div clas
     const monthCats={};
     monthRows.filter(t=>t.type==='despesa').forEach(t=>monthCats[t.categoryId]=(monthCats[t.categoryId]||0)+Number(t.value||0));
     const catHtml=Object.entries(monthCats).sort((a,b)=>b[1]-a[1]).map(([id,val])=>`<span class="pill" style="margin:3px 5px 3px 0"><span class="cat-dot" style="background:${categoryColor(id)}"></span><span class="category-icon">${esc(categoryIcon(id))}</span>${esc(catName(id))}: ${money(val)}</span>`).join('');
-    return `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">${monthLabel(k)}</h3><div class="grid g3" style="margin-bottom:12px"><div class="metric"><div class="label">Receitas</div><div class="value blue">${money(v.r)}</div></div><div class="metric"><div class="label">Despesas</div><div class="value red">${money(v.d)}</div></div><div class="metric"><div class="label">Saldo mensal</div><div class="value ${(v.r-v.d)<0?'red':'blue'}">${(v.r-v.d)<0?'− ':''}${money(Math.abs(v.r-v.d))}</div></div></div>${catHtml?`<div style="margin-bottom:10px"><div class="muted" style="margin-bottom:5px">Despesas por classificação</div>${catHtml}</div>`:''}<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Grupo</th><th>Origem</th><th>Tipo</th><th>Valor</th><th>Status</th></tr>${monthRows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(txAccountLabel(t))}</td><td><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td>${esc(txAutomationLabel(t))}</td><td>${t.type==='receita'?'Receita':'Despesa'}</td><td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td></tr>`).join('')||'<tr><td colspan="7">Sem movimentações.</td></tr>'}</table></div></div>`;
+    return `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">${monthLabel(k)}</h3><div class="grid g3" style="margin-bottom:12px"><div class="metric"><div class="label">Receitas</div><div class="value blue">${money(v.r)}</div></div><div class="metric"><div class="label">Despesas</div><div class="value red">${money(v.d)}</div></div><div class="metric"><div class="label">Saldo mensal</div><div class="value ${(v.r-v.d)<0?'red':'blue'}">${(v.r-v.d)<0?'− ':''}${money(Math.abs(v.r-v.d))}</div></div></div>${catHtml?`<div style="margin-bottom:10px"><div class="muted" style="margin-bottom:5px">Despesas por classificação</div>${catHtml}</div>`:''}<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Grupo</th><th>Origem</th><th>Tipo</th><th>Valor</th><th>Status</th></tr>${monthRows.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(txAccountLabel(t))}</td><td><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td>${esc(txAutomationLabel(t))}</td><td>${t.type==='receita'?'Receita':'Despesa'}</td><td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td><td>${t.type==='despesa'?(t.confirmed?'Paga':'A pagar'):(t.confirmed?'Confirmada':'Pendente')}</td></tr>`).join('')||'<tr><td colspan="7">Sem movimentações.</td></tr>'}</table></div></div>`;
   }).join('')||'<div class="empty">Sem movimentações no período.</div>'}</div>`:''}
-  ${sec.details?`<div class="card section"><h2>Detalhamento das movimentações</h2><div class="table-wrap"><table class="table report-detail-table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Grupo</th><th>Origem</th><th>Tipo</th><th>Valor</th><th>Status</th></tr>${rows.sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(txAccountLabel(t))}</td><td><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td>${esc(txAutomationLabel(t))}</td><td>${t.type==='receita'?'Receita':'Despesa'}</td><td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td></tr>`).join('')||'<tr><td colspan="7">Sem movimentações.</td></tr>'}</table></div></div>`:''}`;
+  ${sec.details?`<div class="card section"><h2>Detalhamento das movimentações</h2><div class="table-wrap"><table class="table report-detail-table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Grupo</th><th>Origem</th><th>Tipo</th><th>Valor</th><th>Status</th></tr>${rows.sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td>${esc(txAccountLabel(t))}</td><td><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td>${esc(txGroupName(t))}</td><td>${esc(txAutomationLabel(t))}</td><td>${t.type==='receita'?'Receita':'Despesa'}</td><td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td><td>${t.type==='despesa'?(t.confirmed?'Paga':'A pagar'):(t.confirmed?'Confirmada':'Pendente')}</td></tr>`).join('')||'<tr><td colspan="7">Sem movimentações.</td></tr>'}</table></div></div>`:''}`;
   window.currentReportData={rows,inc,exp,budget:budgetReportData(r,af),group:gf,r,af,tf,cf,gf,cardf,autof};
 }
 
@@ -2983,7 +2990,7 @@ function dashboard(){
 
   const overdueBills=overdueBillsForSummary().filter(x=>matchesGroupFilter(x,gf));
   const overdueTotal=overdueBills.reduce((s,x)=>s+Number(x.value||0),0);
-  const overdueHtml=overdueBills.length?`<div class="table-wrap"><table class="table"><tr><th>Vencimento</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Valor</th></tr>${overdueBills.map(x=>`<tr><td class="red">${fmtDate(x.date)}${String(x.date)===new Date().toISOString().slice(0,10)?' <span class="pill">Hoje</span>':''}</td><td>${esc(x.description||'Sem descrição')}</td><td>${esc((db.accounts.find(a=>String(a.id)===String(x.accountId))||{}).name||'—')}</td><td><span class="cat-dot" style="background:${categoryColor(x.categoryId)}"></span><span class="category-icon">${esc(categoryIcon(x.categoryId))}</span>${esc(catName(x.categoryId))}</td><td class="red">− ${money(x.value)}</td></tr>`).join('')}</table></div><div class="overdue-total"><b>Total vencido / vence hoje:</b> <span class="red">− ${money(overdueTotal)}</span></div>`:'<div class="empty">Nenhuma conta vencida ou com vencimento hoje e pendente.</div>';
+  const overdueHtml=overdueBills.length?`<div class="table-wrap"><table class="table"><tr><th>Vencimento</th><th>Descrição</th><th>Conta</th><th>Categoria</th><th>Valor</th><th>Pagamento</th></tr>${overdueBills.map(x=>`<tr><td class="red">${fmtDate(x.date)}${String(x.date)===new Date().toISOString().slice(0,10)?' <span class="pill">Hoje</span>':''}</td><td>${esc(x.description||'Sem descrição')}</td><td>${esc((db.accounts.find(a=>String(a.id)===String(x.accountId))||{}).name||'—')}</td><td><span class="cat-dot" style="background:${categoryColor(x.categoryId)}"></span><span class="category-icon">${esc(categoryIcon(x.categoryId))}</span>${esc(catName(x.categoryId))}</td><td class="red">− ${money(x.value)}</td><td>${paymentButtonHtml(x)}</td></tr>`).join('')}</table></div><div class="overdue-total"><b>Total vencido / vence hoje:</b> <span class="red">− ${money(overdueTotal)}</span></div>`:'<div class="empty">Nenhuma conta vencida ou com vencimento hoje e pendente.</div>';
 
   let projectionText='';
   if(projection.projected>=0) projectionText=`✅ Mantido o ritmo atual, a projeção indica fechamento <b>positivo em ${money(projection.projected)}</b>.`;
@@ -3019,7 +3026,7 @@ function dashboard(){
       <div class="card"><h2>Despesas por classificação — ${monthLabel(month)}${gf!=='all'?` · ${esc(groupFilterLabel(gf))}`:''}</h2><div class="muted">Despesas confirmadas e pendentes do grupo selecionado. Total: <b>${money(expenseTotal)}</b>. Clique em uma fatia ou classificação para ver os detalhes.</div>${summaryPie}${selectedCat!=='all'?`<button class="btn" style="margin-top:10px" onclick="clearSummaryCategoryFilter()">Mostrar todas as classificações</button>`:''}</div>
       <div class="card"><h2>Movimentações — ${filterLabel}</h2>${recentHtml}</div>
     </div>
-    <div class="card section"><h2>Detalhamento dos gastos${selectedCat!=='all'?` — ${esc(catName(selectedCat))}`:''}</h2>${selectedCat==='all'?'<div class="muted">Clique em uma fatia do gráfico ou em uma classificação na legenda para listar os gastos confirmados e pendentes.</div>':(()=>{const cc=cats.find(x=>String(x.c.id)===selectedCat);const rows=cc?.movements||[];return rows.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Status</th><th>Valor</th></tr>${rows.map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${esc(x.description)}</td><td>${esc(txAccountLabel(x))}</td><td>${x.confirmed?'Confirmada':'Pendente'}</td><td class="red">− ${money(x.value)}</td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhum lançamento nesta categoria para este mês.</div>';})()}</div>
+    <div class="card section"><h2>Detalhamento dos gastos${selectedCat!=='all'?` — ${esc(catName(selectedCat))}`:''}</h2>${selectedCat==='all'?'<div class="muted">Clique em uma fatia do gráfico ou em uma classificação na legenda para listar os gastos confirmados e pendentes.</div>':(()=>{const cc=cats.find(x=>String(x.c.id)===selectedCat);const rows=cc?.movements||[];return rows.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Status</th><th>Valor</th></tr>${rows.map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${esc(x.description)}</td><td>${esc(txAccountLabel(x))}</td><td>${x.type==='despesa'?(x.confirmed?'Paga':'A pagar'):(x.confirmed?'Confirmada':'Pendente')}</td><td class="red">− ${money(x.value)}</td><td>${paymentButtonHtml(x)}</td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhum lançamento nesta categoria para este mês.</div>';})()}</div>
     <div class="card section"><h2>Contas</h2><div class="grid g3">${[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0)).map(a=>`<div><span class="pill">${esc(a.name)}</span><h3>${money(balance(a.id))}</h3></div>`).join('')||'<div class="empty">Cadastre sua primeira conta.</div>'}</div></div></div>`;
 }
 
@@ -3092,6 +3099,7 @@ function transactions(){
   const cardf=String(window.txFilterCard ?? 'all');
   const autof=String(window.txFilterAutomation ?? 'all');
   const gf=String(window.txGroupFilter ?? 'all');
+  const payf=String(window.txPaymentFilter ?? 'all');
   const query=String(window.txSearch ?? '');
   const normalizeSearch=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
   const matchesSearch=t=>!query.trim()||normalizeSearch(t.description+' '+merchantLabel(t)).includes(normalizeSearch(query.trim()));
@@ -3105,7 +3113,8 @@ function transactions(){
     .filter(t=>matchesCardFilter(t,cardf))
     .filter(t=>matchesAutomationFilter(t,autof))
     .filter(matchesSearch)
-    .filter(t=>matchesGroupFilter(t,gf));
+    .filter(t=>matchesGroupFilter(t,gf))
+    .filter(t=>payf==='all'||(payf==='paid'&&t.type==='despesa'&&(t.paid===true||t.confirmed===true))||(payf==='unpaid'&&t.type==='despesa'&&t.paid!==true&&t.confirmed!==true));
   // Separação por natureza do dinheiro, para que nada pareça contado duas vezes:
   //  • Conta bancária: receitas, despesas em conta e o pagamento das faturas.
   //  • Compras no cartão: não debitam a conta agora; apenas compõem a fatura de um ciclo futuro.
@@ -3205,9 +3214,9 @@ function transactions(){
           <th><button type="button" class="sort-th" onclick="setTxSort('category')">Categoria <span>${txSortIndicator('category')}</span></button></th>
           <th><button type="button" class="sort-th" onclick="setTxSort('type')">Tipo <span>${txSortIndicator('type')}</span></button></th>
           <th><button type="button" class="sort-th" onclick="setTxSort('value')">Valor <span>${txSortIndicator('value')}</span></button></th>
-          <th>Editar</th><th><button type="button" class="sort-th" onclick="setTxSort('confirmed')">Confirmado <span>${txSortIndicator('confirmed')}</span></button></th><th>Excluir</th>
+          <th>Editar</th><th><button type="button" class="sort-th" onclick="setTxSort('confirmed')">Pagamento <span>${txSortIndicator('confirmed')}</span></button></th><th>Excluir</th>
         </tr>
-        ${rows.map(t=>`<tr class="${t.virtualCardStatement?'pending-row':(t.confirmed?'':'pending-row')}">
+        ${rows.map(t=>`<tr class="${t.virtualCardStatement?'pending-row':(t.type==='despesa'&&(t.paid===true||t.confirmed===true)?'paid-row':(t.confirmed?'':'pending-row'))}">
           <td>${fmtDate(t.date)}</td>
           <td>${esc(t.description)}${txAutomationKind(t)!=='single'?`<br><span class="pill tx-origin-pill">${esc(txAutomationLabel(t))}</span>`:''}</td>
           <td>${esc(txAccountLabel(t))}</td>
@@ -3215,7 +3224,7 @@ function transactions(){
           <td>${t.type==='receita'?'Receita':'Despesa'}</td>
           <td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td>
           <td>${t.virtualCardStatement?`<button class="btn" onclick="openCardStatement('${t.cardId}','${t.statementCycle||k}')">🔍 Ver</button>`:'<button class="btn" onclick="openTx('+t.id+')">✎</button>'}</td>
-          <td class="confirm-cell">${t.virtualCardStatement?'—':'<input type="checkbox" class="confirm-check" '+(t.confirmed?'checked':'')+' onchange="toggleTxConfirmed('+t.id+')">'}</td>
+          <td class="confirm-cell">${t.virtualCardStatement?'—':paymentStatusHtml(t)+' '+paymentButtonHtml(t)}</td>
           <td>${t.virtualCardStatement?'—':'<button class="btn danger" onclick="deleteTransaction('+t.id+')">Excluir</button>'}</td>
         </tr>`).join('') || '<tr><td colspan="9" class="empty">Nenhuma movimentação na conta neste mês.</td></tr>'}
       </table></div>
@@ -3229,6 +3238,7 @@ function transactions(){
   const cardSel=document.getElementById('txCardFilter');
 
   document.getElementById('txGroupFilter').onchange=e=>{window.txGroupFilter=e.target.value;transactions();};
+  document.getElementById('txPaymentFilter').onchange=e=>{window.txPaymentFilter=e.target.value;transactions();};
   const search=document.getElementById('txSearchInput');
   search.oninput=()=>{const start=search.selectionStart;window.txSearch=search.value;transactions();const next=document.getElementById('txSearchInput');next.focus();try{next.setSelectionRange(start,start);}catch(e){}};
   ts.onchange=()=>{window.txTypeFilter=ts.value; transactions();};
@@ -3237,7 +3247,7 @@ function transactions(){
   cardSel.onchange=()=>{window.txFilterCard=cardSel.value;transactions();};
   const autoSel=document.getElementById('txAutomationFilter');
   if(autoSel)autoSel.onchange=()=>{window.txFilterAutomation=autoSel.value;transactions();};
-  clear.onclick=()=>{window.txTypeFilter='all';window.txAccountFilter='all';window.txCategoryFilter='all';window.txFilterCard='all';window.txFilterAutomation='all';window.txSearch='';window.txGroupFilter='all';transactions();};
+  clear.onclick=()=>{window.txTypeFilter='all';window.txAccountFilter='all';window.txCategoryFilter='all';window.txFilterCard='all';window.txFilterAutomation='all';window.txSearch='';window.txGroupFilter='all';window.txPaymentFilter='all';transactions();};
 }
 
 async function confirmAccountMonthPending(accountId, monthKeyValue){
@@ -3655,7 +3665,7 @@ function cards(){
       </div>
       <div class="muted" style="margin-top:8px">Confirmado: ${money(confirmed)} · ${tx.length} compra(s)</div><div class="grid g2" style="margin-top:8px"><div><span class="muted">Principal</span><br><b>${money(principalTotal)}</b></div>${c.hasAdditional||c.additionalName?`<div><span class="muted">${esc(c.additionalName||'Adicional')}</span><br><b>${money(additionalTotal)}</b></div>`:''} </div>
       <hr><h3>Lançamentos do cartão</h3>
-      ${tx.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Titular</th><th>Categoria</th><th>Valor</th><th>Status</th><th>Ações</th></tr>${tx.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}${merchantLabel(t)?`<br><span class="invoice-merchant">${esc(merchantLabel(t))}</span>`:''}</td><td>${esc(cardHolderLabel(t))}</td><td><span class="cat-dot" style="background:${categoryColor(t.categoryId)}"></span><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td class="red">− ${money(t.value)}</td><td>${t.confirmed?'Confirmada':'Pendente'}</td><td><button class="btn" onclick="openTx(${t.id})">✎ Editar</button> <button class="btn danger" onclick="deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhuma compra vinculada a este cartão na fatura selecionada.</div>'}
+      ${tx.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Titular</th><th>Categoria</th><th>Valor</th><th>Status</th><th>Ações</th></tr>${tx.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}${merchantLabel(t)?`<br><span class="invoice-merchant">${esc(merchantLabel(t))}</span>`:''}</td><td>${esc(cardHolderLabel(t))}</td><td><span class="cat-dot" style="background:${categoryColor(t.categoryId)}"></span><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td class="red">− ${money(t.value)}</td><td>${t.type==='despesa'?(t.confirmed?'Paga':'A pagar'):(t.confirmed?'Confirmada':'Pendente')}</td><td><button class="btn" onclick="openTx(${t.id})">✎ Editar</button> <button class="btn danger" onclick="deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhuma compra vinculada a este cartão na fatura selecionada.</div>'}
       <div style="margin-top:10px">${orderButtons('cards',c.id)} <button class="btn" onclick="openCard(${c.id})">Editar</button><button class="btn danger" onclick="deleteCard(${c.id})">Excluir</button></div>
     </div>`;
   }).join('');
@@ -3984,6 +3994,26 @@ function saveTransactionEdit(e,id){
   render();
 }
 
+async function setTxPaid(id, paid=true){
+  const t=db.transactions.find(x=>x.id==id);
+  if(!t)return;
+  if(t.type!=='despesa')return toast('O status de pagamento está disponível para despesas.');
+  t.confirmed=!!paid;
+  t.paid=!!paid;
+  t.paidAt=paid?localDateKey():null;
+  const ok=await save();
+  if(ok!==false){render();toast(paid?'✓ Despesa marcada como paga.':'Despesa marcada como a pagar.');}
+}
+function paymentStatusHtml(t){
+  if(t?.type!=='despesa')return t?.confirmed?'Confirmada':'Pendente';
+  const paid=t.paid===true||t.confirmed===true;
+  return `<span class="payment-status ${paid?'payment-status-paid':'payment-status-pending'}">${paid?'✓ Paga':'⏳ A pagar'}</span>`;
+}
+function paymentButtonHtml(t){
+  if(t?.type!=='despesa')return '';
+  const paid=t.paid===true||t.confirmed===true;
+  return `<button type="button" class="btn ${paid?'payment-btn-paid':'primary'}" onclick="setTxPaid(${t.id},${paid?'false':'true'})">${paid?'✓ Paga':'Marcar como paga'}</button>`;
+}
 function toggleTxConfirmed(id){
   const t=db.transactions.find(x=>x.id==id);
   if(!t)return;
