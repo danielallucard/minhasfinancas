@@ -884,6 +884,9 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 .s117-v em{display:block;font-style:normal;font-size:11px;margin-top:2px}
 .s117-open{color:#b45309}.s117-ok{color:#166534}
 .s117-empty{padding:10px 0;color:var(--muted);font-size:13px}
+
+.tr118-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:0 0 10px;margin-bottom:10px;border-bottom:1px solid var(--border);font-weight:700}
+.tr118-head b{color:var(--primary);font-size:18px;white-space:nowrap}
 </style></head>
 <body><div id="cloudGate"><div class="card"><h2>💰 Ricas Finanças</h2><p>Entre com a mesma conta no computador e no celular.</p>
 <form class="form" onsubmit="cloudLogin(event)"><label>E-mail<input id="cloudEmail" type="email" autocomplete="username" required></label>
@@ -3041,7 +3044,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v117</div>
+    <div class="sum114-ver">Ricas Finanças v118</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -3651,12 +3654,16 @@ function openGoalHistory(goalId){
 
 function transfers(){
   document.getElementById('topActions').innerHTML=`<button class="btn primary" onclick="openTransfer()">+ Nova transferência</button>`;
-  const rows=[...db.transfers].sort((a,b)=>String(b.date).localeCompare(String(a.date)) || ((b.order??0)-(a.order??0))).map(t=>`<tr>
+  // v118: filtro por mês, igual a Movimentações e Resumo (usa o mesmo mês selecionado).
+  const k=selectedMonthKey();
+  const list=[...db.transfers].filter(t=>monthKey(t.date)===k).sort((a,b)=>String(b.date).localeCompare(String(a.date)) || ((b.order??0)-(a.order??0)));
+  const total=list.reduce((s,t)=>s+Number(t.value||0),0);
+  const rows=list.map(t=>`<tr>
     <td>${fmtDate(t.date)}</td><td>${esc(accountName(t.from))}</td><td>${esc(accountName(t.to))}</td><td class="blue">${money(t.value)}</td>
     <td><button class="btn" onclick="openTransfer(${t.id})">✎ Editar</button></td>
     <td><button class="btn danger" onclick="deleteTransfer(${t.id})">Excluir</button></td>
-  </tr>`).join('')||'<tr><td colspan="6" class="empty">Nenhuma transferência.</td></tr>';
-  document.getElementById('content').innerHTML=`<div class="card"><div class="muted" style="margin-bottom:10px">Transferências são refletidas imediatamente no saldo das contas de origem e destino, mas não entram como receita ou despesa no Resumo.</div><div class="table-wrap"><table class="table"><tr><th>Data</th><th>Origem</th><th>Destino</th><th>Valor</th><th>Editar</th><th>Excluir</th></tr>${rows}</table></div></div>`;
+  </tr>`).join('')||`<tr><td colspan="6" class="empty">Nenhuma transferência em ${monthLabel(k)}.</td></tr>`;
+  document.getElementById('content').innerHTML=`${monthNav()}<div class="card"><div class="tr118-head"><span>${list.length} transferência${list.length===1?'':'s'} em ${monthLabel(k)}</span><b>${money(total)}</b></div><div class="muted" style="margin-bottom:10px">Transferências são refletidas imediatamente no saldo das contas de origem e destino, mas não entram como receita ou despesa no Resumo.</div><div class="table-wrap"><table class="table"><tr><th>Data</th><th>Origem</th><th>Destino</th><th>Valor</th><th>Editar</th><th>Excluir</th></tr>${rows}</table></div></div>`;
 }
 function deleteCard(id){
   const c=db.cards.find(x=>x.id==id);
