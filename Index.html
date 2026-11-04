@@ -838,7 +838,23 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 @media(max-width:1180px){#content .tx-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#content .tx-filter-grid>label{flex:none!important}#content .tx-filter-grid #txClearFilters{grid-column:span 1}}
 @media(max-width:560px){#content .tx-filter-grid{grid-template-columns:minmax(0,1fr)}#content .tx-filter-grid>label:first-child{grid-column:auto}}
 </style>
-<style id="pay-v110">.invoice-pay-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px;padding:12px 14px;border:1px solid #f0c36d;border-radius:12px;background:#fff8e8}.invoice-pay-bar.paid{border-color:#86d5a6;background:#eefbf3;color:#166534}.invoice-pay-btn,.tx-bill-setpaid{width:auto!important;min-height:36px!important;padding:7px 11px!important;font-size:12px!important;line-height:1.1!important;white-space:nowrap!important;border-radius:8px!important}.invoice-pay-btn.pay{background:#16a34a!important;color:#fff!important;border-color:#16a34a!important}.invoice-pay-btn.undo{background:#fff!important;color:#166534!important;border-color:#86d5a6!important}.tx-bill-payrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px}.tx-bill-status{padding:5px 9px;border-radius:999px;font-size:12px;font-weight:800;background:#fff1cf;color:#8a5a00}.tx-bill-status.paid{background:#dcfce7;color:#166534}.tx-bill-card.invoice-paid{border-left-color:#16a34a!important;background:#f0fdf4!important}.tx-bill-card.invoice-paid .tx-bill-value{color:#166534!important}@media(max-width:560px){.invoice-pay-bar{align-items:flex-start;flex-direction:column}.invoice-pay-btn,.tx-bill-setpaid{width:auto!important;max-width:none!important}}</style></head>
+<style id="pay-v111">
+.paid-row{background:#f0fdf4!important;border-left:4px solid #16a34a!important}
+.payment-cell{white-space:nowrap}
+.payment-wrap{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.payment-status{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:750;white-space:nowrap}
+.payment-status-paid{background:#dcfce7;color:#166534}.payment-status-pending{background:#fff4e2;color:#9a6200}
+.btn.payment-btn,.btn.tx-bill-setpaid,.btn.invoice-pay-btn{width:auto!important;min-width:0!important;min-height:32px!important;height:auto!important;padding:6px 10px!important;font-size:12px!important;line-height:1.1!important;white-space:nowrap!important;border-radius:8px!important;flex:0 0 auto!important}
+.btn.payment-btn.pay,.btn.tx-bill-setpaid.pay,.btn.invoice-pay-btn.pay{background:#16a34a!important;color:#fff!important;border-color:#16a34a!important}
+.btn.payment-btn.undo,.btn.tx-bill-setpaid.undo,.btn.invoice-pay-btn.undo{background:#fff!important;color:#166534!important;border-color:#86d5a6!important}
+.invoice-pay-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px;padding:12px 14px;border:1px solid #f0c36d;border-radius:12px;background:#fff8e8}
+.invoice-pay-bar.paid{border-color:#86d5a6;background:#eefbf3;color:#166534}
+.tx-bill-payrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed #e5e7eb}
+.tx-bill-card.invoice-paid{border-left-color:#16a34a!important;background:#f0fdf4!important}
+.tx-bill-card.invoice-paid .tx-bill-value{color:#166534!important}
+@media(max-width:1180px){table.table td.payment-cell{grid-column:1/-1!important;text-align:center!important}}
+</style>
+</head>
 <body><div id="cloudGate"><div class="card"><h2>💰 Ricas Finanças</h2><p>Entre com a mesma conta no computador e no celular.</p>
 <form class="form" onsubmit="cloudLogin(event)"><label>E-mail<input id="cloudEmail" type="email" autocomplete="username" required></label>
 <label>Senha<input id="cloudPassword" type="password" autocomplete="current-password" required></label>
@@ -1654,10 +1670,6 @@ function txAutomationLabel(t){
   return '✋ Avulsa';
 }
 
-function invoicePayKey(cardId,cycle){return String(cardId)+'|'+String(cycle);}
-function invoicePaidInfo(cardId,cycle){return db.settings?.paidInvoices?.[invoicePayKey(cardId,cycle)]||null;}
-function invoiceIsPaid(cardId,cycle){return !!invoicePaidInfo(cardId,cycle);}
-async function toggleInvoicePaid(cardId,cycle,paid){if(!db.settings)db.settings={};if(!db.settings.paidInvoices)db.settings.paidInvoices={};const key=invoicePayKey(cardId,cycle);if(paid)db.settings.paidInvoices[key]={paid:true,paidAt:localDateKey()};else delete db.settings.paidInvoices[key];const ok=await save();if(ok!==false){render();openCardStatement(cardId,cycle);toast(paid?'✓ Fatura marcada como paga.':'Fatura marcada como a pagar.');}}
 function openCardStatement(cardId,m){
  const c=db.cards.find(x=>String(x.id)===String(cardId));if(!c)return toast('Cartão não encontrado.');
  m=m||suggestedCardStatementMonth(cardId,selectedMonthKey());
@@ -1665,7 +1677,7 @@ function openCardStatement(cardId,m){
  const total=sum(rows),confirmed=sum(rows.filter(t=>t.confirmed===true)),pending=sum(rows.filter(t=>t.confirmed!==true));
  openModal(`Fatura — ${c.name}`,`<div class="invoice-view invoice-view-v82">
    <div class="invoice-cycle-nav"><button class="btn" onclick="openCardStatement('${c.id}','${shiftStatementMonth(m,-1)}')">‹</button><div><span class="muted">Ciclo da fatura</span><b>${monthLabel(m)}</b></div><button class="btn" onclick="openCardStatement('${c.id}','${shiftStatementMonth(m,1)}')">›</button></div>
-   ${invoiceIsPaid(c.id,m)?`<div class="invoice-pay-bar paid"><strong>✓ Fatura paga${invoicePaidInfo(c.id,m)?.paidAt?` em ${fmtDate(invoicePaidInfo(c.id,m).paidAt)}`:''}</strong><button class="btn invoice-pay-btn undo" onclick="toggleInvoicePaid('${c.id}','${m}',false)">Desfazer pagamento</button></div>`:`<div class="invoice-pay-bar"><strong>⏳ Fatura a pagar</strong><button class="btn invoice-pay-btn pay" onclick="toggleInvoicePaid('${c.id}','${m}',true)">✓ Marcar fatura como paga</button></div>`}
+   ${invoiceIsPaid(c.id,m)?`<div class="invoice-pay-bar paid"><strong>✓ Fatura paga${invoicePaidInfo(c.id,m)?.paidAt?' em '+fmtDate(invoicePaidInfo(c.id,m).paidAt):''}</strong><button type="button" class="btn invoice-pay-btn undo" onclick="toggleInvoicePaid('${c.id}','${m}',false,true)">Desfazer pagamento</button></div>`:`<div class="invoice-pay-bar"><strong>⏳ Fatura a pagar</strong><button type="button" class="btn invoice-pay-btn pay" onclick="toggleInvoicePaid('${c.id}','${m}',true,true)">✓ Marcar fatura como paga</button></div>`}
    <div class="invoice-head"><div><span class="pill">💳 ${esc(c.brand||'Cartão')}</span><h2>${esc(c.name)}</h2><div class="muted">Fecha dia ${c.close||'—'} · Vence dia ${c.due||'—'}</div></div><div class="invoice-total"><span>Total da fatura</span><b>${money(total)}</b><small>Confirmadas + pendentes</small></div></div>
    <div class="grid g4 invoice-metrics"><div class="card metric"><div class="label">Principal</div><div class="value red">${money(sum(rows.filter(t=>(t.cardHolder||'principal')==='principal')))}</div></div><div class="card metric"><div class="label">${esc(c.additionalName||'Adicional')}</div><div class="value red">${money(sum(rows.filter(t=>t.cardHolder==='additional')))}</div></div><div class="card metric"><div class="label">Confirmado</div><div class="value blue">${money(confirmed)}</div></div><div class="card metric"><div class="label">Pendente</div><div class="value red">${money(pending)}</div></div></div>
    ${rows.length?`<div class="invoice-note"><b>${rows.length} despesa(s) no ciclo.</b> Os valores entram na fatura mesmo quando ainda estão pendentes. Use a caixa de seleção na coluna <b>Status</b> para confirmar cada despesa.${pending>0?`<div class="invoice-bulk"><button class="btn primary" onclick="confirmAllInvoice('${c.id}','${m}')">✓ Confirmar todas as ${rows.filter(t=>t.confirmed!==true).length} pendentes</button></div>`:''}</div>`:''}
@@ -3087,17 +3099,19 @@ function sortTransactions(rows){
   });
 }
 
+function txState(name){const v=window[name];return (typeof v==='string'&&v)?v:'all';}
 function transactions(){
   document.getElementById('topActions').innerHTML='<button class="btn primary" onclick="openTx()">+ Nova movimentação</button><button class="btn" onclick="openRecurrence()">🔁 Automatizar</button>';
 
   const k=selectedMonthKey();
-  const af=String(window.txAccountFilter ?? 'all');
-  const tf=String(window.txTypeFilter ?? 'all');
-  const cf=String(window.txCategoryFilter ?? 'all');
-  const cardf=String(window.txFilterCard ?? 'all');
-  const autof=String(window.txFilterAutomation ?? 'all');
-  const gf=String(window.txGroupFilter ?? 'all');
-  const query=String(window.txSearch ?? '');
+  const af=txState('txAccountFilter');
+  const tf=txState('txTypeFilter');
+  const cf=txState('txCategoryFilter');
+  const cardf=txState('txFilterCard');
+  const autof=txState('txFilterAutomation');
+  const gf=txState('txGroupFilter');
+  const query=typeof window.txSearch==='string'?window.txSearch:'';
+  const payf=txState('txPayFilterState');
   const normalizeSearch=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
   const matchesSearch=t=>!query.trim()||normalizeSearch(t.description+' '+merchantLabel(t)).includes(normalizeSearch(query.trim()));
 
@@ -3110,12 +3124,14 @@ function transactions(){
     .filter(t=>matchesCardFilter(t,cardf))
     .filter(t=>matchesAutomationFilter(t,autof))
     .filter(matchesSearch)
-    .filter(t=>matchesGroupFilter(t,gf));
+    .filter(t=>matchesGroupFilter(t,gf))
+    .filter(t=>payf==='all'||(payf==='paid'?txIsPaid(t):!txIsPaid(t)));
   // Separação por natureza do dinheiro, para que nada pareça contado duas vezes:
   //  • Conta bancária: receitas, despesas em conta e o pagamento das faturas.
   //  • Compras no cartão: não debitam a conta agora; apenas compõem a fatura de um ciclo futuro.
   const statementRows=(af==='all'&&cardf==='all'&&autof==='all'?cardStatementRows(k):[])
-    .filter(t=>(tf==='all'||tf==='despesa')&&Number(t.value||0)>0);
+    .filter(t=>(tf==='all'||tf==='despesa')&&Number(t.value||0)>0)
+    .filter(t=>{if(payf==='all')return true;const p=invoiceIsPaid(t.cardId,t.statementCycle||k);return payf==='paid'?p:!p;});
   const bankRows=actualRows.filter(t=>!t.cardId);
   // A fatura não é uma movimentação comum: não tem conta, categoria nem confirmação individual.
   // Por isso sai da tabela genérica e ganha um card próprio, com apenas o que faz sentido.
@@ -3158,7 +3174,8 @@ function transactions(){
           </select>
         </label>
         <label style="flex:1;min-width:220px">Cartão de crédito<select id="txCardFilter">${cardFilterOptions(cardf)}</select></label>
-        <label style="flex:1;min-width:220px">Grupo de despesas<select id="txGroupFilter">${groupFilterOptions(gf)}</select></label>
+        <label style="flex:1;min-width:220px">Grupo de despesas<select id="txGroupSelect">${groupFilterOptions(gf)}</select></label>
+        <label style="flex:1;min-width:220px">Pagamento<select id="txPaySelect"><option value="all" ${payf==='all'?'selected':''}>Todas</option><option value="paid" ${payf==='paid'?'selected':''}>✓ Somente pagas</option><option value="unpaid" ${payf==='unpaid'?'selected':''}>⏳ Somente a pagar</option></select></label>
         <label style="flex:1;min-width:220px">Origem do lançamento<select id="txAutomationFilter">${automationFilterOptions(autof)}</select></label>${cardf!=='all'&&cardf!=='none'?`<button class="btn" onclick="openCardStatement('${cardf}',suggestedCardStatementMonth('${cardf}','${k}'))">💳 Abrir fatura</button>`:''}<button class="btn" id="txClearFilters">Limpar filtros</button>
       </div>
       <div class="muted" style="margin-bottom:12px">
@@ -3182,7 +3199,7 @@ function transactions(){
         const card=db.cards.find(c=>String(c.id)===String(t.cardId));
         const fecha=card&&Number(card.close)?cardCycleCloseDate(card,cycle):'';
         const invoicePaid=invoiceIsPaid(t.cardId,cycle);
-        return `<div role="button" class="tx-bill-card ${invoicePaid?'invoice-paid':''}" onclick="openCardStatement('${t.cardId}','${cycle}')" aria-label="Abrir fatura de ${esc(cardName(t.cardId))}">
+        return `<div role="button" tabindex="0" class="tx-bill-card ${invoicePaid?'invoice-paid':''}" onclick="openCardStatement('${t.cardId}','${cycle}')" aria-label="Abrir fatura de ${esc(cardName(t.cardId))}">
           <div class="tx-bill-top">
             <span class="tx-bill-name">💳 ${esc(cardName(t.cardId))}</span>
             <span class="tx-bill-due">⏱ Vence ${fmtDate(t.date)}</span>
@@ -3193,7 +3210,7 @@ function transactions(){
             <span class="muted">${pendTotal>0?`${money(pendTotal)} ainda pendente`:'Todas as despesas confirmadas'}</span>
             <span class="tx-bill-cta">🔍 Abrir fatura</span>
           </div>
-        <div class="tx-bill-payrow" onclick="event.stopPropagation()"><span class="tx-bill-status ${invoicePaid?'paid':''}">${invoicePaid?'✓ Fatura paga':'⏳ A pagar'}</span><button type="button" class="btn tx-bill-setpaid ${invoicePaid?'':'primary'}" onclick="toggleInvoicePaid('${t.cardId}','${cycle}',${invoicePaid?'false':'true'})">${invoicePaid?'Desfazer':'Marcar paga'}</button></div>
+          <div class="tx-bill-payrow" onclick="event.stopPropagation()"><span class="payment-status ${invoicePaid?'payment-status-paid':'payment-status-pending'}">${invoicePaid?'✓ Fatura paga':'⏳ Fatura a pagar'}</span><button type="button" class="btn tx-bill-setpaid ${invoicePaid?'undo':'pay'}" onclick="event.stopPropagation();toggleInvoicePaid('${t.cardId}','${cycle}',${invoicePaid?'false':'true'})">${invoicePaid?'Desfazer':'Marcar paga'}</button></div>
         </div>`;
       }).join('')}
       </div>
@@ -3212,9 +3229,9 @@ function transactions(){
           <th><button type="button" class="sort-th" onclick="setTxSort('category')">Categoria <span>${txSortIndicator('category')}</span></button></th>
           <th><button type="button" class="sort-th" onclick="setTxSort('type')">Tipo <span>${txSortIndicator('type')}</span></button></th>
           <th><button type="button" class="sort-th" onclick="setTxSort('value')">Valor <span>${txSortIndicator('value')}</span></button></th>
-          <th>Editar</th><th><button type="button" class="sort-th" onclick="setTxSort('confirmed')">Confirmado <span>${txSortIndicator('confirmed')}</span></button></th><th>Excluir</th>
+          <th>Editar</th><th><button type="button" class="sort-th" onclick="setTxSort('confirmed')">Pagamento <span>${txSortIndicator('confirmed')}</span></button></th><th>Excluir</th>
         </tr>
-        ${rows.map(t=>`<tr class="${t.virtualCardStatement?'pending-row':(t.confirmed?'':'pending-row')}">
+        ${rows.map(t=>`<tr class="${t.virtualCardStatement?'pending-row':(txIsPaid(t)?'paid-row':'pending-row')}">
           <td>${fmtDate(t.date)}</td>
           <td>${esc(t.description)}${txAutomationKind(t)!=='single'?`<br><span class="pill tx-origin-pill">${esc(txAutomationLabel(t))}</span>`:''}</td>
           <td>${esc(txAccountLabel(t))}</td>
@@ -3222,7 +3239,7 @@ function transactions(){
           <td>${t.type==='receita'?'Receita':'Despesa'}</td>
           <td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td>
           <td>${t.virtualCardStatement?`<button class="btn" onclick="openCardStatement('${t.cardId}','${t.statementCycle||k}')">🔍 Ver</button>`:'<button class="btn" onclick="openTx('+t.id+')">✎</button>'}</td>
-          <td class="confirm-cell">${t.virtualCardStatement?'—':'<input type="checkbox" class="confirm-check" '+(t.confirmed?'checked':'')+' onchange="toggleTxConfirmed('+t.id+')">'}</td>
+          <td class="confirm-cell payment-cell">${t.virtualCardStatement?'—':paymentCellHtml(t)}</td>
           <td>${t.virtualCardStatement?'—':'<button class="btn danger" onclick="deleteTransaction('+t.id+')">Excluir</button>'}</td>
         </tr>`).join('') || '<tr><td colspan="9" class="empty">Nenhuma movimentação na conta neste mês.</td></tr>'}
       </table></div>
@@ -3235,7 +3252,8 @@ function transactions(){
   const cs=document.getElementById('txCategorySelect');
   const cardSel=document.getElementById('txCardFilter');
 
-  document.getElementById('txGroupFilter').onchange=e=>{window.txGroupFilter=e.target.value;transactions();};
+  document.getElementById('txGroupSelect').onchange=e=>{window.txGroupFilter=e.target.value;transactions();};
+  document.getElementById('txPaySelect').onchange=e=>{window.txPayFilterState=e.target.value;transactions();};
   const search=document.getElementById('txSearchInput');
   search.oninput=()=>{const start=search.selectionStart;window.txSearch=search.value;transactions();const next=document.getElementById('txSearchInput');next.focus();try{next.setSelectionRange(start,start);}catch(e){}};
   ts.onchange=()=>{window.txTypeFilter=ts.value; transactions();};
@@ -3244,7 +3262,7 @@ function transactions(){
   cardSel.onchange=()=>{window.txFilterCard=cardSel.value;transactions();};
   const autoSel=document.getElementById('txAutomationFilter');
   if(autoSel)autoSel.onchange=()=>{window.txFilterAutomation=autoSel.value;transactions();};
-  clear.onclick=()=>{window.txTypeFilter='all';window.txAccountFilter='all';window.txCategoryFilter='all';window.txFilterCard='all';window.txFilterAutomation='all';window.txSearch='';window.txGroupFilter='all';transactions();};
+  clear.onclick=()=>{window.txTypeFilter='all';window.txAccountFilter='all';window.txCategoryFilter='all';window.txFilterCard='all';window.txFilterAutomation='all';window.txSearch='';window.txGroupFilter='all';window.txPayFilterState='all';transactions();};
 }
 
 async function confirmAccountMonthPending(accountId, monthKeyValue){
@@ -3991,6 +4009,30 @@ function saveTransactionEdit(e,id){
   render();
 }
 
+function txIsPaid(t){return t&&(t.paid===true||t.confirmed===true);}
+async function setTxPaid(id,paid){
+  const t=db.transactions.find(x=>x.id==id);if(!t)return;
+  t.confirmed=!!paid;t.paid=!!paid;t.paidAt=paid?localDateKey():null;
+  await save();render();
+  toast(t.type==='despesa'?(paid?'✓ Despesa marcada como paga.':'Despesa voltou para a pagar.'):(paid?'Receita confirmada.':'Receita pendente.'));
+}
+function paymentCellHtml(t){
+  const paid=txIsPaid(t),exp=t.type==='despesa';
+  const status=`<span class="payment-status ${paid?'payment-status-paid':'payment-status-pending'}">${paid?(exp?'✓ Paga':'✓ Recebida'):(exp?'⏳ A pagar':'⏳ A receber')}</span>`;
+  const btn=`<button type="button" class="btn payment-btn ${paid?'undo':'pay'}" onclick="setTxPaid(${t.id},${paid?'false':'true'})">${paid?'Desfazer':(exp?'Marcar paga':'Confirmar')}</button>`;
+  return `<span class="payment-wrap">${status}${btn}</span>`;
+}
+function invoicePayKey(cardId,cycle){return String(cardId)+'|'+String(cycle);}
+function invoicePaidInfo(cardId,cycle){return db.settings?.paidInvoices?.[invoicePayKey(cardId,cycle)]||null;}
+function invoiceIsPaid(cardId,cycle){return !!invoicePaidInfo(cardId,cycle);}
+async function toggleInvoicePaid(cardId,cycle,paid,fromModal){
+  if(!db.settings)db.settings={};
+  const map=Object.assign({},db.settings.paidInvoices||{});const key=invoicePayKey(cardId,cycle);
+  if(paid)map[key]={paid:true,paidAt:localDateKey()};else delete map[key];
+  db.settings.paidInvoices=map;
+  await save();render();if(fromModal)openCardStatement(cardId,cycle);
+  toast(paid?'✓ Fatura marcada como paga.':'Fatura voltou para a pagar.');
+}
 function toggleTxConfirmed(id){
   const t=db.transactions.find(x=>x.id==id);
   if(!t)return;
