@@ -871,6 +871,19 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 .acc-break em{font-style:normal;font-size:11px;font-weight:800;padding:2px 7px;border-radius:999px;margin-left:4px;white-space:nowrap}
 .acc-paid{background:#dcfce7;color:#166534}.acc-open{background:#fff1cf;color:#8a5a00}
 .acc-total{border-bottom:none!important;padding-top:8px!important}.acc-total span{color:var(--text,#17202a)!important;font-weight:700}
+
+.s117-owe{margin-top:14px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-radius:14px;background:#fff4e2;border:1px solid #f0c36d}
+.s117-owe span{font-weight:700;color:#8a5a00}.s117-owe b{font-size:22px;color:#b45309;white-space:nowrap}
+.s117-owe.ok{background:#f0fdf4;border-color:#86d5a6}.s117-owe.ok span,.s117-owe.ok b{color:#166534}
+.s117-box{margin-top:12px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:6px 16px 8px;box-shadow:var(--shadow)}
+.s117-head{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-weight:800}
+.s117-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed #e5e7eb;font-size:14px}
+.s117-row:last-child{border-bottom:none}
+.s117-row small{display:block;color:var(--muted);font-size:11px}
+.s117-v{text-align:right;white-space:nowrap;font-weight:700}
+.s117-v em{display:block;font-style:normal;font-size:11px;margin-top:2px}
+.s117-open{color:#b45309}.s117-ok{color:#166534}
+.s117-empty{padding:10px 0;color:var(--muted);font-size:13px}
 </style></head>
 <body><div id="cloudGate"><div class="card"><h2>💰 Ricas Finanças</h2><p>Entre com a mesma conta no computador e no celular.</p>
 <form class="form" onsubmit="cloudLogin(event)"><label>E-mail<input id="cloudEmail" type="email" autocomplete="username" required></label>
@@ -3008,7 +3021,27 @@ function dashboard(){
       <div class="sum114-card exp"><span>Despesa total</span><b>${money(expense)}</b></div>
       <div class="sum114-card bal ${bal<0?'neg':''}"><span>Saldo do mês</span><b>${bal<0?'− ':''}${money(Math.abs(bal))}</b></div>
     </div>
-    <div class="sum114-ver">Ricas Finanças v116</div>
+    ${(()=>{
+      // Cartões: fatura que vence neste mês
+      const cardsL=[...db.cards].map(c=>{const cyc=shiftStatementMonth(month,-cardDueOffset(c));return {name:c.name,value:cardStatementTotal(c.id,cyc),paid:invoiceIsPaid(c.id,cyc),due:cardStatementDueDate(c,cyc)};}).filter(x=>x.value>0).sort((a,b)=>b.value-a.value);
+      // Contas (débito): despesas lançadas direto na conta neste mês
+      const accL=[...db.accounts].map(a=>{const d=db.transactions.filter(t=>String(t.accountId)===String(a.id)&&!t.cardId&&!t.transfer&&!t.virtualCardStatement&&t.type==='despesa'&&monthKey(t.date)===month);const tot=d.reduce((s,t)=>s+Number(t.value||0),0);const open=d.filter(t=>!txIsPaid(t)).reduce((s,t)=>s+Number(t.value||0),0);return {name:a.name,value:tot,open};}).filter(x=>x.value>0).sort((a,b)=>b.value-a.value);
+      const cTot=cardsL.reduce((s,x)=>s+x.value,0), cOpen=cardsL.filter(x=>!x.paid).reduce((s,x)=>s+x.value,0);
+      const aTot=accL.reduce((s,x)=>s+x.value,0), aOpen=accL.reduce((s,x)=>s+x.open,0);
+      const owe=cOpen+aOpen;
+      const tag=open=>open>0?`<em class="s117-open">⏳ ${money(open)}</em>`:`<em class="s117-ok">✓ Pago</em>`;
+      return `
+      <div class="s117-owe ${owe>0?'':'ok'}"><span>${owe>0?'Ainda a pagar no mês':'Tudo pago no mês'}</span><b>${money(owe)}</b></div>
+      <div class="s117-box">
+        <div class="s117-head"><span>💳 Cartões de crédito</span><b>${money(cTot)}</b></div>
+        ${cardsL.length?cardsL.map(x=>`<div class="s117-row"><span>${esc(x.name)}<small>vence ${fmtDate(x.due)}</small></span><span class="s117-v">${money(x.value)}${tag(x.paid?0:x.value)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma fatura neste mês.</div>'}
+      </div>
+      <div class="s117-box">
+        <div class="s117-head"><span>🏦 Contas (débito)</span><b>${money(aTot)}</b></div>
+        ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
+      </div>`;
+    })()}
+    <div class="sum114-ver">Ricas Finanças v117</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
