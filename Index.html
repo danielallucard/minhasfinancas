@@ -862,6 +862,8 @@ input[data-decimal]{font-variant-numeric:tabular-nums}
 .sum114-card.inc{--c:#246bfe}.sum114-card.exp{--c:#d92d20}.sum114-card.bal{--c:#159447}.sum114-card.bal.neg{--c:#d92d20}
 .sum114-card.bal{background:#f6fdf9}.sum114-card.bal.neg{background:#fff6f5}
 .sum114-ver{text-align:center;color:var(--muted);font-size:11px;margin-top:14px}
+
+.acc-inv{margin-top:10px;display:grid;gap:6px}.acc-inv-row{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:10px;background:#f8fafc;font-size:13px}.acc-inv-row b.green{color:#166534}
 </style></head>
 <body><div id="cloudGate"><div class="card"><h2>💰 Ricas Finanças</h2><p>Entre com a mesma conta no computador e no celular.</p>
 <form class="form" onsubmit="cloudLogin(event)"><label>E-mail<input id="cloudEmail" type="email" autocomplete="username" required></label>
@@ -1740,9 +1742,23 @@ function toggleCardAccountFields(){
 }
 
 // Partida dobrada simplificada: receita = crédito/entrada (+); despesa = débito/saída (-); transferência não altera o resultado líquido.
+// v115: faturas marcadas como pagas debitam a conta vinculada ao cartão, na data de vencimento.
+function paidInvoicesList(){
+  const map=db.settings?.paidInvoices||{};
+  return Object.keys(map).map(key=>{
+    const [cardId,cycle]=key.split('|');
+    const c=db.cards.find(x=>String(x.id)===String(cardId));
+    if(!c)return null;
+    return {card:c,cycle,accountId:c.accountId,date:cardStatementDueDate(c,cycle)||`${cycle}-01`,value:cardStatementTotal(c.id,cycle)};
+  }).filter(x=>x&&x.value>0);
+}
+function paidInvoicesFor(accountId,month){
+  return paidInvoicesList().filter(x=>(!accountId||String(x.accountId)===String(accountId))&&(!month||monthKey(x.date)===month));
+}
 function balance(id){
   return db.accounts.filter(a=>(!id||a.id==id)).reduce((s,a)=>s+(+a.initial||0),0)+
     db.transactions.filter(t=>(!id||t.accountId==id)&&!t.cardId&&t.confirmed===true).reduce((s,t)=>s+(t.type==='receita'?1:-1)*+t.value,0)
+    -paidInvoicesFor(id).reduce((s,x)=>s+x.value,0);
 }
 function summaryAccounts(){return db.accounts.filter(a=>a.showInSummary!==false)}
 function forecastMonthBalance(){
@@ -2966,7 +2982,7 @@ function dashboard(){
       <div class="sum114-card exp"><span>Despesa total</span><b>${money(expense)}</b></div>
       <div class="sum114-card bal ${bal<0?'neg':''}"><span>Saldo do mês</span><b>${bal<0?'− ':''}${money(Math.abs(bal))}</b></div>
     </div>
-    <div class="sum114-ver">Ricas Finanças v114</div>
+    <div class="sum114-ver">Ricas Finanças v115</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -3209,8 +3225,10 @@ function accounts(){
   const k=selectedMonthKey();
   const list=[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0));
   const cards=list.map(a=>{
-    const tx=[...db.transactions].filter(t=>t.accountId==a.id&&monthKey(t.date)===k).sort((x,y)=>y.date.localeCompare(x.date));
-    const net=tx.reduce((s,t)=>s+(t.type==='receita'?1:-1)*+t.value,0);
+    const tx=[...db.transactions].filter(t=>t.accountId==a.id&&!t.cardId&&!t.virtualCardStatement&&monthKey(t.date)===k).sort((x,y)=>y.date.localeCompare(x.date));
+    const inv=paidInvoicesFor(a.id,k);
+    const linkedCards=db.cards.filter(c=>String(c.accountId)===String(a.id));
+    const net=tx.reduce((s,t)=>s+(t.type==='receita'?1:-1)*+t.value,0)-inv.reduce((s,x)=>s+x.value,0);
     const pendingCount=tx.filter(t=>t.confirmed!==true&&!t.virtualCardStatement).length;
     const bal=balance(a.id);
     return `<div class="card account-card">
@@ -3219,6 +3237,7 @@ function accounts(){
         <div style="text-align:right"><div class="muted">Saldo atual</div><div class="value ${bal<0?'red':'blue'}">${bal<0?'− ':''}${money(Math.abs(bal))}</div></div>
       </div>
       <div class="muted" style="margin-top:10px">Resultado de ${monthLabel(k)}: <strong class="${net<0?'red':'blue'}">${net<0?'− ':''}${money(Math.abs(net))}</strong></div>
+      ${linkedCards.length?`<div class="acc-inv">${linkedCards.map(c=>{const cyc=shiftStatementMonth(k,-cardDueOffset(c));const tot=cardStatementTotal(c.id,cyc);const paid=invoiceIsPaid(c.id,cyc);return tot>0?`<div class="acc-inv-row"><span>💳 Fatura ${esc(c.name)} · vence ${fmtDate(cardStatementDueDate(c,cyc))}</span><b class="${paid?'green':'muted'}">${paid?'✓ Paga − ':'A pagar '}${money(tot)}</b></div>`:'';}).join('')}</div>`:''}
       <details class="account-transactions">
         <summary>
           <span>📋 Lançamentos de ${monthLabel(k)}</span>
