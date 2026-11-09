@@ -3044,7 +3044,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v119</div>
+    <div class="sum114-ver">Ricas Finanças v120</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -3158,9 +3158,16 @@ function transactions(){
 
   // Compras de cartão não debitam a conta no mês da compra; quem debita é a fatura.
   const cashRows=bankRows;
-  const statementTotal=statementRows.reduce((s,t)=>s+Number(t.value||0),0);
+  // v120: com filtro de categoria, grupo ou pesquisa, desconta-se só a parte das faturas
+  // que corresponde ao filtro (compras filtradas), e não a fatura inteira.
+  const narrowFilter=cf!=='all'||gf!=='all'||!!query.trim();
+  const cardPart=list=>list.reduce((s,t)=>s+Number(t.value||0),0);
+  const filteredCardRows=actualRows.filter(t=>t.cardId&&!t.virtualCardStatement);
+  const statementTotal=narrowFilter?cardPart(filteredCardRows):statementRows.reduce((s,t)=>s+Number(t.value||0),0);
   // v119: faturas marcadas como pagas também saem do saldo confirmado.
-  const paidStatementTotal=statementRows.filter(t=>invoiceIsPaid(t.cardId,t.statementCycle||k)).reduce((s,t)=>s+Number(t.value||0),0);
+  const paidStatementTotal=narrowFilter
+    ?cardPart(filteredCardRows.filter(t=>invoiceIsPaid(t.cardId,txStatementMonth(t))))
+    :statementRows.filter(t=>invoiceIsPaid(t.cardId,t.statementCycle||k)).reduce((s,t)=>s+Number(t.value||0),0);
   const confirmed=cashRows.filter(t=>t.confirmed===true)
     .reduce((s,t)=>s+(t.type==='receita'?1:-1)*Number(t.value||0),0)-paidStatementTotal;
   const estimated=cashRows.reduce((s,t)=>s+(t.type==='receita'?1:-1)*Number(t.value||0),0)-statementTotal;
@@ -3188,7 +3195,7 @@ function transactions(){
         <label style="flex:1;min-width:220px">Origem do lançamento<select id="txAutomationFilter">${automationFilterOptions(autof)}</select></label>${cardf!=='all'&&cardf!=='none'?`<button class="btn" onclick="openCardStatement('${cardf}',suggestedCardStatementMonth('${cardf}','${k}'))">💳 Abrir fatura</button>`:''}<button class="btn" id="txClearFilters">Limpar filtros</button>
       </div>
       <div class="muted" style="margin-bottom:12px">
-        ${rows.length} lançamento(s) na conta${statementRows.length?` e ${statementRows.length} fatura(s) de cartão`:''} em ${monthLabel(k)}.
+        ${rows.length} lançamento(s) na conta${narrowFilter?` e ${filteredCardRows.length} compra(s) no cartão (${money(statementTotal)})`:(statementRows.length?` e ${statementRows.length} fatura(s) de cartão`:'')} em ${monthLabel(k)}.
       </div>
       <div class="grid g2">
         <div class="card metric"><div class="label">Saldo confirmado <span class="muted" style="font-size:11px">(pago/recebido + faturas pagas)</span></div>
