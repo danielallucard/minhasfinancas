@@ -11,6 +11,9 @@
 <meta name="format-detection" content="telephone=no">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
 <title>Ricas Finanças</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <style>
 :root{--bg:#f5f7fb;--card:#fff;--text:#17202a;--muted:#6b7280;--primary:#246bfe;--green:#159447;--red:#d92d20;--amber:#d98c00;--border:#e6e9ef;--shadow:0 8px 24px #17202a12}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
@@ -1024,6 +1027,20 @@ html,body{overflow-x:hidden}
   .top .actions .btn{max-width:58vw;overflow:hidden;text-overflow:ellipsis}
 }
 </style>
+<style id="logout-v125">
+/* ===== v125 — Sair da conta (menu lateral e gaveta "Mais") ===== */
+.account-foot{display:grid;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+.account-foot[hidden]{display:none!important}
+.account-foot .cloud-user-email{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
+.account-foot .logout-btn{width:100%;min-height:42px;color:var(--red);border-color:#f3c2bd;background:#fff;font-weight:700}
+.account-foot .logout-btn:hover{background:#fdf3f2;border-color:var(--red)}
+@media(min-width:1181px){.sidebar{display:flex;flex-direction:column}.sidebar .nav{flex:1 1 auto}}
+</style>
+<style id="ios-v126">
+/* ===== v126 — Dica de instalação no iPhone ===== */
+#iosInstallHint{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:9999;background:#17202a;color:#fff;border-radius:14px;padding:14px 40px 14px 14px;box-shadow:0 10px 30px #0006;font-size:14px;line-height:1.45}
+#iosInstallHint b{color:#7fe0a6}#iosInstallHint button{position:absolute;top:6px;right:8px;border:0;background:transparent;color:#fff;font-size:22px}
+</style>
 </head>
 <body><div id="cloudGate"><div class="card"><h2>💰 Ricas Finanças</h2><p>Entre com a mesma conta no computador e no celular.</p>
 <form class="form" onsubmit="cloudLogin(event)"><label>E-mail<input id="cloudEmail" type="email" autocomplete="username" required></label>
@@ -1033,7 +1050,7 @@ html,body{overflow-x:hidden}
 <p id="cloudLoginMessage" role="status">Carregando conexão…</p></div></div><div id="cloudStatus" role="status">Conectando…</div>
 
 <div class="app">
-<aside class="sidebar"><div class="brand">💰 Ricas Finanças</div><div class="nav" id="nav"></div></aside>
+<aside class="sidebar"><div class="brand">💰 Ricas Finanças</div><div class="nav" id="nav"></div><div class="account-foot" hidden><span class="cloud-user-email"></span><button type="button" class="btn logout-btn" onclick="cloudLogout()">🚪 Sair da conta</button></div></aside>
 <main class="main">
 <div class="top"><div><h1 id="title">Resumo</h1><div class="muted" id="subtitle"></div></div><div class="actions" id="topActions"></div></div>
 <div id="content"></div>
@@ -1043,6 +1060,7 @@ html,body{overflow-x:hidden}
 <div class="mobile-drawer" id="mobileDrawer">
   <div class="mobile-drawer-head"><b>Ricas Finanças</b><button onclick="toggleMobileMenu()">×</button></div>
   <div id="mobileDrawerNav"></div>
+  <div class="account-foot" hidden><span class="cloud-user-email"></span><button type="button" class="btn logout-btn" onclick="cloudLogout()">🚪 Sair da conta</button></div>
 </div>
 <div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
 <div class="mobilebar" id="mobilebar"></div>
@@ -3181,7 +3199,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v124</div>
+    <div class="sum114-ver">Ricas Finanças v126</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -4708,7 +4726,8 @@ const cloudOriginalSettings=settings;
 uid=function(){const a=new Uint32Array(2);crypto.getRandomValues(a);return (a[0]&0xfffff)*4294967296+a[1];};
 function cloudRecurrenceId(id,n){let h=2166136261;for(const c of String(id)+':'+n){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return 4000000000000000+(h>>>0)*10000+(Number(n)%10000);}
 function cloudMessage(text){document.getElementById('cloudLoginMessage').textContent=text;}
-function cloudStatusUpdate(){const text=cloudFailed?'⚠ Falha de sincronização: veja Configurações':!cloudUser?'Entre para sincronizar':!cloudInitialized?'Carregando dados…':cloudPending?'⏳ Alterações aguardando envio':cloudCache||!navigator.onLine?'☁ Cache local · aguardando conexão':'✓ Sincronizado';document.getElementById('cloudStatus').textContent=text;}
+function cloudStatusUpdate(){const text=cloudFailed?'⚠ Falha de sincronização: veja Configurações':!cloudUser?'Entre para sincronizar':!cloudInitialized?'Carregando dados…':cloudPending?'⏳ Alterações aguardando envio':cloudCache||!navigator.onLine?'☁ Cache local · aguardando conexão':'✓ Sincronizado';document.getElementById('cloudStatus').textContent=text;cloudAccountUI();}
+function cloudAccountUI(){const on=!!cloudUser;document.querySelectorAll('.account-foot').forEach(el=>el.hidden=!on);document.querySelectorAll('.cloud-user-email').forEach(el=>{el.textContent=cloudUser?.email||'';el.title=cloudUser?.email||'';});}
 function cloudError(e){console.error('Firebase:',e);const codes={'auth/invalid-credential':'E-mail ou senha incorretos.','auth/wrong-password':'E-mail ou senha incorretos.','auth/user-not-found':'E-mail ou senha incorretos.','auth/invalid-api-key':'A chave do projeto não foi aceita. Confira firebaseConfig.','auth/network-request-failed':'Sem conexão com o serviço. Confira a internet.','auth/too-many-requests':'Muitas tentativas. Aguarde antes de tentar novamente.','permission-denied':'Acesso negado. Confira as regras publicadas do Firestore.','auth/unauthorized-domain':'Domínio não autorizado no Firebase.'};return codes[e.code]||('Não foi possível concluir: '+(e.message||e));}
 async function cloudLogin(e){e.preventDefault();const btn=document.getElementById('cloudLoginButton');btn.disabled=true;try{try{localStorage.setItem('ricas_cloud_trusted',document.getElementById('cloudTrusted').checked?'yes':'no');}catch(_){}await cloudBoot();await cloudAuth.setPersistence(document.getElementById('cloudTrusted').checked?firebase.auth.Auth.Persistence.LOCAL:firebase.auth.Auth.Persistence.SESSION);cloudMessage('Autenticando…');await cloudAuth.signInWithEmailAndPassword(document.getElementById('cloudEmail').value.trim(),document.getElementById('cloudPassword').value);document.getElementById('cloudPassword').value='';}catch(err){cloudMessage(cloudError(err));}finally{btn.disabled=false;}}
 async function cloudResetPassword(){const email=document.getElementById('cloudEmail').value.trim();if(!email)return cloudMessage('Informe seu e-mail no campo acima.');try{await cloudBoot();await cloudAuth.sendPasswordResetEmail(email);cloudMessage('Se houver uma conta elegível, você receberá instruções por e-mail.');}catch(e){cloudMessage(cloudError(e));}}
@@ -4754,13 +4773,49 @@ exportFullBackupZIP=async function(){try{await cloudSQLiteSnapshot();return clou
 const cloudOldRestore=restoreFullBackupZIP;
 restoreFullBackupZIP=async function(inp){try{if(!navigator.onLine||cloudPending)throw new Error('Aguarde a conexão e a sincronização antes de restaurar.');await cloudEnsureSQL();return await cloudOldRestore(inp);}catch(e){toast(cloudError(e));}};
 function cloudRecoveryExport(){if(!cloudRecovery)return exportJSON();downloadBlob(new Blob([cloudRecovery],{type:'application/json'}),'ricas-financas-recuperacao.json');}
-async function cloudLogout(){if(cloudPending||cloudFailed){toast('Resolva a sincronização e exporte um backup antes de sair.');return;}await cloudAuth.signOut();location.reload();}
+// v125: logoff disponível no menu. Antes de sair, aguarda o envio das alterações pendentes;
+// se não for possível sincronizar, oferece salvar um JSON de recuperação para não perder dados.
+let cloudLoggingOut=false;
+async function cloudLogout(){
+  if(cloudLoggingOut)return;
+  if(!cloudAuth||!cloudUser){location.reload();return;}
+  if(!confirm('SAIR DA CONTA\n\n'+(cloudUser.email||'')+'\n\nVocê precisará informar e-mail e senha para entrar novamente neste dispositivo.\n\nDeseja sair?'))return;
+  cloudLoggingOut=true;
+  try{
+    if(cloudPending){
+      toast('Enviando alterações pendentes…');
+      try{await Promise.race([cloudStore.waitForPendingWrites(),new Promise(r=>setTimeout(r,10000))]);}catch(_){}
+      await new Promise(r=>setTimeout(r,300));
+    }
+    if(cloudPending||cloudFailed){
+      if(!confirm('ALTERAÇÕES NÃO SINCRONIZADAS\n\nAlgumas alterações ainda não chegaram à nuvem'+(navigator.onLine?'':' (sem internet)')+'. Se sair agora, elas podem ser perdidas.\n\nOK = salvar um JSON de recuperação e sair.\nCancelar = continuar conectado e tentar novamente depois.')){cloudLoggingOut=false;return;}
+      cloudRecoveryExport();
+      await new Promise(r=>setTimeout(r,800));
+    }
+    if(cloudUnsubscribe){try{cloudUnsubscribe();}catch(_){}cloudUnsubscribe=null;}
+    if(document.getElementById('modal').classList.contains('show'))cloudCloseModal();
+    await cloudAuth.signOut();
+    // Remove do aparelho o cache financeiro local (a cópia oficial continua na nuvem).
+    try{await cloudStore.terminate();await cloudStore.clearPersistence();}catch(e){console.warn('Cache local não removido:',e?.code||e);}
+    try{localStorage.removeItem(KEY);}catch(_){}
+    location.reload();
+  }catch(e){cloudLoggingOut=false;toast(cloudError(e));}
+}
 settings=function(){cloudOriginalSettings();const content=document.getElementById('content');const panels=[...content.querySelectorAll(':scope > .card')];for(const p of panels)if(p.querySelector('h2')?.textContent==='Banco de dados SQLite')p.remove();const p=document.createElement('div');p.className='card section';p.innerHTML='<h2>☁ Sincronização entre dispositivos</h2><p id="cloudAccountLabel"></p><p>As alterações são enviadas automaticamente. O indicador inferior informa se ainda há envios pendentes. Edições simultâneas do mesmo registro seguem a última gravação recebida pelo serviço.</p><div class="actions"><button class="btn primary" onclick="document.getElementById(\'cloudImport\').click()">📥 Importar SQLite para a nuvem</button><input type="file" id="cloudImport" accept=".sqlite,.db" hidden onchange="importSQLiteFile(this)"><button class="btn" onclick="exportSQLiteFile()">📤 Exportar SQLite</button><button class="btn" onclick="cloudRecoveryExport()">Salvar JSON de recuperação</button><button class="btn" onclick="cloudLogout()">Sair da conta</button></div><p class="muted">A importação é necessária somente uma vez. Nunca envie seus arquivos financeiros ao GitHub. Sem internet, alterações aguardam conexão; cache persistente depende da opção de dispositivo particular e do suporte do navegador. Esta versão não garante abertura do site sem internet.</p>';content.prepend(p);document.getElementById('cloudAccountLabel').textContent=cloudUser?.email||'';};
 const cloudCloseModal=closeModal;closeModal=function(){cloudCloseModal();if(cloudRenderPending){cloudRenderPending=false;render();}};
 resetAll=function(){toast('Exclusão geral desativada nesta versão para proteger a base sincronizada.');};
 window.addEventListener('online',cloudStatusUpdate);window.addEventListener('offline',cloudStatusUpdate);
 // Start after the user chooses whether this is a trusted device; restore session without enabling disk cache by default.
 window.addEventListener('load',()=>{cloudMessage('Informe sua conta para entrar.');document.getElementById('cloudStatus').textContent='Entre para sincronizar';try{if(localStorage.getItem('ricas_cloud_trusted')==='yes'){document.getElementById('cloudTrusted').checked=true;cloudBoot().catch(e=>cloudMessage(cloudError(e)));}}catch(_){} });
+</script>
+<script>
+/* v126 — PWA: service worker + dica "Adicionar à Tela de Início" no Safari do iPhone */
+if('serviceWorker' in navigator&&location.protocol==='https:'){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW:',e)));}
+(function(){const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const standalone=navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;let seen=false;try{seen=localStorage.getItem('ricas_ios_hint')==='1';}catch(_){}
+if(!ios||standalone||seen)return;addEventListener('load',()=>{const d=document.createElement('div');d.id='iosInstallHint';
+d.innerHTML='📲 <b>Instale o Ricas Finanças</b><br>Toque em <b>Compartilhar</b> (□↑) e depois em <b>Adicionar à Tela de Início</b>.<button aria-label="Fechar">×</button>';
+d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('ricas_ios_hint','1');}catch(_){}};document.body.appendChild(d);});})();
 </script>
 </body>
 </html>
