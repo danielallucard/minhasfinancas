@@ -1855,6 +1855,7 @@ function txAutomationLabel(t){
   const k=txAutomationKind(t);
   if(k==='installment')return Number(t.totalInstallments)>1?`🔢 Parcela ${t.installment||1}/${t.totalInstallments}`:'🔢 Parcelada';
   if(k==='recurring')return '🔁 Recorrente';
+  if(t.source==='wallet')return '📲 Wallet';
   return '✋ Avulsa';
 }
 
@@ -3199,7 +3200,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v126</div>
+    <div class="sum114-ver">Ricas Finanças v127</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -4816,6 +4817,20 @@ const standalone=navigator.standalone===true||matchMedia('(display-mode: standal
 if(!ios||standalone||seen)return;addEventListener('load',()=>{const d=document.createElement('div');d.id='iosInstallHint';
 d.innerHTML='📲 <b>Instale o Ricas Finanças</b><br>Toque em <b>Compartilhar</b> (□↑) e depois em <b>Adicionar à Tela de Início</b>.<button aria-label="Fechar">×</button>';
 d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('ricas_ios_hint','1');}catch(_){}};document.body.appendChild(d);});})();
+</script>
+<script>
+/* v127 — Apple Wallet: chave do Atalho em Configurações + aviso de compras "A classificar" */
+(function(){
+  const base=settings;
+  settings=function(){base();const content=document.getElementById('content');const p=document.createElement('div');p.className='card section';
+    p.innerHTML='<h2>📲 Apple Wallet (Atalhos do iPhone)</h2><p>As compras por aproximação feitas com o iPhone são lançadas automaticamente como despesa no cartão correspondente, na categoria <b>A classificar</b>. Depois é só editar a categoria normalmente.</p><div class="actions"><button class="btn primary" type="button" id="walletKeyBtn">🔑 Gerar chave do Atalho</button></div><div id="walletKeyBox" hidden style="margin-top:10px"><input id="walletKeyOut" readonly style="width:100%;font-family:monospace;padding:9px;border:1px solid var(--border);border-radius:8px"><p class="muted">Copie a chave e cole no secret <b>WALLET_TOKEN</b> da Cloudflare <b>e</b> no Atalho do iPhone. Ela não fica salva no app; se perder, gere outra e atualize os dois lugares.</p></div>';
+    const anchor=[...content.querySelectorAll(':scope > .card')].find(c=>c.querySelector('h2')?.textContent.includes('Sincronização'));
+    anchor?anchor.after(p):content.prepend(p);
+    p.querySelector('#walletKeyBtn').onclick=async()=>{const b=new Uint8Array(24);crypto.getRandomValues(b);const k=[...b].map(x=>x.toString(16).padStart(2,'0')).join('');const o=document.getElementById('walletKeyOut');o.value=k;document.getElementById('walletKeyBox').hidden=false;o.select();try{await navigator.clipboard.writeText(k);toast('Chave copiada.');}catch(_){toast('Selecione e copie a chave.');}};
+  };
+  let warned=false;
+  setInterval(()=>{if(warned||typeof db==='undefined'||!db.transactions||!db.categories)return;const cat=db.categories.find(c=>c.type==='despesa'&&String(c.name).trim().toLowerCase()==='a classificar');if(!cat)return;const n=db.transactions.filter(t=>t.source==='wallet'&&String(t.categoryId)===String(cat.id)).length;if(n){warned=true;toast(`📲 ${n} compra${n>1?'s':''} do Wallet aguardando categoria (A classificar).`);}},3000);
+})();
 </script>
 </body>
 </html>
