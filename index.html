@@ -2543,7 +2543,7 @@ function recurrences(){
     return `<tr>
   <td>${esc(r.description)}<br><span class="muted">${r.type==='receita'?'Receita':'Despesa'} · ${esc(catName(r.categoryId))}</span><br><span class="muted rec-payment-label">${r.cardId?`💳 ${esc(cardName(r.cardId))} · ${esc(cardHolderLabel(r))}${recurrenceCardData(r)?'':' — cartão não cadastrado'}`:`🏦 ${esc(accountName(r.accountId))}`}</span></td>
   <td>${pill}</td>
-  <td>${fmtDate(r.start)}</td><td>${qty}</td><td class="${r.type==='receita'?'blue':'red'}">${money(r.value)}</td><td class="rec-remaining-cell">${recRemainingHtml(r)}</td>
+  <td>${fmtDate(r.start)}</td><td>${qty}</td><td class="${r.type==='receita'?'blue':'red'}">${money(r.value)}</td><td class="${rec?'rec-remaining-none':'rec-remaining-cell'}">${recRemainingHtml(r)}</td>
   <td>${lastTxt}</td>
   <td class="rec-actions"><button class="btn" onclick="openRecurrence(${r.id})">✎ Editar</button>${actions}
   <button class="btn danger" onclick="deleteRecurrence(${r.id})">Excluir</button></td></tr>`;}).join('')||`<tr><td colspan="8" class="empty">${db.recurrences.length?(recFilter==='recurring'?'Nenhuma automação recorrente.':'Nenhuma automação parcelada.'):'Nenhuma automação cadastrada.'}</td></tr>`}</table></div></div>`;
@@ -2559,6 +2559,14 @@ function recFilterBarHtml(){
   if(recFilter==='installments'&&inst){
     const tot=db.recurrences.filter(r=>!isRecurring(r)).reduce((s,r)=>s+((recRemaining(r)||{}).value||0),0);
     extra=`<div class="rec-filter-total">Total restante das parceladas: <b>${money(tot)}</b></div>`;
+  }
+  if(recFilter==='recurring'&&rec){
+    // v131 — Total por mês das recorrentes ativas (encerradas não entram).
+    const act=db.recurrences.filter(r=>isRecurring(r)&&r.endIdx==null);
+    const desp=act.filter(r=>r.type!=='receita').reduce((s,r)=>s+(Number(r.value)||0),0);
+    const rece=act.filter(r=>r.type==='receita').reduce((s,r)=>s+(Number(r.value)||0),0);
+    const ended=rec-act.length;
+    extra=`<div class="rec-filter-total">Total mensal das recorrentes ativas: <b>${money(desp)}</b>${rece?` <span class="rec-filter-sub">· Receitas: <b class="blue">${money(rece)}</b></span>`:''}${ended?`<div class="rec-filter-note">${ended} encerrada${ended===1?'':'s'} fora do total</div>`:''}</div>`;
   }
   return `<div class="rec-filter-bar" role="tablist">${b('all','Todas',all)}${b('recurring','🔁 Recorrentes',rec)}${b('installments','🔢 Parceladas',inst)}</div>${extra}`;
 }
@@ -3237,7 +3245,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v130</div>
+    <div class="sum114-ver">Ricas Finanças v131</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -4888,6 +4896,9 @@ d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('rica
 .rec-filter-btn.active span{background:rgba(255,255,255,.25);color:#fff}
 .rec-filter-total{margin:-4px 0 12px;padding:9px 12px;border-radius:10px;background:#fffaf0;border:1px solid #f0d9a8;font-size:13px;color:#475569}
 .rec-filter-total b{color:var(--amber);font-size:15px}
+.rec-filter-total b.blue{color:#246bfe}
+@media(max-width:1180px){table.table.rt td.rec-remaining-none{display:none!important}}
+.rec-filter-note{font-size:11.5px;color:#94a3b8;margin-top:2px}
 @media(max-width:560px){.rec-filter-bar{display:grid;grid-template-columns:repeat(3,1fr)}.rec-filter-btn{justify-content:center;padding:8px 6px;font-size:12.5px}}
 .rec-remaining{display:grid;gap:2px}
 .rec-remaining b{color:var(--amber);font-size:15px;white-space:nowrap;font-variant-numeric:tabular-nums}
