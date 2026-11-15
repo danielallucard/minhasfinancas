@@ -3200,7 +3200,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v127</div>
+    <div class="sum114-ver">Ricas Finanças v128</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -4832,5 +4832,110 @@ d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('rica
   setInterval(()=>{if(warned||typeof db==='undefined'||!db.transactions||!db.categories)return;const cat=db.categories.find(c=>c.type==='despesa'&&String(c.name).trim().toLowerCase()==='a classificar');if(!cat)return;const n=db.transactions.filter(t=>t.source==='wallet'&&String(t.categoryId)===String(cat.id)).length;if(n){warned=true;toast(`📲 ${n} compra${n>1?'s':''} do Wallet aguardando categoria (A classificar).`);}},3000);
 })();
 </script>
+<style id="cat-group-v128">
+/* ===== v128 — Categoria com grupo visível ao lançar ===== */
+.category-options .cat-group-title{display:flex;align-items:center;gap:7px;position:sticky;top:-4px;z-index:1;margin:4px 0 2px;padding:7px 10px;background:#f1f5f9;border-radius:7px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#475569}
+.category-options .cat-group-title:first-child{margin-top:0}
+.category-options .cat-group-title i{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+.category-option .cat-group-badge{flex:0 0 auto;max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700;background:color-mix(in srgb,var(--gc,#9ca3af) 14%,#fff);color:color-mix(in srgb,var(--gc,#64748b) 75%,#000);border:1px solid color-mix(in srgb,var(--gc,#9ca3af) 35%,#fff)}
+.category-option.cat-selected{background:rgba(37,99,235,.10)}
+.cat-group-hint{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--muted)}
+.cat-group-hint[hidden]{display:none!important}
+.cat-group-hint b{color:var(--gc,#475569)}
+.cat-group-hint i{width:9px;height:9px;border-radius:50%;background:var(--gc,#9ca3af)}
+@media(max-width:560px){.category-option .cat-group-badge{max-width:55%}}
+</style>
+<script>
+/* v128 — Ao lançar, cada categoria mostra o grupo do orçamento (Custos fixos, Prazeres...).
+   Somente a apresentação muda: cálculos, filtros e gravação continuam iguais. */
+(function(){
+  const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim();
+  function catGroupInfo(c){
+    if(!c)return null;
+    if(c.type==='receita')return {key:'__receita',name:'Receita',icon:'💵',color:'#246bfe'};
+    const g=budgetGroupDef(c.budgetGroup);
+    return g?{key:g.key,name:g.name,icon:g.icon,color:g.color}:{key:'',name:'Sem grupo',icon:'❔',color:'#9ca3af'};
+  }
+  function catLabel(c){const g=catGroupInfo(c);return c?(c.name+(g?' · '+g.name:'')):'';}
+  window.catGroupInfo=catGroupInfo;window.catLabel=catLabel;
+  function groupedOptionsHtml(fn,selectedId){
+    const byName=(a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR',{sensitivity:'base'});
+    const cats=[...db.categories];
+    const sections=[...budgetGroups().map(g=>({key:g.key,name:g.name,icon:g.icon,color:g.color})),
+      {key:'',name:'Sem grupo',icon:'❔',color:'#9ca3af'},{key:'__receita',name:'Receitas',icon:'💵',color:'#246bfe'}];
+    return sections.map(s=>{
+      const list=cats.filter(c=>catGroupInfo(c).key===s.key).sort(byName);
+      if(!list.length)return '';
+      return `<div class="cat-group-title" data-group="${esc(s.key)}"><i style="background:${s.color}"></i>${s.icon} ${esc(s.name)}</div>`+
+        list.map(c=>{const g=catGroupInfo(c);return `<button type="button" class="category-option${String(c.id)===String(selectedId)?' cat-selected':''}" data-id="${c.id}" data-group="${esc(s.key)}" data-name="${esc(c.name)}" data-search="${esc(norm(c.name+' '+g.name))}" onclick="${fn}(${c.id})"><span><span class="category-icon">${esc(c.icon||defaultCategoryIcon(c.name))}</span>${esc(c.name)}</span><span class="cat-group-badge" style="--gc:${g.color}">${g.icon} ${esc(g.name)}</span></button>`;}).join('');
+    }).join('');
+  }
+  function ensureHint(inputId,hintId){
+    let h=document.getElementById(hintId);
+    if(!h){const inp=document.getElementById(inputId);const lbl=inp?.closest('label');if(!lbl)return null;h=document.createElement('div');h.id=hintId;h.className='cat-group-hint';h.hidden=true;lbl.after(h);}
+    return h;
+  }
+  function paintSelection(inputId,valueId,hintId,boxId){
+    const input=document.getElementById(inputId),value=document.getElementById(valueId);
+    if(!input||!value)return;
+    const c=db.categories.find(x=>String(x.id)===String(value.value));
+    const h=ensureHint(inputId,hintId);
+    if(c){input.value=catLabel(c);input.dataset.selectedLabel=input.value;}
+    else delete input.dataset.selectedLabel;
+    if(h){const g=catGroupInfo(c);h.hidden=!c;if(c)h.innerHTML=`<i style="--gc:${g.color}"></i>Grupo: <b style="--gc:${g.color}">${g.icon} ${esc(g.name)}</b>`;}
+    document.querySelectorAll(`#${boxId} .category-option`).forEach(b=>b.classList.toggle('cat-selected',!!c&&b.dataset.id===String(c.id)));
+  }
+  function filterBox(inputId,boxId){
+    const input=document.getElementById(inputId),box=document.getElementById(boxId);
+    if(!input||!box)return;
+    // Ao reabrir com a categoria já escolhida, mostra a lista completa.
+    const raw=input.dataset.selectedLabel&&input.value===input.dataset.selectedLabel?'':input.value;
+    const q=norm(raw).replace(/\s*·\s*/g,' ');
+    const terms=q.split(/\s+/).filter(Boolean);
+    let visible=0;const shownGroups=new Set();
+    box.querySelectorAll('.category-option').forEach(btn=>{
+      const hay=btn.dataset.search||norm(btn.dataset.name);
+      const show=!terms.length||terms.every(t=>hay.includes(t));
+      btn.style.display=show?'flex':'none';
+      if(show){visible++;shownGroups.add(btn.dataset.group);}
+    });
+    box.querySelectorAll('.cat-group-title').forEach(t=>t.style.display=shownGroups.has(t.dataset.group)?'flex':'none');
+    box.style.display='block';
+    box.querySelector('.category-empty')?.remove();
+    if(!visible){const m=document.createElement('div');m.className='muted category-empty';m.style.padding='10px';m.textContent='Nenhuma categoria encontrada.';box.appendChild(m);}
+  }
+  // ---- Nova movimentação / edição ----
+  function rebuildTx(){
+    const box=document.getElementById('txCategoryOptions'),val=document.getElementById('txCategoryValue');
+    if(box)box.innerHTML=groupedOptionsHtml('selectTxCategory',val?.value);
+    paintSelection('txCategorySearch','txCategoryValue','txCategoryGroupHint','txCategoryOptions');
+  }
+  const origOpenTx=openTx;
+  openTx=function(id){origOpenTx(id);rebuildTx();};
+  refreshTransactionCategoryPicker=function(selectedId){const v=document.getElementById('txCategoryValue');if(v&&selectedId!=null)v.value=String(selectedId);rebuildTx();};
+  filterTxCategories=function(){filterBox('txCategorySearch','txCategoryOptions');};
+  selectTxCategory=function(id){
+    const v=document.getElementById('txCategoryValue');if(!v||!db.categories.some(c=>String(c.id)===String(id)))return;
+    v.value=String(id);paintSelection('txCategorySearch','txCategoryValue','txCategoryGroupHint','txCategoryOptions');
+    const box=document.getElementById('txCategoryOptions');if(box)box.style.display='none';
+  };
+  // ---- Automatizações (parceladas/recorrentes) ----
+  recurrenceCategoryOptionsHtml=function(){return groupedOptionsHtml('selectRecurrenceCategory',document.getElementById('recurrenceCategoryValue')?.value);};
+  function rebuildRec(){
+    const box=document.getElementById('recurrenceCategoryOptions');
+    if(box)box.innerHTML=recurrenceCategoryOptionsHtml();
+    paintSelection('recurrenceCategorySearch','recurrenceCategoryValue','recCategoryGroupHint','recurrenceCategoryOptions');
+  }
+  const origOpenRec=openRecurrence;
+  openRecurrence=function(id){origOpenRec(id);rebuildRec();};
+  filterRecurrenceCategories=function(){filterBox('recurrenceCategorySearch','recurrenceCategoryOptions');};
+  selectRecurrenceCategory=function(id){
+    const v=document.getElementById('recurrenceCategoryValue');if(!v||!db.categories.some(c=>String(c.id)===String(id)))return;
+    v.value=String(id);paintSelection('recurrenceCategorySearch','recurrenceCategoryValue','recCategoryGroupHint','recurrenceCategoryOptions');
+    const box=document.getElementById('recurrenceCategoryOptions');if(box)box.style.display='none';
+  };
+})();
+</script>
+
 </body>
 </html>
