@@ -2529,7 +2529,7 @@ function recurrences(){
 
   document.getElementById('content').innerHTML=`<div class="card"><h2>Movimentações automatizadas</h2>
   <p class="muted">As parcelas futuras ficam registradas e podem ser consultadas ou excluídas como um conjunto.</p>
-  <div class="table-wrap"><table class="table rec-table"><tr><th>Descrição</th><th>Modalidade</th><th>Início</th><th>Parcelas</th><th>Valor</th><th>Última</th><th>Ações</th></tr>
+  <div class="table-wrap"><table class="table rec-table"><tr><th>Descrição</th><th>Modalidade</th><th>Início</th><th>Parcelas</th><th>Valor</th><th>Restante</th><th>Última</th><th>Ações</th></tr>
   ${[...db.recurrences].sort((a,b)=>(a.order??0)-(b.order??0)).map(r=>{
     const rec=isRecurring(r), ended=rec&&r.endIdx!=null;
     const pill=rec?(ended?'<span class="pill" style="background:#f1f5f9;color:#64748b">🔁 Recorrente · encerrada</span>':'<span class="pill" style="background:#ecfdf5;color:#047857">🔁 Recorrente</span>'):'<span class="pill">🔢 Parcelada</span>';
@@ -2542,10 +2542,34 @@ function recurrences(){
     return `<tr>
   <td>${esc(r.description)}<br><span class="muted">${r.type==='receita'?'Receita':'Despesa'} · ${esc(catName(r.categoryId))}</span><br><span class="muted rec-payment-label">${r.cardId?`💳 ${esc(cardName(r.cardId))} · ${esc(cardHolderLabel(r))}${recurrenceCardData(r)?'':' — cartão não cadastrado'}`:`🏦 ${esc(accountName(r.accountId))}`}</span></td>
   <td>${pill}</td>
-  <td>${fmtDate(r.start)}</td><td>${qty}</td><td class="${r.type==='receita'?'blue':'red'}">${money(r.value)}</td>
+  <td>${fmtDate(r.start)}</td><td>${qty}</td><td class="${r.type==='receita'?'blue':'red'}">${money(r.value)}</td><td class="rec-remaining-cell">${recRemainingHtml(r)}</td>
   <td>${lastTxt}</td>
   <td class="rec-actions"><button class="btn" onclick="openRecurrence(${r.id})">✎ Editar</button>${actions}
-  <button class="btn danger" onclick="deleteRecurrence(${r.id})">Excluir</button></td></tr>`;}).join('')||'<tr><td colspan="7" class="empty">Nenhuma automação cadastrada.</td></tr>'}</table></div></div>`;
+  <button class="btn danger" onclick="deleteRecurrence(${r.id})">Excluir</button></td></tr>`;}).join('')||'<tr><td colspan="8" class="empty">Nenhuma automação cadastrada.</td></tr>'}</table></div></div>`;
+}
+// v129 — Valor restante das parceladas.
+// Parcela quitada: no cartão, quando a fatura em que ela cai está marcada como paga;
+// em conta, quando o lançamento está pago/confirmado. Parcelas excluídas não contam.
+function recRemaining(r){
+  if(!r||isRecurring(r))return null;
+  const total=Number(r.count)||0,first=recStartIdx(r),skip=new Set((r.skip||[]).map(Number));
+  const mine=db.transactions.filter(t=>t.recurrenceId===r.id);
+  let value=0,left=0,paidN=0,paidV=0,next=null;
+  for(let n=first;n<=total;n++){
+    if(skip.has(n))continue;
+    const t=mine.find(x=>Number(x.installment)===n);
+    const v=Number(t?t.value:r.value)||0;
+    let paid=false;
+    if(t)paid=t.cardId?invoiceIsPaid(t.cardId,txStatementMonth(t)):txIsPaid(t);
+    if(paid){paidN++;paidV+=v;}else{left++;value+=v;if(!next)next={n,date:t?txCashDate(t):recOccurrenceDate(r,n)};}
+  }
+  return {value,left,paidN,paidV,total,next};
+}
+function recRemainingHtml(r){
+  const x=recRemaining(r);
+  if(!x)return '<span class="muted">—</span>';
+  if(!x.left)return '<span class="rec-remaining-done">✓ Quitada</span>';
+  return `<div class="rec-remaining"><b>${money(x.value)}</b><span class="muted">${x.left} parcela${x.left===1?'':'s'} restante${x.left===1?'':'s'}${x.next?` · próxima ${x.next.n}/${x.total} em ${fmtDate(x.next.date)}`:''}</span>${x.paidN?`<span class="muted">Pago: ${money(x.paidV)} (${x.paidN})</span>`:''}</div>`;
 }
 function deleteRecurrence(id){
   if(!confirm('Excluir a automação e suas movimentações futuras?'))return;
@@ -3200,7 +3224,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v128</div>
+    <div class="sum114-ver">Ricas Finanças v129</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -4844,6 +4868,11 @@ d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('rica
 .cat-group-hint b{color:var(--gc,#475569)}
 .cat-group-hint i{width:9px;height:9px;border-radius:50%;background:var(--gc,#9ca3af)}
 @media(max-width:560px){.category-option .cat-group-badge{max-width:55%}}
+.rec-remaining{display:grid;gap:2px}
+.rec-remaining b{color:var(--amber);font-size:15px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rec-remaining .muted{font-size:11.5px;line-height:1.35;white-space:normal}
+.rec-remaining-done{display:inline-block;padding:3px 9px;border-radius:999px;background:#dcfce7;color:#166534;font-size:12px;font-weight:750;white-space:nowrap}
+@media(max-width:1180px){table.table.rt td.rec-remaining-cell{grid-column:1/-1!important;padding:10px 12px!important;border-radius:10px;background:#fffaf0;border:1px solid #f0d9a8!important}table.table.rt td.rec-remaining-cell .rec-remaining b{font-size:19px}}
 </style>
 <script>
 /* v128 — Ao lançar, cada categoria mostra o grupo do orçamento (Custos fixos, Prazeres...).
