@@ -2529,8 +2529,9 @@ function recurrences(){
 
   document.getElementById('content').innerHTML=`<div class="card"><h2>Movimentações automatizadas</h2>
   <p class="muted">As parcelas futuras ficam registradas e podem ser consultadas ou excluídas como um conjunto.</p>
+  ${recFilterBarHtml()}
   <div class="table-wrap"><table class="table rec-table"><tr><th>Descrição</th><th>Modalidade</th><th>Início</th><th>Parcelas</th><th>Valor</th><th>Restante</th><th>Última</th><th>Ações</th></tr>
-  ${[...db.recurrences].sort((a,b)=>(a.order??0)-(b.order??0)).map(r=>{
+  ${[...db.recurrences].filter(recMatchesFilter).sort((a,b)=>(a.order??0)-(b.order??0)).map(r=>{
     const rec=isRecurring(r), ended=rec&&r.endIdx!=null;
     const pill=rec?(ended?'<span class="pill" style="background:#f1f5f9;color:#64748b">🔁 Recorrente · encerrada</span>':'<span class="pill" style="background:#ecfdf5;color:#047857">🔁 Recorrente</span>'):'<span class="pill">🔢 Parcelada</span>';
     const first=rec?1:recStartIdx(r);
@@ -2545,11 +2546,23 @@ function recurrences(){
   <td>${fmtDate(r.start)}</td><td>${qty}</td><td class="${r.type==='receita'?'blue':'red'}">${money(r.value)}</td><td class="rec-remaining-cell">${recRemainingHtml(r)}</td>
   <td>${lastTxt}</td>
   <td class="rec-actions"><button class="btn" onclick="openRecurrence(${r.id})">✎ Editar</button>${actions}
-  <button class="btn danger" onclick="deleteRecurrence(${r.id})">Excluir</button></td></tr>`;}).join('')||'<tr><td colspan="8" class="empty">Nenhuma automação cadastrada.</td></tr>'}</table></div></div>`;
+  <button class="btn danger" onclick="deleteRecurrence(${r.id})">Excluir</button></td></tr>`;}).join('')||`<tr><td colspan="8" class="empty">${db.recurrences.length?(recFilter==='recurring'?'Nenhuma automação recorrente.':'Nenhuma automação parcelada.'):'Nenhuma automação cadastrada.'}</td></tr>`}</table></div></div>`;
+}
+// v130 — Filtro de Automatizações: Todas / Recorrentes / Parceladas (lembrado no aparelho).
+let recFilter=(()=>{try{const v=localStorage.getItem('rf_recFilter');return ['all','recurring','installments'].includes(v)?v:'all';}catch(e){return 'all';}})();
+function recMatchesFilter(r){return recFilter==='all'||(recFilter==='recurring'?isRecurring(r):!isRecurring(r));}
+function setRecFilter(v){recFilter=v;try{localStorage.setItem('rf_recFilter',v);}catch(e){}recurrences();}
+function recFilterBarHtml(){
+  const all=db.recurrences.length,rec=db.recurrences.filter(isRecurring).length,inst=all-rec;
+  const b=(k,label,n)=>`<button type="button" class="rec-filter-btn${recFilter===k?' active':''}" onclick="setRecFilter('${k}')">${label} <span>${n}</span></button>`;
+  let extra='';
+  if(recFilter==='installments'&&inst){
+    const tot=db.recurrences.filter(r=>!isRecurring(r)).reduce((s,r)=>s+((recRemaining(r)||{}).value||0),0);
+    extra=`<div class="rec-filter-total">Total restante das parceladas: <b>${money(tot)}</b></div>`;
+  }
+  return `<div class="rec-filter-bar" role="tablist">${b('all','Todas',all)}${b('recurring','🔁 Recorrentes',rec)}${b('installments','🔢 Parceladas',inst)}</div>${extra}`;
 }
 // v129 — Valor restante das parceladas.
-// Parcela quitada: no cartão, quando a fatura em que ela cai está marcada como paga;
-// em conta, quando o lançamento está pago/confirmado. Parcelas excluídas não contam.
 function recRemaining(r){
   if(!r||isRecurring(r))return null;
   const total=Number(r.count)||0,first=recStartIdx(r),skip=new Set((r.skip||[]).map(Number));
@@ -3224,7 +3237,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v129</div>
+    <div class="sum114-ver">Ricas Finanças v130</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -4868,6 +4881,14 @@ d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('rica
 .cat-group-hint b{color:var(--gc,#475569)}
 .cat-group-hint i{width:9px;height:9px;border-radius:50%;background:var(--gc,#9ca3af)}
 @media(max-width:560px){.category-option .cat-group-badge{max-width:55%}}
+.rec-filter-bar{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 12px}
+.rec-filter-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:999px;border:1px solid var(--line,#e2e8f0);background:#fff;color:#334155;font-weight:700;font-size:13px;cursor:pointer}
+.rec-filter-btn span{min-width:20px;padding:1px 6px;border-radius:999px;background:#f1f5f9;color:#64748b;font-size:11px;text-align:center}
+.rec-filter-btn.active{background:#2563eb;border-color:#2563eb;color:#fff}
+.rec-filter-btn.active span{background:rgba(255,255,255,.25);color:#fff}
+.rec-filter-total{margin:-4px 0 12px;padding:9px 12px;border-radius:10px;background:#fffaf0;border:1px solid #f0d9a8;font-size:13px;color:#475569}
+.rec-filter-total b{color:var(--amber);font-size:15px}
+@media(max-width:560px){.rec-filter-bar{display:grid;grid-template-columns:repeat(3,1fr)}.rec-filter-btn{justify-content:center;padding:8px 6px;font-size:12.5px}}
 .rec-remaining{display:grid;gap:2px}
 .rec-remaining b{color:var(--amber);font-size:15px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .rec-remaining .muted{font-size:11.5px;line-height:1.35;white-space:normal}
@@ -4917,7 +4938,6 @@ d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('rica
   function filterBox(inputId,boxId){
     const input=document.getElementById(inputId),box=document.getElementById(boxId);
     if(!input||!box)return;
-    // Ao reabrir com a categoria já escolhida, mostra a lista completa.
     const raw=input.dataset.selectedLabel&&input.value===input.dataset.selectedLabel?'':input.value;
     const q=norm(raw).replace(/\s*·\s*/g,' ');
     const terms=q.split(/\s+/).filter(Boolean);
@@ -4933,7 +4953,6 @@ d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('rica
     box.querySelector('.category-empty')?.remove();
     if(!visible){const m=document.createElement('div');m.className='muted category-empty';m.style.padding='10px';m.textContent='Nenhuma categoria encontrada.';box.appendChild(m);}
   }
-  // ---- Nova movimentação / edição ----
   function rebuildTx(){
     const box=document.getElementById('txCategoryOptions'),val=document.getElementById('txCategoryValue');
     if(box)box.innerHTML=groupedOptionsHtml('selectTxCategory',val?.value);
@@ -4948,7 +4967,6 @@ d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('rica
     v.value=String(id);paintSelection('txCategorySearch','txCategoryValue','txCategoryGroupHint','txCategoryOptions');
     const box=document.getElementById('txCategoryOptions');if(box)box.style.display='none';
   };
-  // ---- Automatizações (parceladas/recorrentes) ----
   recurrenceCategoryOptionsHtml=function(){return groupedOptionsHtml('selectRecurrenceCategory',document.getElementById('recurrenceCategoryValue')?.value);};
   function rebuildRec(){
     const box=document.getElementById('recurrenceCategoryOptions');
