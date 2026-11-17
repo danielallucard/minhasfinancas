@@ -3245,7 +3245,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v131</div>
+    <div class="sum114-ver">Ricas Finanças v132</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -4991,6 +4991,104 @@ d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('rica
     const v=document.getElementById('recurrenceCategoryValue');if(!v||!db.categories.some(c=>String(c.id)===String(id)))return;
     v.value=String(id);paintSelection('recurrenceCategorySearch','recurrenceCategoryValue','recCategoryGroupHint','recurrenceCategoryOptions');
     const box=document.getElementById('recurrenceCategoryOptions');if(box)box.style.display='none';
+  };
+})();
+</script>
+
+<!-- ===== v132 — Cards compactos em Movimentações + grupo da categoria =====
+     COLE ESTE BLOCO INTEIRO LOGO ANTES DE </body> NO Index.html.
+     Somente apresentação: cálculos, filtros, saldos e sincronização não mudam. -->
+<style id="tx-compact-v132">
+.txc-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;line-height:1.5;white-space:nowrap;
+  background:color-mix(in srgb,var(--gc,#9ca3af) 13%,#fff);color:color-mix(in srgb,var(--gc,#64748b) 75%,#000);border:1px solid color-mix(in srgb,var(--gc,#9ca3af) 30%,#fff)}
+.txc-cat-badge{display:flex;width:max-content;margin-top:4px}
+.txc-meta,.txc-conf-lbl{display:none}
+@media(max-width:1180px){
+  table.table.rt.txc tr:not(.rt-head){display:grid!important;grid-template-columns:minmax(0,1fr) auto auto!important;gap:6px 8px!important;
+    padding:10px 12px!important;margin:0 0 8px!important;border-radius:12px!important;align-items:center!important}
+  table.table.rt.txc td{grid-column:auto!important;align-self:center!important;font-size:14px!important;line-height:1.35!important;min-width:0}
+  table.table.rt.txc td::before{display:none!important;content:none!important}
+  table.table.rt.txc td[colspan]{grid-column:1/-1!important}
+  table.table.rt.txc td.txc-mh{display:none!important}
+  table.table.rt.txc td.txc-desc{grid-column:1/2!important;align-self:start!important;font-size:14.5px!important;font-weight:650!important}
+  table.table.rt.txc td.txc-desc>br{display:none}
+  table.table.rt.txc td.txc-desc .tx-origin-pill,table.table.rt.txc td.txc-desc .invoice-merchant{margin:3px 0 0 6px;vertical-align:middle}
+  table.table.rt.txc td.txc-val{grid-column:2/4!important;align-self:start!important;text-align:right!important;font-size:15.5px!important;font-weight:800!important;white-space:nowrap!important}
+  table.table.rt.txc td.txc-pay{grid-column:1!important;text-align:left!important;justify-self:start}
+  table.table.rt.txc td.txc-edit{grid-column:2!important}
+  table.table.rt.txc td.txc-del{grid-column:3!important}
+  table.table.rt.txc td.txc-act{grid-column:2/4!important;display:flex!important;gap:6px;justify-content:flex-end}
+  table.table.rt.txc td.txc-pay,table.table.rt.txc td.txc-edit,table.table.rt.txc td.txc-del,table.table.rt.txc td.txc-act{grid-row:2!important;margin-top:2px}
+  table.table.rt.txc td.txc-desc,table.table.rt.txc td.txc-val{grid-row:1!important}
+  table.table.rt.txc td .btn{width:auto!important;min-height:32px!important;height:auto!important;padding:5px 10px!important;font-size:12px!important}
+  table.table.rt.txc td.txc-pay .confirm-check{vertical-align:middle}
+  table.table.rt.txc td.txc-pay .payment-wrap{flex-wrap:nowrap;gap:5px}
+  table.table.rt.txc td.txc-pay .payment-status{font-size:11px;padding:3px 7px}
+  table.table.rt.txc td.txc-pay .btn.payment-btn{padding:5px 9px!important;font-size:11.5px!important}
+  .txc-meta{display:flex;flex-wrap:wrap;align-items:center;gap:3px 6px;margin-top:4px;font-size:12px;font-weight:400;color:var(--muted)}
+  .txc-meta .sep{opacity:.45}
+  .txc-cat-badge{display:none}
+  .txc-conf-lbl{display:inline;margin-left:6px;font-size:12px;color:var(--muted)}
+}
+</style>
+<script>
+/* v132 — Movimentações: cards compactos no celular e grupo do orçamento visível. */
+(function(){
+  const orig=transactions;
+  const SEP='<span class="sep">·</span>';
+  function grp(t){
+    if(!t||t.type!=='despesa')return null;
+    const k=txFilterGroup(t);
+    if(k===null)return null;
+    const g=budgetGroupDef(k);
+    return g?{name:g.name,icon:g.icon,color:g.color}:{name:'Sem grupo',icon:'❔',color:'#9ca3af'};
+  }
+  function badge(t,extra){const g=grp(t);return g?`<span class="txc-badge ${extra||''}" style="--gc:${g.color}">${g.icon} ${esc(g.name)}</span>`:'';}
+  function rowTx(tr){
+    const b=tr.querySelector('button[onclick*="openTx("]');
+    const m=b&&String(b.getAttribute('onclick')).match(/openTx\((\d+)\)/);
+    return m?db.transactions.find(x=>String(x.id)===m[1]):null;
+  }
+  const meta=parts=>`<div class="txc-meta">${parts.filter(Boolean).join(SEP)}</div>`;
+  const cat=t=>`${esc(categoryIcon(t.categoryId))} ${esc(catName(t.categoryId))}`;
+  // Conta bancária: Data | Descrição | Conta | Categoria | Tipo | Valor | Editar | Pagamento | Excluir
+  function bank(table){
+    table.classList.add('txc');
+    [...table.rows].forEach(tr=>{
+      if(tr.querySelector('th')||tr.cells.length<9)return;
+      const t=rowTx(tr);if(!t)return;
+      const c=tr.cells;
+      ['txc-mh','txc-desc','txc-mh','txc-mh','txc-mh','txc-val','txc-edit','txc-pay','txc-del'].forEach((k,i)=>c[i].classList.add(k));
+      c[1].insertAdjacentHTML('beforeend',meta([fmtDate(t.date),'🏦 '+esc(txAccountLabel(t)),cat(t),badge(t)]));
+      c[3].insertAdjacentHTML('beforeend',badge(t,'txc-cat-badge'));
+    });
+  }
+  // Cartão (filtros): Data | Descrição | Cartão | Categoria | Grupo | Origem | Vencimento | Valor | Confirmado | Ações
+  function card(table){
+    table.classList.add('txc');
+    [...table.rows].forEach(tr=>{
+      if(tr.querySelector('th')||tr.cells.length<10)return;
+      const t=rowTx(tr);if(!t)return;
+      const c=tr.cells;
+      ['txc-mh','txc-desc','txc-mh','txc-mh','txc-mh','txc-mh','txc-mh','txc-val','txc-pay','txc-act'].forEach((k,i)=>c[i].classList.add(k));
+      const kind=txAutomationKind(t);
+      c[1].insertAdjacentHTML('beforeend',meta([fmtDate(t.date),'💳 '+esc(cardName(t.cardId)),cat(t),badge(t),'vence '+fmtDate(txCashDate(t)),kind!=='single'?esc(txAutomationLabel(t)):'']));
+      c[4].innerHTML=badge(t)||'—';
+      c[8].insertAdjacentHTML('beforeend',`<span class="txc-conf-lbl">${t.confirmed?'Confirmada':'Pendente'}</span>`);
+    });
+  }
+  transactions=function(){
+    orig.apply(this,arguments);
+    try{
+      const heads=[...document.querySelectorAll('#content .tx-section-head')];
+      const bankHead=heads.find(h=>!h.classList.contains('tx-section-card')&&!h.classList.contains('tx-section-pay'));
+      const bt=bankHead&&bankHead.nextElementSibling&&bankHead.nextElementSibling.querySelector('table');
+      if(bt)bank(bt);
+      let el=document.querySelector('#content .tx-section-card');
+      while(el&&!el.classList.contains('table-wrap'))el=el.nextElementSibling;
+      const ct=el&&el.querySelector('table');
+      if(ct)card(ct);
+    }catch(e){console.warn('v132:',e);}
   };
 })();
 </script>
