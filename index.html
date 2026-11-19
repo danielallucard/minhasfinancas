@@ -3245,7 +3245,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v132</div>
+    <div class="sum114-ver">Ricas Finanças v133</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -5093,5 +5093,84 @@ d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('rica
 })();
 </script>
 
+<!-- ===== v133 — Prioridade das metas (1ª, 2ª, 3ª...) ===== -->
+<style id="goal-priority-v133">
+.goal-prio{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-width:34px;height:24px;padding:0 8px;border-radius:999px;background:var(--goal-color,#8b5cf6);color:#fff;font-size:12px;font-weight:800;letter-spacing:.02em;box-shadow:0 2px 6px rgba(15,23,42,.15)}
+.goal-prio-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-4px 0 12px;padding:6px 8px 6px 10px;border-radius:10px;background:#f8fafc;border:1px solid var(--border)}
+.goal-prio-row span{font-size:12.5px;color:#475569;font-weight:600}
+.goal-prio-row .goal-prio-btns{display:flex;gap:6px}
+.goal-prio-row .btn{min-width:38px;min-height:34px!important;padding:4px 10px!important;font-size:15px;line-height:1}
+.goal-prio-row .btn:disabled{opacity:.35;cursor:default}
+.goal-prio-hint{margin:0 0 12px;font-size:12.5px;color:var(--muted)}
+</style>
+<script>
+/* v133 — Metas com prioridade: a ordem das metas ativas define 1ª, 2ª, 3ª...
+   Metas concluídas ficam sem prioridade. Usa o campo "order" já existente. */
+(function(){
+  const active=()=>(db.goals||[]).filter(g=>g&&!g.done).sort((a,b)=>(Number(a.order)||0)-(Number(b.order)||0));
+  function goalPriority(id){const i=active().findIndex(g=>String(g.id)===String(id));return i<0?null:i+1;}
+  function renumber(list){
+    const done=(db.goals||[]).filter(g=>g&&g.done).sort((a,b)=>(Number(a.order)||0)-(Number(b.order)||0));
+    [...list,...done].forEach((g,i)=>g.order=i);
+  }
+  function setGoalPriority(id,pos,silent){
+    const g=(db.goals||[]).find(x=>String(x.id)===String(id));if(!g||g.done)return;
+    const list=active().filter(x=>x!==g);
+    pos=Math.max(1,Math.min(list.length+1,Number(pos)||list.length+1));
+    list.splice(pos-1,0,g);renumber(list);
+    if(!silent){save();render();toast(`"${g.name}" agora é a ${pos}ª prioridade.`);}
+  }
+  window.goalPriority=goalPriority;window.setGoalPriority=setGoalPriority;
+  window.moveGoalPriority=function(id,delta){const p=goalPriority(id);if(p)setGoalPriority(id,p+delta);};
+
+  const origGoals=goals;
+  goals=function(){
+    renumber(active());
+    origGoals.apply(this,arguments);
+    const n=active().length;
+    const list=document.querySelector('#content .goal-list');
+    if(list&&n>1)list.insertAdjacentHTML('beforebegin','<p class="goal-prio-hint">As metas estão em ordem de prioridade. Use ↑ ↓ em cada meta ou escolha a posição em ✎ Editar.</p>');
+    document.querySelectorAll('#content .goal-card').forEach(card=>{
+      const b=card.querySelector('button[onclick^="openGoal("]');
+      const m=b&&String(b.getAttribute('onclick')).match(/openGoal\((\d+)\)/);
+      if(!m)return;
+      const p=goalPriority(m[1]);if(!p)return;
+      card.querySelector('.goal-id')?.insertAdjacentHTML('afterbegin',`<span class="goal-prio" title="Prioridade ${p}">${p}ª</span>`);
+      card.querySelector('.goal-head')?.insertAdjacentHTML('afterend',`<div class="goal-prio-row"><span>Prioridade ${p} de ${n}</span><span class="goal-prio-btns"><button type="button" class="btn" title="Subir prioridade" ${p===1?'disabled':''} onclick="moveGoalPriority(${m[1]},-1)">↑</button><button type="button" class="btn" title="Descer prioridade" ${p===n?'disabled':''} onclick="moveGoalPriority(${m[1]},1)">↓</button></span></div>`);
+    });
+  };
+
+  const origOpenGoal=openGoal;
+  openGoal=function(id){
+    origOpenGoal(id);
+    const g=id?(db.goals||[]).find(x=>String(x.id)===String(id)):null;
+    if(g&&g.done)return; // concluída não tem prioridade
+    const n=active().length+(g?0:1);
+    const cur=g?goalPriority(g.id):n;
+    const opts=Array.from({length:n},(_,i)=>`<option value="${i+1}" ${i+1===cur?'selected':''}>${i+1}ª prioridade${i===0?' (mais importante)':''}${i+1===n&&n>1?' (última)':''}</option>`).join('');
+    document.querySelector('#modalBody .goal-form input[name="name"]')?.closest('label')
+      ?.insertAdjacentHTML('afterend',`<label>Prioridade<select name="priority">${opts}</select></label>`);
+  };
+
+  const origSaveGoal=saveGoal;
+  saveGoal=function(e,id){
+    const pos=Number(e.target.querySelector('select[name="priority"]')?.value)||0;
+    const before=new Set((db.goals||[]).map(g=>g.id));
+    origSaveGoal(e,id);
+    if(!pos||document.getElementById('modal').classList.contains('show'))return; // validação falhou: nada muda
+    const g=id?(db.goals||[]).find(x=>String(x.id)===String(id)):(db.goals||[]).find(x=>!before.has(x.id));
+    if(!g||g.done||goalPriority(g.id)===pos)return;
+    setGoalPriority(g.id,pos,true);save();render();
+  };
+
+  // Ao reabrir uma meta concluída, ela volta como última prioridade.
+  const origToggle=toggleGoalDone;
+  toggleGoalDone=function(id){
+    const g=(db.goals||[]).find(x=>String(x.id)===String(id));
+    if(g&&g.done){g.done=false;setGoalPriority(g.id,active().length,true);save();toast('Meta reaberta como última prioridade');render();return;}
+    origToggle(id);
+  };
+})();
+</script>
 </body>
 </html>
