@@ -3245,7 +3245,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v133</div>
+    <div class="sum114-ver">Ricas Finanças v134</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -5144,7 +5144,7 @@ d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('rica
   openGoal=function(id){
     origOpenGoal(id);
     const g=id?(db.goals||[]).find(x=>String(x.id)===String(id)):null;
-    if(g&&g.done)return; // concluída não tem prioridade
+    if(g&&g.done)return;
     const n=active().length+(g?0:1);
     const cur=g?goalPriority(g.id):n;
     const opts=Array.from({length:n},(_,i)=>`<option value="${i+1}" ${i+1===cur?'selected':''}>${i+1}ª prioridade${i===0?' (mais importante)':''}${i+1===n&&n>1?' (última)':''}</option>`).join('');
@@ -5163,12 +5163,99 @@ d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('rica
     setGoalPriority(g.id,pos,true);save();render();
   };
 
-  // Ao reabrir uma meta concluída, ela volta como última prioridade.
   const origToggle=toggleGoalDone;
   toggleGoalDone=function(id){
     const g=(db.goals||[]).find(x=>String(x.id)===String(id));
     if(g&&g.done){g.done=false;setGoalPriority(g.id,active().length,true);save();toast('Meta reaberta como última prioridade');render();return;}
     origToggle(id);
+  };
+})();
+</script>
+<!-- ===== v134 — Categoria filtrada pelo tipo: Receita só mostra receitas; Despesa escolhe Grupo → Categoria ===== -->
+<style id="cat-type-group-v134">
+.cat-grp-sel{margin-bottom:8px}
+.cat-grp-sel[hidden]{display:none!important}
+</style>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const CFG={
+    tx:{type:()=>document.querySelector('#modalBody .tx-form select[name="type"]'),picker:'txCategoryPicker',search:'txCategorySearch',value:'txCategoryValue',box:'txCategoryOptions',grp:'txCatGroupSel',hint:'txCategoryGroupHint',show:()=>showTxCategories()},
+    rec:{type:()=>$('recTypeSelect'),picker:'recurrenceCategoryPicker',search:'recurrenceCategorySearch',value:'recurrenceCategoryValue',box:'recurrenceCategoryOptions',grp:'recCatGroupSel',hint:'recCategoryGroupHint',show:()=>showRecurrenceCategories()}
+  };
+  const catById=id=>db.categories.find(c=>String(c.id)===String(id));
+  const groupKey=c=>c.type==='receita'?'__receita':(budgetGroupDef(c.budgetGroup)?c.budgetGroup:'');
+  const typeOf=k=>CFG[k].type()?.value||'';
+  const grpOf=k=>$(CFG[k].grp)?.value||'all';
+  function matches(k,c){
+    if(!c)return false;
+    const t=typeOf(k);
+    if(t==='receita')return c.type==='receita';
+    if(t==='despesa'){
+      if(c.type!=='despesa')return false;
+      const g=grpOf(k);
+      return g==='all'||groupKey(c)===(g==='none'?'':g);
+    }
+    return true;
+  }
+  // Esconde da lista o que não pertence ao tipo/grupo escolhido (a busca por texto continua valendo).
+  function apply(k){
+    const box=$(CFG[k].box);if(!box)return;
+    box.querySelectorAll('.category-option').forEach(b=>{if(!matches(k,catById(b.dataset.id)))b.style.display='none';});
+    const vis=new Set([...box.querySelectorAll('.category-option')].filter(b=>b.style.display!=='none').map(b=>b.dataset.group));
+    box.querySelectorAll('.cat-group-title').forEach(t=>t.style.display=vis.has(t.dataset.group)?'flex':'none');
+    box.querySelector('.category-empty')?.remove();
+    if(!vis.size){const m=document.createElement('div');m.className='muted category-empty';m.style.padding='10px';
+      m.textContent=typeOf(k)==='despesa'&&grpOf(k)!=='all'?'Nenhuma categoria neste grupo.':'Nenhuma categoria encontrada.';box.appendChild(m);}
+  }
+  function clearSel(k){
+    const c=CFG[k],v=$(c.value),s=$(c.search),h=$(c.hint);
+    if(v)v.value='';if(s){s.value='';delete s.dataset.selectedLabel;}if(h)h.hidden=true;
+    $(c.box)?.querySelectorAll('.cat-selected').forEach(b=>b.classList.remove('cat-selected'));
+  }
+  function ui(k){
+    const c=CFG[k],wrap=$(c.grp)?.closest('label');if(!wrap)return;
+    wrap.hidden=typeOf(k)!=='despesa';
+    const s=$(c.search);if(s)s.placeholder=typeOf(k)==='despesa'?(grpOf(k)==='all'?'Escolha o grupo acima ou pesquise…':'Categorias do grupo escolhido…'):(typeOf(k)==='receita'?'Categorias de receita…':'Digite para pesquisar a categoria...');
+  }
+  function syncGroup(k){
+    const cat=catById($(CFG[k].value)?.value),sel=$(CFG[k].grp);
+    if(sel&&cat&&cat.type==='despesa'){const g=groupKey(cat);sel.value=g===''?'none':g;}
+    ui(k);
+  }
+  function setup(k){
+    const c=CFG[k],picker=$(c.picker);if(!picker||$(c.grp))return;
+    const opts=budgetGroups().map(g=>`<option value="${g.key}">${g.icon} ${esc(g.name)}</option>`).join('');
+    picker.insertAdjacentHTML('afterbegin',`<label class="cat-grp-sel">Grupo da despesa<select id="${c.grp}"><option value="all">Todos os grupos</option>${opts}<option value="none">❔ Sem grupo</option></select></label>`);
+    syncGroup(k);
+    $(c.grp).addEventListener('change',()=>{
+      if($(c.value)?.value&&!matches(k,catById($(c.value).value)))clearSel(k);
+      ui(k);c.show();$(c.search)?.focus();
+    });
+    c.type()?.addEventListener('change',()=>{
+      if($(c.value)?.value&&!matches(k,catById($(c.value).value)))clearSel(k);
+      ui(k);const box=$(c.box);if(box&&box.style.display!=='none')apply(k);
+    });
+  }
+  const oFT=filterTxCategories;filterTxCategories=function(){oFT.apply(this,arguments);apply('tx');};
+  const oFR=filterRecurrenceCategories;filterRecurrenceCategories=function(){oFR.apply(this,arguments);apply('rec');};
+  const oST=selectTxCategory;selectTxCategory=function(id){oST(id);syncGroup('tx');};
+  const oSR=selectRecurrenceCategory;selectRecurrenceCategory=function(id){oSR(id);syncGroup('rec');};
+  const oOT=openTx;openTx=function(id){oOT(id);setup('tx');};
+  const oOR=openRecurrence;openRecurrence=function(id){oOR(id);setup('rec');};
+
+  // Filtros da tela Movimentações: a lista de categorias acompanha Movimentação (receita/despesa) e Grupo.
+  const oTx=transactions;
+  transactions=function(){
+    const tf=txState('txTypeFilter');
+    if(tf==='receita'&&txState('txGroupFilter')!=='all')window.txGroupFilter='all';
+    const gf=txState('txGroupFilter'),cf=txState('txCategoryFilter');
+    const ok=c=>(tf==='all'||c.type===tf)&&categoryInGroup(c,gf);
+    if(cf!=='all'&&!ok(catById(cf)||{}))window.txCategoryFilter='all';
+    oTx.apply(this,arguments);
+    const cs=$('txCategorySelect');
+    if(cs)[...cs.options].forEach(o=>{if(o.value!=='all'){const c=catById(o.value);if(c&&!ok(c))o.remove();}});
+    const gl=$('txGroupSelect')?.closest('label');if(gl)gl.style.display=tf==='receita'?'none':'';
   };
 })();
 </script>
