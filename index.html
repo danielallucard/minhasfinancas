@@ -3245,7 +3245,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v134</div>
+    <div class="sum114-ver">Ricas Finanças v135</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -5257,6 +5257,38 @@ d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('rica
     if(cs)[...cs.options].forEach(o=>{if(o.value!=='all'){const c=catById(o.value);if(c&&!ok(c))o.remove();}});
     const gl=$('txGroupSelect')?.closest('label');if(gl)gl.style.display=tf==='receita'?'none':'';
   };
+})();
+</script>
+<!-- ===== v135 — Toque/clique fora não fecha mais a janela nem a lista de categorias ===== -->
+<script>
+(function(){
+  // 1) Janela (modal): clicar/tocar no fundo escuro NÃO fecha mais.
+  //    Fecha só pelo × ou pelos botões Cancelar/Salvar. Evita perder o que foi digitado
+  //    e evita fechar ao tocar fora para esconder o teclado do iPhone ou após o calendário.
+  window.addEventListener('click',e=>{
+    const m=document.getElementById('modal');
+    if(m&&e.target===m)e.stopImmediatePropagation();
+  },true);
+
+  // 2) Lista de categorias: perder o foco (fechar o teclado, clicar no vazio) NÃO fecha mais a lista.
+  //    Bloqueia o "focusout" antigo que escondia a lista.
+  document.addEventListener('focusout',e=>{
+    if(e.target.closest?.('#txCategoryPicker,#recurrenceCategoryPicker'))e.stopPropagation();
+  },true);
+
+  // A lista fecha quando: escolhe uma categoria (como antes), começa a mexer em OUTRO campo
+  // do formulário, ou aperta Esc no computador.
+  const BOXES=[['txCategoryPicker','txCategoryOptions'],['recurrenceCategoryPicker','recurrenceCategoryOptions']];
+  function closeOthers(target){
+    BOXES.forEach(([p,b])=>{
+      const picker=document.getElementById(p),box=document.getElementById(b);
+      if(picker&&box&&box.style.display!=='none'&&!picker.contains(target))box.style.display='none';
+    });
+  }
+  document.addEventListener('focusin',e=>{
+    if(e.target.matches?.('input,select,textarea'))closeOthers(e.target);
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeOthers(document.body);});
 })();
 </script>
 </body>
