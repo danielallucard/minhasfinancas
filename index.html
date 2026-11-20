@@ -3245,7 +3245,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v137</div>
+    <div class="sum114-ver">Ricas Finanças</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -5379,11 +5379,15 @@ d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('rica
       const table=head&&head.nextElementSibling&&head.nextElementSibling.querySelector('table');
       const ids=new Set();
       if(table)table.querySelectorAll('button[onclick*="openTx("]').forEach(b=>{const m=String(b.getAttribute('onclick')).match(/openTx\((\d+)\)/);if(m)ids.add(m[1]);});
-      const list=db.transactions.filter(t=>ids.has(String(t.id))&&t.type==='despesa'&&!t.transfer&&!t.cardId&&!t.virtualCardStatement);
+      const k=selectedMonthKey();const seen=new Set();
+      // v138: só lançamentos com data no mês selecionado (evita somar outros meses que compartilham o mesmo id, ex.: parcelas/recorrentes)
+      const list=db.transactions.filter(t=>{const key=String(t.id)+'|'+t.date;if(seen.has(key))return false;
+        const ok=ids.has(String(t.id))&&monthKey(t.date)===k&&t.type==='despesa'&&!t.transfer&&!t.cardId&&!t.virtualCardStatement;
+        if(ok)seen.add(key);return ok;});
       const total=list.reduce((s,t)=>s+Number(t.value||0),0);
       const paid=list.filter(txIsPaid).reduce((s,t)=>s+Number(t.value||0),0);
       const box=document.createElement('div');box.className='tx-debit-sum';
-      box.innerHTML=`<div><div class="label">🏦 Despesas no débito <span class="muted" style="font-size:11px">(${list.length} lançamento${list.length===1?'':'s'} na conta, sem cartão e transferências)</span></div><div class="value">${money(total)}</div></div>
+      box.innerHTML=`<div><div class="label">🏦 Despesas no débito <span class="muted" style="font-size:11px">(${list.length} lançamento${list.length===1?'':'s'} de ${monthLabel(k)}, sem cartão e transferências)</span></div><div class="value">${money(total)}</div></div>
         <div class="tx-debit-split"><span class="ok">✓ Pago ${money(paid)}</span><span class="open">⏳ A pagar ${money(total-paid)}</span></div>`;
       const grid=content.querySelector('.card .grid.g2');
       if(grid)grid.after(box);
