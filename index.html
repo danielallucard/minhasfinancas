@@ -3245,7 +3245,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v140</div>
+    <div class="sum114-ver">Ricas Finanças v141</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -5405,5 +5405,184 @@ d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('rica
 html{overscroll-behavior-y:none}
 body{overscroll-behavior-y:auto}
 </style>
+<!-- ===== v141 — Novo visual (inspirado em dashboards financeiros: Organizze, Mobills e templates fintech) ===== -->
+<style id="theme-v141">
+:root{
+  --bg:#f3f5fb;--card:#fff;--text:#0f172a;--muted:#64748b;--border:#e8ecf4;
+  --primary:#4f46e5;--primary2:#7c3aed;--green:#10b981;--red:#ef4444;--amber:#f59e0b;
+  --radius:20px;--shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px rgba(15,23,42,.06);
+  --grad:linear-gradient(135deg,#4f46e5 0%,#7c3aed 55%,#a855f7 100%);
+}
+body{background:radial-gradient(1200px 500px at 100% -10%,#e9e7ff 0%,transparent 60%),var(--bg);background-attachment:fixed}
+
+/* Menu lateral escuro com item ativo em destaque */
+.sidebar{background:linear-gradient(180deg,#151a3a 0%,#1e1b4b 100%)!important;color:#e2e8f0!important;border:0!important;box-shadow:4px 0 24px rgba(15,23,42,.12)!important}
+.sidebar .brand,.sidebar h1,.sidebar h2{color:#fff!important}
+.sidebar hr,.sidebar .brand{border-color:rgba(255,255,255,.08)!important}
+#nav button{color:#cbd5e1!important;border-radius:12px!important;transition:background .15s,color .15s;font-weight:550}
+#nav button:hover{background:rgba(255,255,255,.07)!important;color:#fff!important}
+#nav button.active{background:var(--grad)!important;color:#fff!important;box-shadow:0 6px 16px rgba(124,58,237,.35)}
+.sidebar .muted,.sidebar small{color:#94a3b8!important}
+.mobile-drawer{background:linear-gradient(180deg,#151a3a,#1e1b4b)!important}
+.mobile-drawer .nav-mobile-item.active{background:var(--grad)!important;color:#fff!important;border-radius:12px}
+.mobile-menu-btn{background:var(--grad)!important}
+
+/* Barra superior */
+.top{background:rgba(255,255,255,.85)!important;backdrop-filter:saturate(1.6) blur(12px);-webkit-backdrop-filter:saturate(1.6) blur(12px);border:1px solid var(--border)!important;box-shadow:var(--shadow)!important}
+.top h1{letter-spacing:-.02em}
+
+/* Botões */
+.btn{border-radius:12px!important;transition:transform .12s,box-shadow .15s,background .15s}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--grad)!important;border:0!important;color:#fff!important;box-shadow:0 6px 16px rgba(79,70,229,.3)}
+.btn.primary:hover{box-shadow:0 8px 22px rgba(79,70,229,.4)}
+
+/* Cards e tabelas */
+.card,.s117-box,.tx-fold,.tx-debit-sum{border-radius:var(--radius)!important;border:1px solid var(--border)!important;box-shadow:var(--shadow)!important;background:#fff}
+table.table th{color:#94a3b8;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+table.table tbody tr{transition:background .12s}
+table.table tbody tr:hover{background:#f8f7ff}
+input,select,textarea{border-radius:12px!important}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#a5b4fc!important;box-shadow:0 0 0 4px rgba(99,102,241,.15)!important}
+.modalbox{border-radius:22px!important;box-shadow:0 24px 60px rgba(15,23,42,.25)!important}
+
+/* Barra inferior do celular */
+.mobilebar{background:rgba(255,255,255,.92)!important;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--border)!important}
+.mobilebar button.active{color:var(--primary)!important}
+
+/* ---------- Resumo ---------- */
+.sum114{gap:14px!important}
+.sum114 .sum114-card{position:relative;overflow:hidden;flex-direction:column!important;border:1px solid var(--border)!important;border-left:0!important;border-radius:var(--radius)!important;box-shadow:var(--shadow);padding:18px 20px 18px 76px!important;min-height:92px;justify-content:center!important;flex-direction:column!important;align-items:flex-start!important;gap:4px!important;background:#fff!important}
+.sum114-card::before{content:''!important;position:absolute!important;left:18px!important;top:50%!important;bottom:auto!important;right:auto!important;transform:translateY(-50%);width:44px!important;height:44px!important;border-radius:14px;background:color-mix(in srgb,var(--c) 14%,#fff);background-repeat:no-repeat;background-position:center;background-size:22px}
+.sum114-card span{font-size:13px!important;font-weight:600;color:var(--muted)!important}
+.sum114-card b{font-size:clamp(21px,4.6vw,27px)!important;letter-spacing:-.02em;position:relative}.sum114-card span{position:relative}
+.sum114-card.inc{--c:#10b981}.sum114-card.exp{--c:#ef4444}
+.sum114-card.inc::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 17 17 7M9 7h8v8'/%3E%3C/svg%3E")}
+.sum114-card.exp::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ef4444' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 7l10 10M17 9v8H9'/%3E%3C/svg%3E")}
+/* Saldo do mês = cartão de destaque com gradiente */
+.sum114-card.bal,.sum114-card.bal.neg{background:var(--grad)!important;border:0!important;box-shadow:0 12px 28px rgba(79,70,229,.32)!important}
+.sum114-card.bal.neg{background:linear-gradient(135deg,#be123c,#ef4444 60%,#f97316)!important;box-shadow:0 12px 28px rgba(239,68,68,.3)!important}
+.sum114-card.bal span{color:rgba(255,255,255,.82)!important}
+.sum114-card.bal b{color:#fff!important}
+.sum114-card.bal::before{background-color:rgba(255,255,255,.18);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='6' width='18' height='13' rx='3'/%3E%3Cpath d='M16 12.5h2M3 10h18'/%3E%3C/svg%3E")}
+.sum114-card.bal::after{content:'';position:absolute;right:-40px;top:-40px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.1)}
+@media(min-width:900px){.sum114{grid-template-columns:1fr 1fr 1.15fr!important}}
+.s117-owe{border-radius:16px!important}
+.s117-box{padding:16px 18px!important}
+
+/* Gráficos do Resumo */
+.ch141-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:14px;margin-top:14px}
+@media(max-width:980px){.ch141-grid{grid-template-columns:1fr}}
+.ch141{background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 18px 14px;min-width:0}
+.ch141-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.ch141-h b{font-size:15.5px;letter-spacing:-.01em}
+.ch141-h small{color:var(--muted);font-size:12px}
+.ch141-leg{display:flex;gap:14px;font-size:12px;color:var(--muted);font-weight:600}
+.ch141-leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.ch141 svg{width:100%;height:auto;display:block;overflow:visible}
+.ch141 .bar{transition:opacity .15s}.ch141 .bar:hover{opacity:.75}
+.ch141-donut{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.ch141-donut svg{width:170px;flex:none;margin:0 auto}
+.ch141-list{flex:1;min-width:190px;display:grid;gap:9px}
+.ch141-row{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:13px}
+.ch141-row .dot{width:10px;height:10px;border-radius:50%}
+.ch141-row .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch141-row .vl{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ch141-row .bar2{grid-column:2/4;height:6px;border-radius:99px;background:#eef1f7;overflow:hidden;margin-top:-3px}
+.ch141-row .bar2>i{display:block;height:100%;border-radius:99px}
+.ch141-empty{color:var(--muted);text-align:center;padding:30px 10px;font-size:13px}
+.ch141-goals{display:grid;gap:12px}
+.ch141-goal{display:grid;gap:6px}
+.ch141-goal-top{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.ch141-goal-top b{font-variant-numeric:tabular-nums}
+.ch141-track{height:9px;border-radius:99px;background:#eef1f7;overflow:hidden}
+.ch141-track>i{display:block;height:100%;border-radius:99px;background:var(--grad)}
+
+/* Movimentações e demais telas */
+.tx-debit-sum,.tx-fold{border-left:0!important}
+.tx-debit-sum{position:relative}
+.tx-fold-pay>summary,.tx-debit-sum{padding-left:16px}
+.tx-section-head h2{letter-spacing:-.01em}
+.goal-bar>i,.progress>i{background:var(--grad)!important}
+.pill,.badge{border-radius:999px}
+</style>
+<script>
+/* v141 — Gráficos no Resumo: Receitas x Despesas (6 meses), Despesas por categoria e Metas.
+   Só leitura: usa os mesmos dados do Resumo (summaryMonthlyData), sem alterar cálculos. */
+(function(){
+  const fmtK=v=>{v=Math.abs(v);return v>=1000?'R$ '+(v/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})+' mil':'R$ '+Math.round(v)};
+  const shortM=k=>{const [y,m]=k.split('-');return new Date(+y,+m-1,1).toLocaleDateString('pt-BR',{month:'short'}).replace('.','')};
+  function monthTotals(k){
+    const rows=summaryMonthlyData(k).rows.filter(t=>!t.transfer&&!t.virtualCardStatement);
+    const s=tp=>rows.filter(t=>t.type===tp).reduce((a,t)=>a+Number(t.value||0),0);
+    return {k,inc:s('receita'),exp:s('despesa'),rows};
+  }
+  function barsChart(month){
+    const data=[];for(let i=5;i>=0;i--)data.push(monthTotals(shiftStatementMonth(month,-i)));
+    const max=Math.max(1,...data.flatMap(d=>[d.inc,d.exp]));
+    const W=560,H=220,pl=52,pb=26,pt=10,ch=H-pb-pt,gw=(W-pl-6)/6,bw=Math.min(22,gw/3.4);
+    let g='';
+    for(let i=1;i<=3;i++){const y=pt+ch-ch*i/3;g+=`<line x1="${pl}" x2="${W}" y1="${y}" y2="${y}" stroke="#eef1f7"/><text x="${pl-8}" y="${y+4}" text-anchor="end" font-size="10" fill="#94a3b8">${fmtK(max*i/3)}</text>`;}
+    data.forEach((d,i)=>{
+      const cx=pl+gw*i+gw/2,cur=d.k===month;
+      const hi=ch*d.inc/max,he=ch*d.exp/max;
+      if(cur)g+=`<rect x="${cx-gw/2+4}" y="${pt-4}" width="${gw-8}" height="${ch+8}" rx="12" fill="#f5f3ff"/>`;
+      g+=`<rect class="bar" x="${cx-bw-2}" y="${pt+ch-hi}" width="${bw}" height="${Math.max(hi,0)}" rx="6" fill="url(#g141i)"><title>Receitas ${monthLabel(d.k)}: ${money(d.inc)}</title></rect>`;
+      g+=`<rect class="bar" x="${cx+2}" y="${pt+ch-he}" width="${bw}" height="${Math.max(he,0)}" rx="6" fill="url(#g141e)"><title>Despesas ${monthLabel(d.k)}: ${money(d.exp)}</title></rect>`;
+      g+=`<text x="${cx}" y="${H-6}" text-anchor="middle" font-size="11.5" font-weight="${cur?800:600}" fill="${cur?'#4f46e5':'#94a3b8'}">${shortM(d.k)}</text>`;
+    });
+    const cur=data[5],prev=data[4];
+    const diff=prev.exp?((cur.exp-prev.exp)/prev.exp*100):0;
+    const note=prev.exp?`Despesas ${diff>0?'▲':'▼'} ${Math.abs(diff).toFixed(0)}% vs. ${shortM(prev.k)}`:'Últimos 6 meses';
+    return `<div class="ch141"><div class="ch141-h"><div><b>Receitas x Despesas</b><br><small>${note}</small></div>
+      <div class="ch141-leg"><span><i style="background:#10b981"></i>Receitas</span><span><i style="background:#ef4444"></i>Despesas</span></div></div>
+      <svg viewBox="0 0 ${W} ${H}"><defs>
+        <linearGradient id="g141i" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#10b981"/></linearGradient>
+        <linearGradient id="g141e" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fb7185"/><stop offset="1" stop-color="#ef4444"/></linearGradient>
+      </defs>${g}</svg></div>`;
+  }
+  function donutChart(month){
+    const rows=monthTotals(month).rows.filter(t=>t.type==='despesa');
+    const by={};rows.forEach(t=>{const id=String(t.categoryId||'');by[id]=(by[id]||0)+Number(t.value||0);});
+    let arr=Object.entries(by).sort((a,b)=>b[1]-a[1]);
+    const total=arr.reduce((s,x)=>s+x[1],0);
+    if(!total)return `<div class="ch141"><div class="ch141-h"><b>Despesas por categoria</b></div><div class="ch141-empty">Nenhuma despesa neste mês.</div></div>`;
+    const pal=['#6366f1','#ec4899','#f59e0b','#10b981','#06b6d4','#8b5cf6','#f97316','#94a3b8'];
+    if(arr.length>6){const rest=arr.slice(5).reduce((s,x)=>s+x[1],0);arr=arr.slice(0,5).concat([['__outros',rest]]);}
+    const items=arr.map(([id,v],i)=>({id,v,name:id==='__outros'?'Outras':catName(id),color:id==='__outros'?'#cbd5e1':(db.categories.find(c=>String(c.id)===id)?.color||pal[i%pal.length])}));
+    const R=60,C=2*Math.PI*R;let off=0;
+    const segs=items.map(it=>{const len=C*it.v/total;const s=`<circle r="${R}" cx="85" cy="85" fill="none" stroke="${it.color}" stroke-width="22" stroke-dasharray="${Math.max(len-2,0.1)} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 85 85)"><title>${esc(it.name)}: ${money(it.v)}</title></circle>`;off+=len;return s;}).join('');
+    const list=items.map(it=>{const p=it.v/total*100;return `<div class="ch141-row"><span class="dot" style="background:${it.color}"></span><span class="nm">${esc(it.name)}</span><span class="vl">${p.toFixed(0)}%</span><span class="bar2"><i style="width:${p}%;background:${it.color}"></i></span></div>`;}).join('');
+    return `<div class="ch141"><div class="ch141-h"><b>Despesas por categoria</b><small>${monthLabel(month)}</small></div>
+      <div class="ch141-donut"><svg viewBox="0 0 170 170"><circle r="${R}" cx="85" cy="85" fill="none" stroke="#f1f5f9" stroke-width="22"/>${segs}
+      <text x="85" y="80" text-anchor="middle" font-size="10.5" fill="#94a3b8" font-weight="600">Total</text>
+      <text x="85" y="98" text-anchor="middle" font-size="14.5" fill="#0f172a" font-weight="800">${fmtK(total)}</text></svg>
+      <div class="ch141-list">${list}</div></div></div>`;
+  }
+  function goalsChart(){
+    const goals=[...(db.goals||[])].filter(g=>!g.done&&Number(g.target||0)>0).sort((a,b)=>(a.order??0)-(b.order??0));
+    if(!goals.length)return '';
+    const val=g=>{try{return Number(goalAllocated(g))||0;}catch(e){return 0;}};
+    const rows=goals.slice(0,4).map(g=>{const tgt=Number(g.target);const s=val(g)||0;const p=Math.max(0,Math.min(100,s/tgt*100));
+      return `<div class="ch141-goal"><div class="ch141-goal-top"><span>${esc(g.icon||'🎯')} ${esc(g.name||'Meta')}</span><b>${p.toFixed(0)}%</b></div><div class="ch141-track"><i style="width:${p}%"></i></div><small class="muted">${money(s)} de ${money(tgt)}</small></div>`;}).join('');
+    return `<div class="ch141" style="margin-top:14px"><div class="ch141-h"><b>Metas</b><small><a href="#" onclick="go('goals');return false" style="color:var(--primary);font-weight:700;text-decoration:none">Ver todas →</a></small></div><div class="ch141-goals">${rows}</div></div>`;
+  }
+  const orig=dashboard;
+  dashboard=function(){
+    orig.apply(this,arguments);
+    try{
+      const month=selectedMonthKey();
+      const host=document.querySelector('#content .summary-page');if(!host)return;
+      const box=document.createElement('div');
+      box.innerHTML=`<div class="ch141-grid">${barsChart(month)}${donutChart(month)}</div>${goalsChart()}`;
+      const ver=host.querySelector('.sum114-ver');
+      // gráficos logo abaixo dos 3 cartões principais
+      const kpis=host.querySelector('.sum114');
+      (kpis||ver).after(...box.childNodes);
+      if(ver)ver.textContent='Ricas Finanças v141';
+    }catch(e){console.warn('v141:',e);}
+  };
+})();
+</script>
 </body>
 </html>
