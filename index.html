@@ -3245,7 +3245,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v141</div>
+    <div class="sum114-ver">Ricas Finanças v142</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -5579,8 +5579,518 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#a5b4fc!import
       // gráficos logo abaixo dos 3 cartões principais
       const kpis=host.querySelector('.sum114');
       (kpis||ver).after(...box.childNodes);
-      if(ver)ver.textContent='Ricas Finanças v141';
+      if(ver)ver.textContent='Ricas Finanças v142';
     }catch(e){console.warn('v141:',e);}
+  };
+})();
+</script>
+<!-- ===== v142 — Design system aplicado a todas as telas ===== -->
+<style id="ds-v142">
+/* ---------- Base ---------- */
+#content h1{font-size:20px;letter-spacing:-.02em;margin:0 0 14px}
+#content h2{font-size:16.5px;letter-spacing:-.015em;font-weight:750}
+#content h3{font-size:14.5px;letter-spacing:-.01em;font-weight:750}
+#content p.muted,#content>.muted{line-height:1.55}
+.blue{color:#4f46e5!important}.red{color:#ef4444!important}.green{color:#10b981!important}
+hr{border:0;border-top:1px solid var(--border);margin:16px 0}
+
+/* ---------- Navegação de mês (pílula flutuante) ---------- */
+.month-nav,.summary-page .month-nav{background:transparent!important;box-shadow:none!important;justify-content:flex-start;gap:8px!important}
+.month-nav::before{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(var(--bg) 70%,transparent);pointer-events:none}
+.month-nav .btn{height:40px;min-width:40px!important;border-radius:999px!important;background:#fff!important;border:1px solid var(--border)!important;box-shadow:0 1px 2px rgba(15,23,42,.05);font-size:18px;font-weight:700;color:#475569}
+.month-nav .btn:hover{border-color:#c7d2fe!important;color:var(--primary)}
+.month-nav .month-current{font-size:15px!important;font-weight:750;color:var(--text)!important;padding:0 18px!important;text-transform:capitalize}
+.month-nav .month-current::before{content:'';display:inline-block;width:15px;height:15px;margin-right:8px;vertical-align:-2px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f46e5' stroke-width='2.2' stroke-linecap='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='3'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E") center/contain no-repeat}
+@media(max-width:1180px){.month-nav,.summary-page .month-nav{justify-content:space-between}.month-nav .month-current{flex:1}}
+
+/* ---------- Botões ---------- */
+.btn{font-weight:650;border:1px solid var(--border);background:#fff;color:#334155}
+.btn:hover{background:#f8fafc;border-color:#cbd5e1}
+.btn.danger{background:#fef2f2!important;border-color:#fee2e2!important;color:#dc2626!important}
+.btn.danger:hover{background:#fee2e2!important}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.payment-btn,.tx-bill-setpaid,button.pay{background:linear-gradient(135deg,#10b981,#059669)!important;color:#fff!important;border:0!important;box-shadow:0 4px 12px rgba(16,185,129,.25)}
+.payment-btn.undo,button.undo{background:#fff!important;color:#059669!important;border:1px solid #a7f3d0!important;box-shadow:none}
+.order-buttons .btn,.goal-prio-btns .btn{width:34px;height:34px;padding:0!important;border-radius:10px!important}
+
+/* ---------- Indicadores (metric) em todas as telas ---------- */
+.card.metric,.metric{position:relative;border-radius:16px!important}
+.card.metric{background:linear-gradient(180deg,#fff,#fafbff)!important}
+.metric .label{font-size:12px!important;font-weight:650;color:var(--muted)!important;text-transform:none;letter-spacing:0}
+.metric .value{font-size:clamp(19px,2.3vw,25px)!important;font-weight:800!important;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.grid.g3>.card.metric:first-child,.grid.g4>.card.metric:first-child{background:var(--grad)!important;border:0!important;box-shadow:0 10px 24px rgba(79,70,229,.28)!important}
+.grid.g3>.card.metric:first-child *,.grid.g4>.card.metric:first-child *{color:#fff!important}
+.grid.g3>.card.metric:first-child .label,.grid.g4>.card.metric:first-child .label,.grid.g3>.card.metric:first-child .muted{color:rgba(255,255,255,.8)!important}
+
+/* ---------- Etiquetas ---------- */
+.pill{background:#eef2ff!important;color:#4338ca!important;border:0!important;font-weight:650;padding:3px 10px!important}
+.payment-status{border-radius:999px!important;font-weight:700}
+.payment-status-pending,.acc-open,.txc-badge.pending{background:#fff7ed!important;color:#c2410c!important}
+.payment-status-paid{background:#ecfdf5!important;color:#047857!important}
+.cat-dot{box-shadow:0 0 0 3px color-mix(in srgb,currentColor 0%,#fff)}
+
+/* ---------- Tabelas ---------- */
+.table-wrap{border-radius:14px}
+table.table th{background:transparent;border-bottom:1px solid var(--border)!important}
+table.table td{border-bottom:1px solid #f1f4f9!important}
+tr.paid-row{background:linear-gradient(90deg,#f0fdf4,transparent 60%)!important}
+tr.pending-row td:first-child{box-shadow:inset 3px 0 0 #fbbf24}
+tr.paid-row td:first-child{box-shadow:inset 3px 0 0 #10b981}
+tr.paid-row{border-left:0!important}
+
+/* ---------- Estados vazios ---------- */
+.empty,.ch141-empty,.s117-empty{text-align:center;color:var(--muted);padding:26px 12px!important}
+.empty::before,td.empty::before{content:'';display:block;width:46px;height:46px;margin:0 auto 10px;border-radius:14px;background:#eef2ff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236366f1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h16M4 12h10M4 17h7'/%3E%3C/svg%3E") center/22px no-repeat}
+
+/* ---------- Movimentações ---------- */
+.tx-bill-card{border-radius:16px!important;border:1px solid var(--border)!important;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.tx-section-head{border-bottom:0!important;padding-bottom:4px}
+.tx-section-head h2{font-size:16px!important}
+.txc{border-radius:16px!important;border:1px solid var(--border)!important;box-shadow:0 1px 2px rgba(15,23,42,.04)!important}
+.tx-filter-grid input,.tx-filter-grid select{background:#f8fafc}
+
+/* ---------- Contas ---------- */
+.acc142-hero{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;margin-bottom:14px}
+@media(max-width:760px){.acc142-hero{grid-template-columns:1fr}}
+.acc142-total{background:var(--grad);color:#fff;border-radius:var(--radius);padding:20px 22px;box-shadow:0 12px 28px rgba(79,70,229,.3);position:relative;overflow:hidden}
+.acc142-total::after{content:'';position:absolute;right:-50px;bottom:-70px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.09)}
+.acc142-total small{opacity:.82;font-weight:600;font-size:12.5px}
+.acc142-total b{display:block;font-size:clamp(24px,4vw,32px);letter-spacing:-.03em;margin-top:4px;font-variant-numeric:tabular-nums}
+.acc142-total span{font-size:12px;opacity:.85}
+.acc142-split{background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px;display:grid;gap:10px;align-content:center}
+.acc142-bar{display:flex;height:12px;border-radius:99px;overflow:hidden;background:#eef1f7}
+.acc142-bar i{display:block;height:100%}
+.acc142-leg{display:grid;gap:6px;font-size:12.5px}
+.acc142-leg div{display:flex;align-items:center;gap:8px}
+.acc142-leg i{width:9px;height:9px;border-radius:50%;flex:none}
+.acc142-leg b{margin-left:auto;font-variant-numeric:tabular-nums}
+.account-card>div:first-child h2{display:flex;align-items:center;gap:12px;margin:0!important}
+.acc142-av{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px;flex:none;box-shadow:0 6px 14px rgba(15,23,42,.15)}
+.account-card .value{font-size:22px!important;font-weight:800;letter-spacing:-.02em}
+.acc-break{background:#f8fafc;border-radius:14px;padding:6px 14px;margin-top:14px}
+.acc-break>div{border-bottom-color:#e8ecf4!important}
+.account-transactions>summary{border-radius:12px;padding:10px 4px}
+
+/* ---------- Cartões (visual de cartão físico) ---------- */
+.cc142{position:relative;border-radius:18px;padding:18px 20px;color:#fff;overflow:hidden;min-height:150px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 14px 30px rgba(15,23,42,.22);margin-bottom:16px}
+.cc142::before{content:'';position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.12)}
+.cc142::after{content:'';position:absolute;right:40px;bottom:-90px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.07)}
+.cc142-top{display:flex;justify-content:space-between;align-items:flex-start;position:relative;z-index:1}
+.cc142-name{font-size:18px;font-weight:800;letter-spacing:-.01em}
+.cc142-brand{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.85;background:rgba(255,255,255,.18);padding:3px 9px;border-radius:99px}
+.cc142-chip{width:36px;height:27px;border-radius:7px;background:linear-gradient(135deg,#fde68a,#f59e0b);margin:12px 0 8px;position:relative;z-index:1;opacity:.95}
+.cc142-row{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;position:relative;z-index:1}
+.cc142-row small{display:block;font-size:11px;opacity:.78;font-weight:600}
+.cc142-row b{font-size:20px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.cc142-use{position:relative;z-index:1;margin-top:12px}
+.cc142-track{height:7px;border-radius:99px;background:rgba(255,255,255,.25);overflow:hidden}
+.cc142-track i{display:block;height:100%;border-radius:99px;background:#fff}
+.cc142-use span{display:flex;justify-content:space-between;font-size:11px;opacity:.85;margin-top:5px;font-weight:600}
+.cc142-hide{display:none!important}
+
+/* ---------- Metas ---------- */
+.goal-card{border-radius:var(--radius)!important;border:1px solid var(--border)!important;box-shadow:var(--shadow)!important;transition:transform .15s,box-shadow .15s}
+.goal-card:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(15,23,42,.08)!important}
+.goal-prio{background:var(--grad)!important;color:#fff!important}
+.goal-bar{height:12px!important;background:#eef1f7!important}
+.goal-prio-row{background:#f8fafc!important;border-radius:12px!important;border:0!important}
+
+/* ---------- Categorias / Orçamento ---------- */
+.budget-group-head{border-radius:14px}
+.budget-bar{height:8px!important;background:#eef1f7!important}
+.budget-pct input{border-radius:10px!important;text-align:center;font-weight:700}
+.budget-income .value{color:var(--primary)!important}
+
+/* ---------- Automatizações ---------- */
+.rec-filter-bar{background:#f1f5f9;padding:4px;border-radius:14px;display:inline-flex!important;gap:4px}
+.rec-filter-btn{border:0!important;border-radius:10px!important;background:transparent!important;color:#475569!important;font-weight:650;padding:7px 14px!important}
+.rec-filter-btn.active{background:#fff!important;color:var(--primary)!important;box-shadow:0 1px 3px rgba(15,23,42,.12)}
+
+/* ---------- Relatórios (tela) ---------- */
+.report-filters-card h1{display:flex;align-items:center;gap:10px}
+.report-content-picker{background:#f8fafc;border:1px solid var(--border)!important;border-radius:16px!important;padding:4px 14px 12px!important}
+.report-content-picker>summary{font-weight:750;padding:10px 0}
+.report-content-grid label{background:#fff;border:1px solid var(--border);border-radius:12px;padding:9px 12px!important;transition:border-color .15s}
+.report-content-grid label:has(input:checked){border-color:#c7d2fe;background:#f5f7ff}
+.report-actions .btn.primary{padding:12px 20px!important;font-size:15px}
+#reportOutput .progress{height:9px!important;border-radius:99px;background:#eef1f7!important}
+#reportOutput [title^="Receitas:"]{background:linear-gradient(#34d399,#10b981)!important;border-radius:6px 6px 0 0!important}
+#reportOutput [title^="Despesas:"]{background:linear-gradient(#fb7185,#ef4444)!important;border-radius:6px 6px 0 0!important}
+.distribution-group{border-radius:14px!important}
+.bgr-track{border-radius:10px;overflow:hidden}
+
+/* ---------- Configurações ---------- */
+#content .card.section h2,#content .card>h2:first-child{display:flex;align-items:center;gap:8px}
+#content .form input,#content .form select{background:#f8fafc}
+
+/* ---------- Modais ---------- */
+#modalTitle{font-size:18px;letter-spacing:-.015em}
+.modalbox .form label{font-weight:650;color:#334155}
+
+/* ---------- Celular ---------- */
+@media(max-width:760px){
+  .card{border-radius:18px!important}
+  .cc142{min-height:140px}
+  .metric .value{font-size:21px!important}
+}
+</style>
+<script>
+/* v142 — Melhorias visuais de Contas e Cartões (somente apresentação; nenhum cálculo alterado). */
+(function(){
+  const PAL=['#4f46e5','#0ea5e9','#10b981','#f59e0b','#ec4899','#8b5cf6','#14b8a6','#f97316'];
+  const CC=['linear-gradient(135deg,#4f46e5,#7c3aed 60%,#a855f7)','linear-gradient(135deg,#0f172a,#334155)','linear-gradient(135deg,#0ea5e9,#2563eb)','linear-gradient(135deg,#059669,#10b981)','linear-gradient(135deg,#db2777,#f97316)','linear-gradient(135deg,#7c2d12,#ea580c)'];
+  const initials=n=>String(n||'?').trim().split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+
+  // ---------- Contas ----------
+  const oAcc=accounts;
+  accounts=function(){
+    oAcc.apply(this,arguments);
+    try{
+      const list=[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0));
+      const content=document.getElementById('content');
+      content.querySelectorAll('.account-card').forEach((card,i)=>{
+        const a=list[i];const h=card.querySelector('h2');if(!a||!h||h.querySelector('.acc142-av'))return;
+        const av=document.createElement('span');av.className='acc142-av';av.style.background=PAL[i%PAL.length];av.textContent=initials(a.name);
+        h.prepend(av);
+      });
+      if(list.length&&!content.querySelector('.acc142-hero')){
+        const bals=list.map((a,i)=>({name:a.name,v:Number(balance(a.id))||0,c:PAL[i%PAL.length]}));
+        const total=bals.reduce((s,x)=>s+x.v,0),pos=bals.filter(x=>x.v>0),posT=pos.reduce((s,x)=>s+x.v,0)||1;
+        const hero=document.createElement('div');hero.className='acc142-hero';
+        hero.innerHTML=`<div class="acc142-total"><small>Saldo total nas contas</small><b>${total<0?'− ':''}${money(Math.abs(total))}</b><span>${list.length} conta${list.length>1?'s':''} cadastrada${list.length>1?'s':''}</span></div>
+          <div class="acc142-split"><div class="acc142-bar">${pos.map(x=>`<i style="width:${x.v/posT*100}%;background:${x.c}" title="${esc(x.name)}"></i>`).join('')}</div>
+          <div class="acc142-leg">${bals.map(x=>`<div><i style="background:${x.c}"></i><span>${esc(x.name)}</span><b class="${x.v<0?'red':''}">${x.v<0?'− ':''}${money(Math.abs(x.v))}</b></div>`).join('')}</div></div>`;
+        const first=content.querySelector('.account-card');
+        let anchor=first;while(anchor&&anchor.parentElement!==content)anchor=anchor.parentElement;
+        (anchor||content.lastChild).before(hero);
+      }
+    }catch(e){console.warn('v142 contas:',e);}
+  };
+
+  // ---------- Cartões ----------
+  const oCards=cards;
+  cards=function(){
+    oCards.apply(this,arguments);
+    try{
+      const k=selectedMonthKey();
+      const list=[...db.cards].sort((a,b)=>(a.order??0)-(b.order??0));
+      const els=[...document.querySelectorAll('#content .grid.g2 > .card')].filter(el=>el.querySelector('h2'));
+      els.forEach((el,i)=>{
+        const c=list[i];if(!c||el.querySelector('.cc142'))return;
+        const total=cardTransactions(c.id,k).reduce((s,t)=>s+Number(t.value||0),0);
+        const lim=Number(c.limit)||0,use=lim?Math.min(100,total/lim*100):0;
+        const face=document.createElement('div');face.className='cc142';face.style.background=CC[i%CC.length];
+        face.innerHTML=`<div class="cc142-top"><span class="cc142-name">${esc(c.name)}</span><span class="cc142-brand">${esc(c.brand||'Crédito')}</span></div>
+          <div class="cc142-chip"></div>
+          <div class="cc142-row"><div><small>Fatura de ${monthLabel(k)}</small><b>${money(total)}</b></div><div style="text-align:right"><small>Fecha dia ${c.close||'—'} · vence dia ${c.due||'—'}</small><small>${esc(accountName(c.accountId))}</small></div></div>
+          ${lim?`<div class="cc142-use"><div class="cc142-track"><i style="width:${use}%"></i></div><span><em style="font-style:normal">${use.toFixed(0)}% do limite usado</em><em style="font-style:normal">Limite ${money(lim)}</em></span></div>`:''}`;
+        // esconde o cabeçalho antigo (etiqueta, nome, limite e datas) — as informações estão no cartão visual
+        const pill=el.querySelector(':scope > .pill');if(pill)pill.classList.add('cc142-hide');
+        el.querySelector(':scope > h2')?.classList.add('cc142-hide');
+        [...el.querySelectorAll(':scope > p')].slice(0,2).forEach(p=>{if(/Limite:|Fechamento:/.test(p.textContent))p.classList.add('cc142-hide');});
+        el.prepend(face);
+      });
+    }catch(e){console.warn('v142 cartões:',e);}
+  };
+})();
+</script>
+<script>
+/* v142 — Novo PDF do relatório: mesmo visual do app e TODO o conteúdo da tela
+   (aviso de filtro de grupo, gráficos de rosca, status do orçamento, distribuição real × meta,
+   desempenho mensal por grupo, resumo e classificação de cada mês, colunas Conta e Tipo). */
+(function(){
+  const P=MiniPDF.prototype;
+  const Y=(pdf,y)=>pdf.H-y;
+  // Caminho arredondado (y para baixo, como o restante da classe)
+  P.rrect=function(x,y,w,h,r,fill,stroke,lw=0.8){
+    if(w<=0||h<=0)return;r=Math.max(0,Math.min(r,w/2,h/2));const k=0.5523*r,n=MiniPDF.n,H=this.H;
+    const p=[`${n(x+r)} ${n(H-y)} m`,`${n(x+w-r)} ${n(H-y)} l`,`${n(x+w-r+k)} ${n(H-y)} ${n(x+w)} ${n(H-y-r+k)} ${n(x+w)} ${n(H-y-r)} c`,
+      `${n(x+w)} ${n(H-y-h+r)} l`,`${n(x+w)} ${n(H-y-h+r-k)} ${n(x+w-r+k)} ${n(H-y-h)} ${n(x+w-r)} ${n(H-y-h)} c`,
+      `${n(x+r)} ${n(H-y-h)} l`,`${n(x+r-k)} ${n(H-y-h)} ${n(x)} ${n(H-y-h+r-k)} ${n(x)} ${n(H-y-h+r)} c`,
+      `${n(x)} ${n(H-y-r)} l`,`${n(x)} ${n(H-y-r+k)} ${n(x+r-k)} ${n(H-y)} ${n(x+r)} ${n(H-y)} c h`].join(' ');
+    let op=fill&&stroke?'B':fill?'f':'S';
+    this.cur.push(`${fill?MiniPDF.rgb(fill)+' rg ':''}${stroke?MiniPDF.rgb(stroke)+' RG '+lw+' w ':''}${p} ${op}`);
+  };
+  P.circle=function(cx,cy,r,fill){this.rrect(cx-r,cy-r,2*r,2*r,r,fill);};
+  // Fatia de rosca de a0 a a1 (radianos, 0 = topo, sentido horário)
+  P.ring=function(cx,cy,R,r,a0,a1,fill){
+    if(a1-a0<=1e-4)return;const n=MiniPDF.n,H=this.H;
+    const pt=(rad,a)=>[cx+rad*Math.sin(a),cy-rad*Math.cos(a)];
+    const arc=(rad,s,e)=>{const out=[];const steps=Math.max(1,Math.ceil(Math.abs(e-s)/(Math.PI/2)));const d=(e-s)/steps;
+      for(let i=0;i<steps;i++){const b0=s+d*i,b1=b0+d,kk=4/3*Math.tan(d/4)*rad;
+        const p0=pt(rad,b0),p3=pt(rad,b1);
+        const c1=[p0[0]+kk*Math.cos(b0),p0[1]+kk*Math.sin(b0)],c2=[p3[0]-kk*Math.cos(b1),p3[1]-kk*Math.sin(b1)];
+        out.push(`${n(c1[0])} ${n(H-c1[1])} ${n(c2[0])} ${n(H-c2[1])} ${n(p3[0])} ${n(H-p3[1])} c`);}return out;};
+    const s=pt(R,a0),e=pt(r,a1);
+    this.cur.push(`${MiniPDF.rgb(fill)} rg ${n(s[0])} ${n(H-s[1])} m ${arc(R,a0,a1).join(' ')} ${n(e[0])} ${n(H-e[1])} l ${arc(r,a1,a0).join(' ')} h f`);
+  };
+  P.hgrad=function(x,y,w,h,c1,c2,steps=90){
+    const a=MiniPDF.rgb(c1).split(' ').map(Number),b=MiniPDF.rgb(c2).split(' ').map(Number),sw=w/steps;
+    for(let i=0;i<steps;i++){const t=i/(steps-1);const c='#'+a.map((v,j)=>Math.round((v+(b[j]-v)*t)*255).toString(16).padStart(2,'0')).join('');this.rect(x+i*sw,y,sw+0.6,h,c);}
+  };
+
+  const C={text:'#0f172a',muted:'#64748b',light:'#94a3b8',primary:'#4f46e5',violet:'#7c3aed',green:'#10b981',red:'#ef4444',amber:'#d97706',
+    border:'#e8ecf4',soft:'#f5f7fc',indigoSoft:'#eef2ff',greenSoft:'#ecfdf5',redSoft:'#fef2f2',amberSoft:'#fff7ed'};
+  const PAL=['#6366f1','#ec4899','#f59e0b','#10b981','#06b6d4','#8b5cf6','#f97316','#84cc16','#0ea5e9','#e11d48'];
+
+  generateReportPDF=function(){
+    renderReport();
+    const d=window.currentReportData;if(!d)return toast('Verifique o período do relatório.');
+    const {rows,inc,exp,r,af,tf,cf,gf,cardf,autof}=d;if(!rows)return;
+    const bd=d.budget;const sec=loadReportSections();
+    if(!Object.values(sec).some(Boolean))return toast('Selecione ao menos um item para o relatório.');
+    const pdf=new MiniPDF();const M=36,CW=pdf.W-2*M,TOP=56,BOTTOM=pdf.H-46;
+    const fmtD=x=>x.toLocaleDateString('pt-BR');
+    const periodTxt=`${fmtD(r.start)} a ${fmtD(r.end)}`;
+    let y=0;
+    const newPage=()=>{pdf.addPage();
+      pdf.hgrad(0,0,pdf.W,6,C.primary,'#a855f7',40);
+      pdf.text('Ricas Finanças',M,20,{size:8.5,bold:true,color:C.primary});
+      pdf.text(`Relatório financeiro · ${periodTxt}`,M+CW,20,{size:8,color:C.light,align:'right'});
+      y=TOP;};
+    const ensure=h=>{if(y+h>BOTTOM){newPage();return true;}return false;};
+    const section=(title,sub,need=60)=>{ensure(need+(sub?44:32));y+=10;
+      pdf.rrect(M,y+1,4,14,2,C.primary);
+      pdf.text(title,M+12,y+1.5,{size:13,bold:true});y+=20;
+      if(sub){const lines=wrap(sub,CW,8.3);lines.forEach(l=>{pdf.text(l,M,y,{size:8.3,color:C.muted});y+=11;});}
+      y+=6;};
+    const wrap=(txt,maxW,size,bold)=>{const words=String(txt).split(/\s+/);const out=[];let cur='';
+      words.forEach(w=>{const t=cur?cur+' '+w:w;if(pdf.width(t,size,bold)>maxW&&cur){out.push(cur);cur=w;}else cur=t;});if(cur)out.push(cur);return out;};
+    const pill=(txt,x,yy,{bg,color,size=7.4,bold=true,align='left'}={})=>{const w=pdf.width(txt,size,bold)+12;const xx=align==='right'?x-w:x;
+      pdf.rrect(xx,yy,w,size+6,(size+6)/2,bg);pdf.text(txt,xx+6,yy+3.1,{size,bold,color});return w;};
+    const card=(x,yy,w,h)=>pdf.rrect(x,yy,w,h,10,'#ffffff',C.border,0.8);
+    const kpis=(items,h=54)=>{ // items: [label,value,color,highlight]
+      ensure(h+10);const gap=10,w=(CW-gap*(items.length-1))/items.length;
+      items.forEach(([l,v,c,hl],i)=>{const x=M+i*(w+gap);
+        if(hl){pdf.rrect(x,y,w,h,10,c);pdf.hgrad(x+10,y,w-20,h,c===C.red?'#be123c':C.primary,c===C.red?'#f97316':'#a855f7',30);pdf.rrect(x,y,12,h,10,c===C.red?'#be123c':C.primary);pdf.rrect(x+w-12,y,12,h,10,c===C.red?'#f97316':'#a855f7');}
+        else card(x,y,w,h);
+        if(!hl){pdf.circle(x+18,y+h/2,9,c===C.text?C.indigoSoft:c===C.green?C.greenSoft:c===C.red?C.redSoft:C.indigoSoft);pdf.circle(x+18,y+h/2,3.2,c===C.text?C.primary:c);}
+        const tx=hl?x+14:x+34;
+        pdf.text(l,tx,y+h/2-13,{size:7.8,bold:true,color:hl?'#e0e7ff':C.muted,maxW:w-(tx-x)-8});
+        pdf.text(v,tx,y+h/2,{size:h>50?13.5:11.5,bold:true,color:hl?'#ffffff':c,maxW:w-(tx-x)-8});});
+      y+=h+10;};
+    const donut=(cx,cy,R,r,items,center1,center2)=>{const tot=items.reduce((s,x)=>s+x.v,0)||1;let a=0;
+      pdf.ring(cx,cy,R,r,0,Math.PI*2-1e-3,'#f1f5f9');
+      items.forEach(it=>{const da=it.v/tot*Math.PI*2;pdf.ring(cx,cy,R,r,a+0.012,a+da-0.012,it.color);a+=da;});
+      if(center1)pdf.text(center1,cx,cy-9,{size:7.5,color:C.light,align:'center',bold:true});
+      if(center2)pdf.text(center2,cx,cy+1,{size:10.5,color:C.text,align:'center',bold:true});};
+    const table=(cols,data,opt={})=>{ // cols: {t,w,a,b}; opt.color(i,j), opt.status(j)
+      const rh=opt.rh||17,fs=opt.fs||7.6;
+      const head=()=>{pdf.rrect(M,y,CW,18,6,C.indigoSoft);let x=M;cols.forEach(c=>{pdf.text(c.t.toUpperCase(),c.a==='right'?x+c.w-6:x+6,y+5.6,{size:6.8,bold:true,color:'#4338ca',align:c.a||'left',maxW:c.w-8});x+=c.w;});y+=20;};
+      ensure(rh*2+22);head();
+      data.forEach((row,i)=>{
+        if(y+rh>BOTTOM){newPage();head();}
+        if(i%2)pdf.rect(M,y,CW,rh,'#fafbff');
+        let x=M;row.forEach((v,j)=>{const c=cols[j];
+          if(opt.status===j&&v){const ok=/Confirmad/.test(v);pill(v,x+5,y+3.4,{bg:ok?C.greenSoft:C.amberSoft,color:ok?'#047857':'#c2410c',size:6.6});}
+          else if(c.dot&&opt.dot){const dc=opt.dot(i);if(dc)pdf.circle(x+8,y+rh/2,2.6,dc);pdf.text(v,x+14,y+(rh-fs)/2+0.6,{size:fs,maxW:c.w-18,color:C.text});}
+          else pdf.text(v,c.a==='right'?x+c.w-6:x+6,y+(rh-fs)/2+0.6,{size:fs,align:c.a||'left',maxW:c.w-10,color:opt.color?opt.color(i,j):C.text,bold:c.b});
+          x+=c.w;});
+        pdf.line(M,y+rh,M+CW,y+rh,'#f1f4f9',0.5);y+=rh;});
+      y+=8;};
+
+    // ---------- Capa / cabeçalho ----------
+    pdf.hgrad(0,0,pdf.W,112,'#4338ca','#a855f7',120);
+    pdf.circle(pdf.W-50,40,52,'#9d6cf0');pdf.circle(pdf.W-130,96,14,'#a78bfa');
+    pdf.hgrad(0,112,pdf.W,0.01,'#4338ca','#a855f7',2);
+    pdf.text('RICAS FINANÇAS',M,26,{size:8.5,bold:true,color:'#c7d2fe'});
+    pdf.text('Relatório financeiro',M,40,{size:24,bold:true,color:'#ffffff'});
+    pdf.text(`Período: ${periodTxt}`,M,74,{size:10.5,color:'#e0e7ff',bold:true});
+    pdf.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`,M,90,{size:8,color:'#c7d2fe'});
+    y=128;
+    // Filtros em etiquetas
+    const typeLbl={all:'Receitas e despesas',receita:'Receitas',despesa:'Despesas'}[tf]||'—';
+    const chips=[['Conta',af==='all'?'Todas':accountName(af)],['Tipo',typeLbl],['Categoria',cf==='all'?'Todas':catName(cf)],['Grupo',gf==='all'?'Todos':groupFilterLabel(gf)],['Cartão',cardf==='all'?'Todos':cardf==='none'?'Sem cartão':cardName(cardf)],['Origem',automationFilterLabel(autof)]];
+    let cx=M;chips.forEach(([k,v])=>{const t=`${k}: ${v}`;const w=pdf.width(t,7.6,false)+14;if(cx+w>M+CW){cx=M;y+=18;}
+      pdf.rrect(cx,y,w,14,7,C.soft,C.border,0.6);pdf.text(t,cx+7,y+3.6,{size:7.6,color:C.muted});cx+=w+6;});
+    y+=24;
+    if(gf!=='all'){const g=budgetGroupDef(gf);const msg=`Somente despesas desse grupo${gf==='investimentos'?' (incluindo transferências para contas de investimentos)':''}. Receitas não pertencem a grupos e ficam fora deste filtro.`;
+      const lines=wrap(msg,CW-28,8);const h=24+lines.length*10.5;ensure(h+8);
+      pdf.rrect(M,y,CW,h,10,C.soft);pdf.rrect(M,y,4,h,2,g?.color||'#9ca3af');
+      pdf.text(`Filtro de grupo ativo: ${groupFilterLabel(gf)}`,M+14,y+8,{size:9,bold:true});lines.forEach((l,i)=>pdf.text(l,M+14,y+21+i*10.5,{size:8,color:C.muted}));y+=h+12;}
+
+    // ---------- Indicadores ----------
+    const res=inc-exp;
+    if(sec.summary)kpis([['Receitas',pdfMoney(inc),C.green],['Despesas',pdfMoney(exp),C.red],['Resultado',pdfSignedMoney(res),res<0?C.red:C.primary,true],['Movimentações',String(rows.length),C.text]],58);
+
+    // ---------- Despesas por categoria (rosca + lista) ----------
+    const byCat={};rows.filter(t=>t.type==='despesa').forEach(t=>{const k=t.transfer?'__inv':t.categoryId;byCat[k]=(byCat[k]||0)+Number(t.value||0);});
+    const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+    const catColor=(id,i)=>id==='__inv'?'#22c55e':(db.categories.find(c=>String(c.id)===String(id))?.color||PAL[i%PAL.length]);
+    if(sec.categoryChart){
+      section('Despesas por categoria','Participação de cada categoria no total de despesas do período.',150);
+      if(!cats.length){pdf.text('Sem despesas no período.',M,y,{size:9,color:C.muted});y+=20;}
+      else{
+        const tot=cats.reduce((s,x)=>s+x[1],0),max=cats[0][1];
+        const listX=M+180,listW=CW-180-14,rowH=19;
+        let idx=0;
+        while(idx<cats.length){
+          const avail=Math.floor((BOTTOM-y-24)/rowH);const first=idx===0;
+          const n=Math.max(1,Math.min(cats.length-idx,avail));
+          const h=Math.max(first?170:0,n*rowH+24);
+          if(y+Math.min(h,170)>BOTTOM){newPage();continue;}
+          card(M,y,CW,h);
+          if(first){const top=cats.slice(0,7).map(([id,v],i)=>({v,color:catColor(id,i)}));
+            if(cats.length>7)top.push({v:cats.slice(7).reduce((s,x)=>s+x[1],0),color:'#cbd5e1'});
+            donut(M+92,y+h/2>y+85?y+85:y+h/2,62,40,top,'TOTAL',pdfMoney(tot));}
+          let yy=y+14;
+          cats.slice(idx,idx+n).forEach(([id,v],j)=>{const i=idx+j,col=catColor(id,i),nm=id==='__inv'?'Aportes em investimentos':catName(id);
+            pdf.circle(listX+4,yy+4.5,3.2,col);
+            pdf.text(nm,listX+13,yy,{size:8.6,maxW:118});
+            const bx=listX+136,bw=listW-136-112;
+            pdf.rrect(bx,yy+1.5,bw,6,3,'#eef1f7');pdf.rrect(bx,yy+1.5,Math.max(6,bw*v/max),6,3,col);
+            pdf.text(pdfMoney(v),listX+listW-40,yy,{size:8.6,bold:true,align:'right'});
+            pdf.text((v/tot*100).toFixed(1)+'%',listX+listW,yy,{size:8,color:C.muted,align:'right'});
+            yy+=rowH;});
+          y+=h+10;idx+=n;
+          if(idx<cats.length)newPage();
+        }
+      }
+    }
+
+    // ---------- Receitas × despesas ----------
+    const byMonth={};rows.forEach(t=>{const k=txCashMonth(t);if(!byMonth[k])byMonth[k]={r:0,d:0};byMonth[k][t.type==='receita'?'r':'d']+=Number(t.value||0);});
+    const months=Object.keys(byMonth).sort();
+    if(sec.monthlyChart){
+      section('Receitas × despesas','Comparação mês a mês dentro do período selecionado.',190);
+      if(!months.length){pdf.text('Sem dados.',M,y,{size:9,color:C.muted});y+=20;}
+      else{
+        const h=196;card(M,y,CW,h);
+        const H=128,base=y+24+H,GL=64,mx=Math.max(1,...months.map(k=>Math.max(byMonth[k].r,byMonth[k].d)));
+        const plotW=CW-GL-20,slot=Math.min(84,plotW/months.length),bw=Math.min(18,slot*0.3),x0=M+GL+(plotW-slot*months.length)/2;
+        [0,0.25,0.5,0.75,1].forEach(f=>{const yy=base-H*f;pdf.line(M+GL,yy,M+CW-14,yy,f?'#eef1f7':'#cbd5e1',0.6,f>0);pdf.text(pdfMoney(mx*f).replace(',00',''),M+GL-6,yy-3.5,{size:6.8,color:C.light,align:'right'});});
+        months.forEach((k,i)=>{const cx=x0+slot*i+slot/2,v=byMonth[k],hr=H*v.r/mx,hd=H*v.d/mx;
+          if(hr>0)pdf.rrect(cx-bw-1.5,base-hr,bw,hr,Math.min(4,hr/2),C.green);
+          if(hd>0)pdf.rrect(cx+1.5,base-hd,bw,hd,Math.min(4,hd/2),C.red);
+          pdf.text(monthLabel(k).replace(' de ','/').replace(/^(\w{3})\w*/,'$1'),cx,base+6,{size:7.4,color:C.muted,align:'center',bold:true});});
+        const ly=y+h-20;pdf.circle(M+GL+4,ly+4,3.5,C.green);pdf.text('Receitas',M+GL+12,ly,{size:8,color:C.muted});
+        pdf.circle(M+GL+72,ly+4,3.5,C.red);pdf.text('Despesas',M+GL+80,ly,{size:8,color:C.muted});
+        y+=h+10;
+      }
+    }
+
+    // ---------- Divisão do orçamento ----------
+    if(sec.budget&&bd){
+      const shown=(gf==='all'||gf==='none')?bd.groups:bd.groups.filter(g=>g.key===gf);
+      const partial=(r.start.getDate()!==1)||(new Date(r.end.getFullYear(),r.end.getMonth()+1,0).getDate()!==r.end.getDate());
+      section('Divisão do orçamento — desempenho no período',`Receita base: ${pdfMoney(bd.income)} em ${bd.months.length} mês(es), conforme a regra definida em Categorias. Este bloco considera o filtro de conta; os filtros de tipo e de categoria não se aplicam.${partial?' Atenção: o período personalizado não cobre meses completos; o planejado usa a receita base dos meses inteiros.':''}`,80);
+      const statusOf=(g,use)=>(g.key==='investimentos'||g.key==='conhecimento'||g.key==='metas')
+        ?(use>=100?['Meta atingida','ok']:use>=70?['Em andamento','warn']:['Abaixo da meta','bad'])
+        :(use>100?['Acima do limite','bad']:use>85?['Próximo do limite','warn']:['Dentro do limite','ok']);
+      const ST={ok:[C.greenSoft,'#047857',C.green],warn:[C.amberSoft,'#c2410c','#f59e0b'],bad:[C.redSoft,'#b91c1c',C.red]};
+      pdf.text('Planejado × realizado por grupo',M,y,{size:10,bold:true});y+=15;
+      const cols=[['Grupo',108,'left'],['Meta',34,'right'],['Planejado',68,'right'],['Realizado',68,'right'],['Comprometido',72,'right'],['Uso',86,'left'],['Situação',CW-436,'left']];
+      const head=()=>{pdf.rrect(M,y,CW,18,6,C.indigoSoft);let x=M;cols.forEach(([t,w,a])=>{pdf.text(t.toUpperCase(),a==='right'?x+w-6:x+6,y+5.6,{size:6.8,bold:true,color:'#4338ca',align:a});x+=w;});y+=20;};
+      ensure(60);head();
+      shown.forEach((g,i)=>{if(y+22>BOTTOM){newPage();head();}
+        const use=g.planned>0?g.total/g.planned*100:(g.total>0?100:0);const [lbl,kind]=statusOf(g,use);const [bg,fg,bar]=ST[kind];
+        if(i%2)pdf.rect(M,y,CW,22,'#fafbff');
+        let x=M;const ty=y+7;
+        pdf.circle(x+9,y+11,3.2,g.color||PAL[i%PAL.length]);pdf.text(g.name,x+16,ty,{size:8.2,bold:true,maxW:cols[0][1]-18});x+=cols[0][1];
+        pdf.text(g.pct.toFixed(0)+'%',x+cols[1][1]-6,ty,{size:8.2,align:'right',color:C.muted});x+=cols[1][1];
+        pdf.text(pdfMoney(g.planned),x+cols[2][1]-6,ty,{size:8.2,align:'right'});x+=cols[2][1];
+        pdf.text(pdfMoney(g.confirmed),x+cols[3][1]-6,ty,{size:8.2,align:'right',color:C.red});x+=cols[3][1];
+        pdf.text(pdfMoney(g.total),x+cols[4][1]-6,ty,{size:8.2,align:'right'});x+=cols[4][1];
+        const bw=cols[5][1]-36;pdf.rrect(x+6,y+8,bw,6,3,'#eef1f7');pdf.rrect(x+6,y+8,Math.max(6,bw*Math.min(100,use)/100),6,3,bar);
+        pdf.text(use.toFixed(0)+'%',x+cols[5][1]-2,ty,{size:7.6,bold:true,color:fg,align:'right'});x+=cols[5][1];
+        pill(lbl,x+6,y+4.5,{bg,color:fg,size:6.8});
+        pdf.line(M,y+22,M+CW,y+22,'#f1f4f9',0.5);y+=22;});
+      if(gf==='all'&&bd.ungrouped.total>0){ensure(16);y+=4;pdf.text(`Sem grupo: realizado ${pdfMoney(bd.ungrouped.confirmed)} · comprometido ${pdfMoney(bd.ungrouped.total)}`,M,y,{size:8,color:C.muted});y+=12;}
+      pdf.text('Realizado = confirmadas · Comprometido = confirmadas + pendentes · Uso = comprometido ÷ planejado',M,y+4,{size:7.2,color:C.light});y+=20;
+
+      // Distribuição real × meta
+      const items=[...bd.groups.map(g=>({name:g.name,color:g.color,v:g.confirmed,meta:g.pct,key:g.key})),{name:'Sem grupo',color:'#9ca3af',v:bd.ungrouped.confirmed,meta:null,key:''}];
+      const act=items.filter(x=>x.v>0),totC=act.reduce((s,x)=>s+x.v,0);
+      const h=Math.max(170,items.length*17+46);ensure(h+30);
+      pdf.text('Distribuição real × meta',M,y,{size:10,bold:true});y+=15;
+      card(M,y,CW,h);
+      if(act.length)donut(M+92,y+h/2,60,38,act,'REALIZADO',pdfMoney(totC));else pdf.text('Sem despesas confirmadas.',M+40,y+h/2,{size:8.5,color:C.muted});
+      const tx0=M+180,tw=CW-180-14;let yy=y+14;
+      const tc=[['Grupo',tw-210],['Realizado',75],['Real / receita',60],['Meta',40],['Desvio',35]];
+      let xx=tx0;tc.forEach(([t,w],i)=>{pdf.text(t.toUpperCase(),i?xx+w:xx,yy,{size:6.6,bold:true,color:C.light,align:i?'right':'left'});xx+=w;});yy+=14;
+      items.forEach(it=>{const real=bd.income?it.v/bd.income*100:0,dev=it.meta==null?null:real-it.meta;const hl=gf!=='all'&&String(it.key)===(gf==='none'?'':gf);
+        if(hl)pdf.rrect(tx0-6,yy-4,tw+8,16,5,C.indigoSoft);
+        let x=tx0;pdf.circle(x+3,yy+3.6,3,it.color||'#9ca3af');pdf.text(it.name,x+11,yy,{size:8.2,maxW:tc[0][1]-14,bold:hl});x+=tc[0][1];
+        pdf.text(pdfMoney(it.v),x+tc[1][1],yy,{size:8.2,align:'right'});x+=tc[1][1];
+        pdf.text(real.toFixed(1)+'%',x+tc[2][1],yy,{size:8.2,align:'right',bold:true});x+=tc[2][1];
+        pdf.text(it.meta==null?'—':it.meta.toFixed(1)+'%',x+tc[3][1],yy,{size:8.2,align:'right',color:C.muted});x+=tc[3][1];
+        pdf.text(dev==null?'—':(dev>0?'+':'')+dev.toFixed(1),x+tc[4][1],yy,{size:8.2,align:'right',color:dev==null?C.muted:Math.abs(dev)<0.05?C.muted:dev>0?'#c2410c':'#047857'});
+        yy+=17;});
+      y+=h+12;
+
+      // Desempenho mensal por grupo
+      if(bd.months.length>1&&shown.length){
+        const mu=bd.months.map(m=>{const pm=bd.perMonth[m];return {m,vals:shown.map(g=>{const pl=pm.income*g.pct/100,v=pm.g[g.key].total;return {g,u:pl>0?v/pl*100:(v>0?100:0)};})};});
+        const maxU=Math.max(120,...mu.flatMap(x=>x.vals.map(v=>v.u)));
+        const ch=210;ensure(ch+40);
+        pdf.text('Desempenho mensal por grupo (% do planejado)',M,y,{size:10,bold:true});y+=13;
+        wrap('Cada barra mostra o comprometido do grupo em relação ao planejado do mês; a linha tracejada marca 100%. Para Custos fixos, Conforto e Prazeres, ficar abaixo da linha é o desejável; para Metas, Investimentos e Conhecimento, o objetivo é alcançá-la.',CW,7.6).forEach(l=>{pdf.text(l,M,y,{size:7.6,color:C.muted});y+=10;});
+        y+=4;card(M,y,CW,ch);
+        const H=130,base=y+20+H,GL=40,plotW=CW-GL-16,slot=plotW/mu.length,bw=Math.max(2,Math.min(10,(slot-10)/shown.length));
+        [0,50,100,150,200].filter(v=>v<=maxU).forEach(v=>{const yy=base-H*v/maxU;pdf.line(M+GL,yy,M+CW-10,yy,v===100?C.primary:'#eef1f7',v===100?0.9:0.5,v===100);pdf.text(v+'%',M+GL-5,yy-3.4,{size:6.6,color:v===100?C.primary:C.light,align:'right',bold:v===100});});
+        mu.forEach((x,i)=>{const cx=M+GL+slot*i+slot/2,gw=bw*shown.length;
+          x.vals.forEach((v,j)=>{const hh=v.u?Math.max(1.5,H*v.u/maxU):0;if(hh)pdf.rrect(cx-gw/2+j*bw+0.4,base-hh,bw-0.8,hh,Math.min(2,bw/3),v.g.color||PAL[j%PAL.length]);});
+          pdf.text(monthLabel(x.m).replace(' de ','/').replace(/^(\w{3})\w*/,'$1'),cx,base+5,{size:mu.length>8?6.2:7,color:C.muted,align:'center'});});
+        let lx=M+GL;const ly=y+ch-18;shown.forEach((g,j)=>{const w=pdf.width(g.name,7.4)+20;if(lx+w>M+CW){return;}pdf.circle(lx+3,ly+3.6,3,g.color||PAL[j%PAL.length]);pdf.text(g.name,lx+10,ly,{size:7.4,color:C.muted});lx+=w;});
+        y+=ch+12;
+      }
+    }
+
+    // ---------- Evolução por mês ----------
+    if(sec.evolution){
+      section('Evolução por mês',null,60);
+      if(!months.length){pdf.text('Sem dados.',M,y,{size:9,color:C.muted});y+=20;}
+      else table([{t:'Mês',w:CW-3*120},{t:'Receitas',w:120,a:'right'},{t:'Despesas',w:120,a:'right'},{t:'Resultado',w:120,a:'right',b:true}],
+        months.map(k=>[monthLabel(k),pdfMoney(byMonth[k].r),pdfMoney(byMonth[k].d),pdfSignedMoney(byMonth[k].r-byMonth[k].d)]),
+        {rh:19,fs:8.4,color:(i,j)=>j===1?C.green:j===2?C.red:j===3?(byMonth[months[i]].r-byMonth[months[i]].d<0?C.red:C.primary):C.text});
+    }
+
+    // Colunas completas, iguais às da tela
+    const COLS=[{t:'Data',w:50},{t:'Descrição',w:94},{t:'Conta',w:58},{t:'Categoria',w:66,dot:true},{t:'Grupo',w:54},{t:'Origem',w:46},{t:'Tipo',w:44},{t:'Valor',w:64,a:'right',b:true},{t:'Status',w:CW-476}];
+    const rowOf=t=>[fmtDate(t.date),t.description||'',txAccountLabel(t),t.transfer?'Aporte em investimentos':catName(t.categoryId),txGroupName(t),txAutomationLabel(t),t.type==='receita'?'Receita':'Despesa',(t.type==='receita'?'+ ':'- ')+pdfMoney(t.value),t.confirmed?'Confirmada':'Pendente'];
+    const txTable=list=>table(COLS,list.map(rowOf),{status:8,color:(i,j)=>j===7?(list[i].type==='receita'?C.green:C.red):C.text,dot:i=>list[i].transfer?'#22c55e':categoryColor(list[i].categoryId)});
+
+    // ---------- Movimentação mês a mês ----------
+    if(sec.monthlyMovement){
+      section('Movimentação mês a mês','Cada mês com seus totais, as despesas por classificação e os lançamentos, respeitando os filtros selecionados.',60);
+      if(!months.length){pdf.text('Sem movimentações no período.',M,y,{size:9,color:C.muted});y+=20;}
+      months.forEach(k=>{
+        const v=byMonth[k],mr=rows.filter(t=>txCashMonth(t)===k).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+        ensure(150);
+        pdf.rrect(M,y,CW,24,8,C.soft);pdf.rrect(M,y,4,24,2,C.primary);
+        pdf.text(monthLabel(k).replace(/^./,c=>c.toUpperCase()),M+14,y+7.5,{size:10.5,bold:true});
+        pdf.text(`${mr.length} lançamento${mr.length===1?'':'s'}`,M+CW-10,y+8.5,{size:8,color:C.muted,align:'right'});y+=32;
+        const s=v.r-v.d;
+        kpis([['Receitas',pdfMoney(v.r),C.green],['Despesas',pdfMoney(v.d),C.red],['Saldo mensal',pdfSignedMoney(s),s<0?C.red:C.primary]],42);
+        const mc={};mr.filter(t=>t.type==='despesa').forEach(t=>mc[t.categoryId]=(mc[t.categoryId]||0)+Number(t.value||0));
+        const ent=Object.entries(mc).sort((a,b)=>b[1]-a[1]);
+        if(ent.length){ensure(34);pdf.text('DESPESAS POR CLASSIFICAÇÃO',M,y,{size:6.8,bold:true,color:C.light});y+=12;
+          let x=M;ent.forEach(([id,val])=>{const t=`${catName(id)}: ${pdfMoney(val)}`;const w=pdf.width(t,7.4)+22;if(x+w>M+CW){x=M;y+=18;ensure(18);}
+            pdf.rrect(x,y,w,14,7,'#ffffff',C.border,0.6);pdf.circle(x+8,y+7,2.8,categoryColor(id));pdf.text(t,x+14,y+3.6,{size:7.4,color:C.text});x+=w+5;});
+          y+=24;}
+        if(mr.length)txTable(mr);
+        y+=6;
+      });
+    }
+
+    // ---------- Detalhamento ----------
+    if(sec.details){
+      section('Detalhamento das movimentações',`${rows.length} lançamento${rows.length===1?'':'s'} no período, em ordem de data.`,60);
+      const list=[...rows].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+      if(!list.length){pdf.text('Sem movimentações no período.',M,y,{size:9,color:C.muted});y+=20;}
+      else txTable(list);
+    }
+
+    // ---------- Rodapé ----------
+    const total=pdf.pages.length;
+    pdf.pages.forEach((p,i)=>{pdf.cur=p;pdf.line(M,pdf.H-32,M+CW,pdf.H-32,C.border,0.6);
+      pdf.text('Ricas Finanças · relatório financeiro',M,pdf.H-25,{size:7.2,color:C.light});
+      pdf.text(`Página ${i+1} de ${total}`,M+CW,pdf.H-25,{size:7.2,color:C.light,align:'right'});});
+    const bytes=pdf.output();window.lastReportPDF=bytes;
+    const stamp=`${localDateKey(r.start)}_a_${localDateKey(r.end)}`;
+    const blob=new Blob([bytes],{type:'application/pdf'});const name=`ricas-financas-relatorio_${stamp}.pdf`;
+    if(hasFsApi())downloadBlob(blob,name);else deliverFile(blob,name);
+    toast('Relatório em PDF gerado');
   };
 })();
 </script>
