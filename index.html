@@ -3245,7 +3245,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v136</div>
+    <div class="sum114-ver">Ricas Finanças v137</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -5354,6 +5354,40 @@ d.querySelector('button').onclick=()=>{d.remove();try{localStorage.setItem('rica
         parts.forEach(p=>body.appendChild(p));
       }
     }catch(e){console.warn('v136:',e);}
+  };
+})();
+</script>
+<!-- ===== v137 — Movimentações: somatório das despesas no débito (conta bancária) ===== -->
+<style id="tx-debit-v137">
+.tx-debit-sum{margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:14px 16px;border:1px solid var(--border);border-left:4px solid var(--red);border-radius:14px;background:#fff}
+.tx-debit-sum .label{color:var(--muted);font-size:12.5px;font-weight:500}
+.tx-debit-sum .value{font-size:clamp(19px,5vw,25px);font-weight:800;color:var(--red);white-space:nowrap;font-variant-numeric:tabular-nums}
+.tx-debit-split{display:flex;gap:6px;flex-wrap:wrap}
+.tx-debit-split span{padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.tx-debit-split .ok{background:#dcfce7;color:#166534}.tx-debit-split .open{background:#fff4e2;color:#9a6200}
+</style>
+<script>
+/* v137 — Soma das despesas lançadas direto na conta (débito) no mês, respeitando os filtros.
+   Não inclui compras no cartão de crédito nem transferências. Somente exibição. */
+(function(){
+  const orig=transactions;
+  transactions=function(){
+    orig.apply(this,arguments);
+    try{
+      const content=document.getElementById('content');
+      const head=[...content.querySelectorAll('.tx-section-head')].find(h=>!h.classList.contains('tx-section-card')&&!h.classList.contains('tx-section-pay'));
+      const table=head&&head.nextElementSibling&&head.nextElementSibling.querySelector('table');
+      const ids=new Set();
+      if(table)table.querySelectorAll('button[onclick*="openTx("]').forEach(b=>{const m=String(b.getAttribute('onclick')).match(/openTx\((\d+)\)/);if(m)ids.add(m[1]);});
+      const list=db.transactions.filter(t=>ids.has(String(t.id))&&t.type==='despesa'&&!t.transfer&&!t.cardId&&!t.virtualCardStatement);
+      const total=list.reduce((s,t)=>s+Number(t.value||0),0);
+      const paid=list.filter(txIsPaid).reduce((s,t)=>s+Number(t.value||0),0);
+      const box=document.createElement('div');box.className='tx-debit-sum';
+      box.innerHTML=`<div><div class="label">🏦 Despesas no débito <span class="muted" style="font-size:11px">(${list.length} lançamento${list.length===1?'':'s'} na conta, sem cartão e transferências)</span></div><div class="value">${money(total)}</div></div>
+        <div class="tx-debit-split"><span class="ok">✓ Pago ${money(paid)}</span><span class="open">⏳ A pagar ${money(total-paid)}</span></div>`;
+      const grid=content.querySelector('.card .grid.g2');
+      if(grid)grid.after(box);
+    }catch(e){console.warn('v137:',e);}
   };
 })();
 </script>
