@@ -1129,7 +1129,11 @@ const BUDGET_GROUPS_DEFAULT=[
 function budgetGroups(){
   const custom=Array.isArray(db.settings?.customBudgetGroups)?db.settings.customBudgetGroups:[];
   const seen=new Set(BUDGET_GROUPS_DEFAULT.map(g=>g.key));
-  return [...BUDGET_GROUPS_DEFAULT,...custom.filter(g=>g&&/^custom_[a-zA-Z0-9_]+$/.test(g.key)&&!seen.has(g.key)&&(seen.add(g.key),true)).map(g=>({...g,percent:Number(g.percent)||0}))];
+  // v148: grupos padrão podem ser renomeados/editados (groupOverrides) ou excluídos (hiddenBudgetGroups).
+  const ov=(db.settings&&typeof db.settings.groupOverrides==='object'&&db.settings.groupOverrides)||{};
+  const hid=new Set(Array.isArray(db.settings?.hiddenBudgetGroups)?db.settings.hiddenBudgetGroups:[]);
+  const defs=BUDGET_GROUPS_DEFAULT.filter(g=>!hid.has(g.key)).map(g=>({...g,...(ov[g.key]||{}),key:g.key,percent:g.percent}));
+  return [...defs,...custom.filter(g=>g&&/^custom_[a-zA-Z0-9_]+$/.test(g.key)&&!seen.has(g.key)&&(seen.add(g.key),true)).map(g=>({...g,percent:Number(g.percent)||0}))];
 }
 function openExpenseGroup(){
   openModal('Novo grupo de despesas',`<form class="form" onsubmit="saveExpenseGroup(event)">
@@ -3245,7 +3249,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v147</div>
+    <div class="sum114-ver">Ricas Finanças v148</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -3555,7 +3559,7 @@ function budgetSpending(month){
   // Transferências para contas marcadas como "conta de investimentos" contam como aporte.
   (db.transfers||[]).filter(tr=>monthKey(tr.date)===month).forEach(tr=>{
     const to=db.accounts.find(a=>String(a.id)===String(tr.to)), from=db.accounts.find(a=>String(a.id)===String(tr.from));
-    if(to?.investmentAccount&&!from?.investmentAccount){const v=Number(tr.value||0);out.investimentos.total+=v;out.investimentos.confirmed+=v;}
+    if(out.investimentos&&to?.investmentAccount&&!from?.investmentAccount){const v=Number(tr.value||0);out.investimentos.total+=v;out.investimentos.confirmed+=v;}
   });
   return out;
 }
@@ -5590,7 +5594,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#a5b4fc!import
       // gráficos logo abaixo dos 3 cartões principais
       const kpis=host.querySelector('.sum114');
       (kpis||ver).after(...box.childNodes);
-      if(ver)ver.textContent='Ricas Finanças v147';
+      if(ver)ver.textContent='Ricas Finanças v148';
     }catch(e){console.warn('v141:',e);}
   };
 })();
@@ -6535,5 +6539,94 @@ tr.paid-row{border-left:0!important}
 .ch141-seg button{border:0;background:transparent;padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:700;color:#64748b;cursor:pointer;font-family:inherit}
 .ch141-seg button.on{background:#fff;color:#4f46e5;box-shadow:0 1px 3px rgba(15,23,42,.12)}
 </style>
+<!-- ===== v148 — Editar, renomear e excluir grupos de despesas ===== -->
+<style id="group-edit-v148">
+.bg148-edit{border:1px solid var(--border);background:#fff;border-radius:10px;padding:4px 10px;font-size:12.5px;font-weight:700;color:#4f46e5;cursor:pointer;font-family:inherit}
+.bg148-edit:hover{background:#eef2ff}
+.bg148-danger{margin-top:18px;padding-top:14px;border-top:1px dashed var(--border)}
+</style>
+<script>
+/* v148 — Cada grupo de despesas (padrão ou criado) pode ser editado: nome, ícone, cor,
+   percentual e descrição. Também pode ser excluído, movendo as categorias para outro grupo. */
+(function(){
+  const isDefault=k=>BUDGET_GROUPS_DEFAULT.some(g=>g.key===k);
+  const norm=v=>String(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim();
+  window.openEditExpenseGroup=function(key){
+    const g=budgetGroupDef(key);if(!g)return;
+    const n=db.categories.filter(c=>c.type==='despesa'&&c.budgetGroup===key).length;
+    const others=budgetGroups().filter(x=>x.key!==key);
+    openModal('Editar grupo de despesas',`<form class="form" onsubmit="saveEditExpenseGroup(event,'${key}')">
+      <label>Nome do grupo<input name="name" required minlength="2" maxlength="60" value="${esc(g.name)}"></label>
+      <div class="row"><label>Ícone<select name="icon">${categoryIconOptionsHtml(g.icon)}</select></label><label>Cor<input name="color" type="color" value="${esc(g.color||'#8b5cf6')}"></label></div>
+      <label>Percentual da receita<input name="percent" type="number" min="0" max="100" step="0.1" value="${budgetPercent(key)}" required></label>
+      <label>Descrição (opcional)<input name="hint" maxlength="160" value="${esc(g.hint||'')}"></label>
+      <button class="btn primary">💾 Salvar alterações</button>
+      ${isDefault(key)?`<button class="btn" type="button" onclick="resetExpenseGroupLook('${key}')">↺ Restaurar nome, ícone e cor originais</button>`:''}
+      <div class="bg148-danger">
+        <b>Excluir grupo</b>
+        <p class="muted" style="margin:6px 0">${n?`Este grupo tem ${n} categoria${n===1?'':'s'}. Escolha para onde ${n===1?'ela vai':'elas vão'}:`:'Nenhuma categoria vinculada a este grupo.'}</p>
+        ${n?`<select id="bg148Move"><option value="">❔ Sem grupo</option>${others.map(o=>`<option value="${o.key}">${o.icon} ${esc(o.name)}</option>`).join('')}</select>`:''}
+        <button class="btn danger" type="button" style="margin-top:8px" onclick="deleteExpenseGroup('${key}')">🗑 Excluir grupo</button>
+      </div></form>`);
+  };
+  window.saveEditExpenseGroup=async function(e,key){
+    e.preventDefault();if(!storageConnected())return toast('Aguarde o carregamento da sua conta.');
+    const f=new FormData(e.target),name=String(f.get('name')||'').trim(),percent=Number(f.get('percent'));
+    if(name.length<2||!Number.isFinite(percent)||percent<0||percent>100)return toast('Informe nome e percentual válidos.');
+    if(budgetGroups().some(g=>g.key!==key&&norm(g.name)===norm(name)))return toast('Já existe um grupo com esse nome.');
+    const data={name,icon:String(f.get('icon')||'📁'),color:String(f.get('color')||'#8b5cf6'),hint:String(f.get('hint')||'').trim()};
+    if(isDefault(key)){
+      if(!db.settings.groupOverrides||typeof db.settings.groupOverrides!=='object')db.settings.groupOverrides={};
+      db.settings.groupOverrides[key]=data;
+    }else{
+      const c=(db.settings.customBudgetGroups||[]).find(x=>x.key===key);if(c)Object.assign(c,data,{percent});
+    }
+    normalizeBudget();
+    const bg=db.settings.budget.groups.find(x=>x.key===key);if(bg)bg.percent=percent;
+    await save();closeModal();render();toast('Grupo atualizado');
+  };
+  window.resetExpenseGroupLook=async function(key){
+    if(db.settings.groupOverrides)delete db.settings.groupOverrides[key];
+    await save();closeModal();render();toast('Nome, ícone e cor originais restaurados');
+  };
+  window.deleteExpenseGroup=async function(key){
+    const g=budgetGroupDef(key);if(!g)return;
+    const to=document.getElementById('bg148Move')?.value||'';
+    const n=db.categories.filter(c=>c.type==='despesa'&&c.budgetGroup===key).length;
+    const dest=to?budgetGroupDef(to)?.name:'Sem grupo';
+    if(!confirm(`Excluir o grupo "${g.name}"?${n?`\n\n${n} categoria(s) serão movidas para "${dest}".`:''}\n\nAs despesas e categorias NÃO serão apagadas.`))return;
+    db.categories.forEach(c=>{if(c.type==='despesa'&&c.budgetGroup===key)c.budgetGroup=to;});
+    if(isDefault(key)){
+      if(!Array.isArray(db.settings.hiddenBudgetGroups))db.settings.hiddenBudgetGroups=[];
+      if(!db.settings.hiddenBudgetGroups.includes(key))db.settings.hiddenBudgetGroups.push(key);
+    }else{
+      db.settings.customBudgetGroups=(db.settings.customBudgetGroups||[]).filter(x=>x.key!==key);
+    }
+    normalizeBudget();await save();closeModal();render();toast('Grupo excluído');
+  };
+  window.restoreDefaultExpenseGroups=async function(){
+    const hid=db.settings.hiddenBudgetGroups||[];if(!hid.length)return;
+    const names=BUDGET_GROUPS_DEFAULT.filter(g=>hid.includes(g.key)).map(g=>g.name).join(', ');
+    if(!confirm(`Recriar os grupos padrão excluídos?\n\n${names}`))return;
+    db.settings.hiddenBudgetGroups=[];normalizeBudget();await save();render();toast('Grupos padrão recriados');
+  };
+  const orig=categories;
+  categories=function(){
+    orig.apply(this,arguments);
+    try{
+      document.querySelectorAll('#content details.bg145').forEach(d=>{
+        const k=d.dataset.key;if(!k||k==='none'||!budgetGroupDef(k))return;
+        const sm=d.querySelector('summary');
+        const b=document.createElement('button');b.type='button';b.className='bg148-edit';b.textContent='✏️ Editar';
+        b.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();openEditExpenseGroup(k);});
+        sm.querySelector('.bg145-name').after(b);
+      });
+      const tools=document.querySelector('#content .bg145-tools');
+      if(tools&&(db.settings.hiddenBudgetGroups||[]).length)
+        tools.insertAdjacentHTML('beforeend','<button type="button" class="btn" onclick="restoreDefaultExpenseGroups()">↺ Recriar grupos padrão</button>');
+    }catch(e){console.warn('v148:',e);}
+  };
+})();
+</script>
 </body>
 </html>
