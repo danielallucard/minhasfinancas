@@ -3245,7 +3245,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v142</div>
+    <div class="sum114-ver">Ricas Finanças v143</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -5579,7 +5579,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#a5b4fc!import
       // gráficos logo abaixo dos 3 cartões principais
       const kpis=host.querySelector('.sum114');
       (kpis||ver).after(...box.childNodes);
-      if(ver)ver.textContent='Ricas Finanças v142';
+      if(ver)ver.textContent='Ricas Finanças v143';
     }catch(e){console.warn('v141:',e);}
   };
 })();
@@ -6091,6 +6091,254 @@ tr.paid-row{border-left:0!important}
     const blob=new Blob([bytes],{type:'application/pdf'});const name=`ricas-financas-relatorio_${stamp}.pdf`;
     if(hasFsApi())downloadBlob(blob,name);else deliverFile(blob,name);
     toast('Relatório em PDF gerado');
+  };
+})();
+</script>
+<!-- ===== v143 — Contas: saldo do mês (sem acumular meses anteriores) + logotipos de bancos e cartões ===== -->
+<style id="logos-v143">
+.lg143{width:42px;height:42px;border-radius:14px;flex:none;display:grid;place-items:center;background:#fff;border:1px solid var(--border);box-shadow:0 6px 14px rgba(15,23,42,.1);overflow:hidden;position:relative}
+.lg143 img{width:30px;height:30px;object-fit:contain;display:block}
+.lg143.sm{width:34px;height:34px;border-radius:11px}.lg143.sm img{width:24px;height:24px}
+.acc142-av.has-logo{background:#fff!important;color:transparent!important;border:1px solid var(--border);box-shadow:0 6px 14px rgba(15,23,42,.1)}
+.acc142-av.has-logo img{width:30px;height:30px;object-fit:contain;display:block}
+.cc142-id{display:flex;align-items:center;gap:10px;min-width:0}
+.cc142-logo{width:34px;height:34px;border-radius:10px;background:#fff;display:grid;place-items:center;flex:none;box-shadow:0 4px 10px rgba(0,0,0,.18)}
+.cc142-logo img{width:24px;height:24px;object-fit:contain}
+.cc142-net{height:26px;min-width:40px;padding:3px 7px;border-radius:8px;background:#fff;display:grid;place-items:center;box-shadow:0 4px 10px rgba(0,0,0,.18)}
+.cc142-net img{height:20px;width:auto;max-width:44px;object-fit:contain;display:block}
+.lg143-field{display:grid;gap:8px}
+.lg143-pick{display:flex;align-items:center;gap:10px}
+.lg143-pick select{flex:1;min-width:0}
+.lg143-prev{width:40px;height:40px;border-radius:12px;border:1px solid var(--border);background:#fff;display:grid;place-items:center;flex:none;overflow:hidden;font-size:11px;color:var(--muted);font-weight:700}
+.lg143-prev img{width:28px;height:28px;object-fit:contain}
+.acc143-note{font-size:12px;opacity:.85;margin-top:4px}
+</style>
+<script>
+/* v143
+   1) Contas: o valor de cada conta e o total do topo passam a ser o SALDO DO MÊS selecionado
+      (entradas − saídas − faturas do mês). Sobras de meses anteriores não são somadas.
+      Os demais cálculos do app (Resumo, Movimentações, orçamento) não mudam.
+   2) Logotipos: buscados na internet pelo site do banco/bandeira (serviço público de ícones do Google,
+      com o do DuckDuckGo como reserva). Se não carregar, volta para as iniciais coloridas. */
+(function(){
+  const norm=x=>String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const BANKS=[
+    ['Banco do Brasil','bb.com.br',/banco do brasil|\bbb\b|ourocard/],
+    ['Caixa','caixa.gov.br',/caixa|\bcef\b/],
+    ['Itaú','itau.com.br',/\bitau|personnalite/],
+    ['Bradesco','bradesco.com.br',/bradesco/],
+    ['Santander','santander.com.br',/santander/],
+    ['Nubank','nubank.com.br',/nubank|\bnu\b|roxinho/],
+    ['Inter','inter.co',/\binter\b|banco inter/],
+    ['C6 Bank','c6bank.com.br',/\bc6\b/],
+    ['BTG Pactual','btgpactual.com',/btg/],
+    ['XP Investimentos','xpi.com.br',/\bxp\b/],
+    ['Rico','rico.com.vc',/\brico\b/],
+    ['Clear','clear.com.br',/\bclear\b/],
+    ['PicPay','picpay.com',/picpay/],
+    ['Mercado Pago','mercadopago.com.br',/mercado ?pago/],
+    ['PagBank','pagbank.com.br',/pagbank|pagseguro/],
+    ['Neon','neon.com.br',/\bneon\b/],
+    ['Next','next.me',/\bnext\b/],
+    ['Banco Original','original.com.br',/original/],
+    ['Safra','safra.com.br',/safra/],
+    ['Sicoob','sicoob.com.br',/sicoob/],
+    ['Sicredi','sicredi.com.br',/sicredi/],
+    ['Banrisul','banrisul.com.br',/banrisul/],
+    ['BRB','brb.com.br',/\bbrb\b/],
+    ['Banco Pan','bancopan.com.br',/\bpan\b/],
+    ['Banco BV','bv.com.br',/\bbv\b/],
+    ['Will Bank','willbank.com.br',/will ?bank/],
+    ['Agibank','agibank.com.br',/agibank/],
+    ['Banco do Nordeste','bnb.gov.br',/\bbnb\b|banco do nordeste/],
+    ['Banestes','banestes.com.br',/banestes/],
+    ['Cora','cora.com.br',/\bcora\b/],
+    ['Porto Bank','portoseguro.com.br',/porto/],
+    ['Credicard','credicard.com.br',/credicard/],
+    ['Nomad','nomadglobal.com',/nomad/],
+    ['Wise','wise.com',/\bwise\b/],
+    ['Avenue','avenue.us',/avenue/],
+    ['Daycoval','daycoval.com.br',/daycoval/],
+    ['RecargaPay','recargapay.com.br',/recargapay/],
+    ['Méliuz','meliuz.com.br',/meliuz/]
+  ];
+  const NETS=[
+    ['Visa','visa.com.br',/visa/],['Mastercard','mastercard.com.br',/master/],['Elo','elo.com.br',/\belo\b/],
+    ['American Express','americanexpress.com',/amex|american/],['Hipercard','hipercard.com.br',/hiper/],['Diners Club','dinersclub.com',/diners/]
+  ];
+  const detect=(list,txt)=>{const n=norm(txt);const hit=list.find(b=>b[2].test(n));return hit?hit[1]:'';};
+  const cleanDomain=d=>String(d||'').trim().toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').replace(/\/.*$/,'');
+  // obj.logo: '' = automático pelo nome | 'none' = sem logotipo | domínio escolhido/digitado
+  window.bankLogoDomain=function(obj,extraText){
+    if(!obj)return '';
+    if(obj.logo==='none')return '';
+    if(obj.logo)return cleanDomain(obj.logo);
+    return detect(BANKS,(obj.name||'')+' '+(obj.description||'')+' '+(extraText||''));
+  };
+  window.netLogoDomain=function(card){return card?detect(NETS,(card.brand||'')+' '+(card.name||'')):'';};
+  const src1=d=>`https://www.google.com/s2/favicons?domain=${encodeURIComponent(d)}&sz=128`;
+  const src2=d=>`https://icons.duckduckgo.com/ip3/${encodeURIComponent(d)}.ico`;
+  // imagem com reserva: Google → DuckDuckGo → some e mostra o que estiver por baixo (iniciais)
+  window.logoImgHtml=function(d,alt){
+    if(!d)return '';
+    return `<img src="${src1(d)}" alt="${esc(alt||'')}" loading="lazy" referrerpolicy="no-referrer" data-alt="${src2(d)}" onerror="if(this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt='';}else{this.closest('[data-logo-host]')?.classList.remove('has-logo');this.remove();}">`;
+  };
+
+  // ---------- 1) Saldo do mês por conta ----------
+  window.accountMonthBalance=function(accountId,k){
+    const tx=db.transactions.filter(t=>t.accountId==accountId&&!t.cardId&&!t.virtualCardStatement&&monthKey(t.date)===k);
+    const inT=tx.filter(t=>t.type==='receita').reduce((s,t)=>s+Number(t.value||0),0);
+    const outT=tx.filter(t=>t.type!=='receita').reduce((s,t)=>s+Number(t.value||0),0);
+    const invT=monthInvoicesFor(accountId,k).reduce((s,x)=>s+Number(x.value||0),0);
+    return inT-outT-invT;
+  };
+
+  const PAL=['#4f46e5','#0ea5e9','#10b981','#f59e0b','#ec4899','#8b5cf6','#14b8a6','#f97316'];
+  const oAcc=accounts;
+  accounts=function(){
+    oAcc.apply(this,arguments);
+    try{
+      const k=selectedMonthKey();
+      const list=[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0));
+      const content=document.getElementById('content');
+      // valor de cada conta = saldo do mês
+      content.querySelectorAll('.account-card').forEach((card,i)=>{
+        const a=list[i];if(!a)return;
+        const v=accountMonthBalance(a.id,k);
+        const box=[...card.querySelectorAll('div')].find(d=>d.children.length===2&&/Saldo atual/.test(d.firstElementChild?.textContent||''));
+        if(box){
+          box.firstElementChild.textContent='Saldo do mês';
+          const val=box.lastElementChild;val.className='value '+(v<0?'red':'blue');val.textContent=(v<0?'− ':'')+money(Math.abs(v));
+        }
+        // logotipo
+        const av=card.querySelector('.acc142-av');const d=bankLogoDomain(a);
+        if(av&&d&&!av.querySelector('img')){av.setAttribute('data-logo-host','');av.classList.add('has-logo');av.insertAdjacentHTML('afterbegin',logoImgHtml(d,a.name));}
+      });
+      // topo: soma dos saldos do mês
+      const hero=content.querySelector('.acc142-hero');
+      if(hero&&list.length){
+        const bals=list.map((a,i)=>({a,name:a.name,v:accountMonthBalance(a.id,k),c:PAL[i%PAL.length]}));
+        const total=bals.reduce((s,x)=>s+x.v,0),pos=bals.filter(x=>x.v>0),posT=pos.reduce((s,x)=>s+x.v,0)||1;
+        hero.innerHTML=`<div class="acc142-total"><small>Saldo do mês nas contas · ${monthLabel(k)}</small><b>${total<0?'− ':''}${money(Math.abs(total))}</b><span>Entradas − saídas − faturas do mês. Sobras de meses anteriores não entram.</span></div>
+          <div class="acc142-split"><div class="acc142-bar">${pos.map(x=>`<i style="width:${x.v/posT*100}%;background:${x.c}" title="${esc(x.name)}"></i>`).join('')}</div>
+          <div class="acc142-leg">${bals.map(x=>{const d=bankLogoDomain(x.a);return `<div>${d?`<span class="lg143 sm" style="width:20px;height:20px;border-radius:6px;box-shadow:none"><img style="width:14px;height:14px" src="${src1(d)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.outerHTML='<i style=&quot;background:${x.c}&quot;></i>'"></span>`:`<i style="background:${x.c}"></i>`}<span>${esc(x.name)}</span><b class="${x.v<0?'red':''}">${x.v<0?'− ':''}${money(Math.abs(x.v))}</b></div>`;}).join('')}</div></div>`;
+      }
+    }catch(e){console.warn('v143 contas:',e);}
+  };
+
+  // ---------- 2) Logotipos nos cartões ----------
+  const oCards=cards;
+  cards=function(){
+    oCards.apply(this,arguments);
+    try{
+      const list=[...db.cards].sort((a,b)=>(a.order??0)-(b.order??0));
+      const els=[...document.querySelectorAll('#content .grid.g2 > .card')].filter(el=>el.querySelector('.cc142'));
+      els.forEach((el,i)=>{
+        const c=list[i];if(!c)return;
+        const face=el.querySelector('.cc142');
+        const nm=face.querySelector('.cc142-name');
+        const acc=db.accounts.find(a=>String(a.id)===String(c.accountId));
+        const d=bankLogoDomain(c)||(c.logo?'':bankLogoDomain(acc));
+        if(nm&&d&&!face.querySelector('.cc142-logo')){
+          const wrap=document.createElement('span');wrap.className='cc142-id';
+          nm.before(wrap);wrap.innerHTML=`<span class="cc142-logo" data-logo-host>${logoImgHtml(d,c.name)}</span>`;wrap.appendChild(nm);
+          wrap.querySelector('img').addEventListener('error',function(){if(!this.dataset.alt)this.closest('.cc142-logo')?.remove();});
+        }
+        const nd=netLogoDomain(c),br=face.querySelector('.cc142-brand');
+        if(nd&&br&&!br.dataset.done){
+          br.dataset.done='1';
+          const keep=br.outerHTML;
+          br.className='cc142-net';br.title=c.brand||'';br.innerHTML=logoImgHtml(nd,c.brand);
+          br.querySelector('img').onerror=function(){if(this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt='';}else{br.outerHTML=keep;}};
+        }
+      });
+    }catch(e){console.warn('v143 cartões:',e);}
+  };
+
+  // ---------- Campo "Logotipo" nos formulários ----------
+  function fieldHtml(obj,kind){
+    const cur=obj?.logo||'';
+    const known=BANKS.some(b=>b[1]===cur);
+    const custom=cur&&cur!=='none'&&!known;
+    return `<label class="lg143-field">Logotipo do banco
+      <span class="lg143-pick"><span class="lg143-prev" id="lg143Prev"></span>
+      <select id="lg143Sel">
+        <option value="" ${!cur?'selected':''}>Automático (pelo nome${kind==='card'?' ou conta vinculada':''})</option>
+        ${BANKS.map(b=>`<option value="${b[1]}" ${cur===b[1]?'selected':''}>${b[0]}</option>`).join('')}
+        <option value="__custom" ${custom?'selected':''}>Outro — informar o site</option>
+        <option value="none" ${cur==='none'?'selected':''}>Sem logotipo</option>
+      </select></span>
+      <input id="lg143Custom" placeholder="Site do banco, ex.: meubanco.com.br" value="${custom?esc(cur):''}" style="${custom?'':'display:none'}">
+    </label>`;
+  }
+  function wireField(getObjForAuto){
+    const sel=document.getElementById('lg143Sel'),cus=document.getElementById('lg143Custom'),prev=document.getElementById('lg143Prev');
+    if(!sel)return;
+    const form=sel.closest('form');
+    const upd=()=>{
+      cus.style.display=sel.value==='__custom'?'':'none';
+      let d='';
+      if(sel.value==='__custom')d=cleanDomain(cus.value);
+      else if(sel.value==='none')d='';
+      else if(sel.value)d=sel.value;
+      else d=getObjForAuto(form);
+      prev.innerHTML=d?`<img src="${src1(d)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.textContent='—'">`:'—';
+    };
+    sel.addEventListener('change',upd);cus.addEventListener('input',upd);
+    form.querySelectorAll('input[name="name"],input[name="description"],input[name="brand"],select[name="accountId"]').forEach(x=>x.addEventListener('input',upd));
+    form.querySelector('select[name="accountId"]')?.addEventListener('change',upd);
+    upd();
+  }
+  function readField(){
+    const sel=document.getElementById('lg143Sel');if(!sel)return null;
+    if(sel.value==='__custom'){const d=cleanDomain(document.getElementById('lg143Custom').value);return d||'';}
+    return sel.value;
+  }
+  function insertBeforeSubmit(html){
+    const form=document.querySelector('#modalBody form');const btn=form&&[...form.querySelectorAll('button.btn.primary')].pop();
+    if(btn)btn.insertAdjacentHTML('beforebegin',html);
+  }
+
+  const oOA=openAccount;
+  openAccount=function(id){
+    oOA.apply(this,arguments);
+    try{
+      const a=id?db.accounts.find(x=>x.id==id):null;
+      insertBeforeSubmit(fieldHtml(a,'account'));
+      wireField(form=>detect(BANKS,(form.querySelector('[name=name]')?.value||'')+' '+(form.querySelector('[name=description]')?.value||'')));
+    }catch(e){console.warn('v143:',e);}
+  };
+  const oSA=saveAccount;
+  saveAccount=function(e,id){
+    const logo=readField();const before=db.accounts.length;
+    oSA.apply(this,arguments);
+    if(logo===null)return;
+    const a=id?db.accounts.find(x=>x.id==id):(db.accounts.length>before?db.accounts[db.accounts.length-1]:null);
+    if(a&&(a.logo||'')!==logo){a.logo=logo;save();render();}
+  };
+
+  const oOC=openCard;
+  openCard=function(id){
+    oOC.apply(this,arguments);
+    try{
+      const c=id?db.cards.find(x=>x.id==id):null;
+      insertBeforeSubmit(fieldHtml(c,'card'));
+      wireField(form=>{
+        const own=detect(BANKS,form.querySelector('[name=name]')?.value||'');if(own)return own;
+        const acc=db.accounts.find(a=>String(a.id)===String(form.querySelector('[name=accountId]')?.value));
+        return bankLogoDomain(acc);
+      });
+      const br=document.querySelector('#modalBody input[name="brand"]');
+      if(br){br.setAttribute('list','lg143Nets');br.placeholder='Visa, Mastercard, Elo…';br.insertAdjacentHTML('afterend',`<datalist id="lg143Nets">${NETS.map(n=>`<option value="${n[0]}">`).join('')}</datalist>`);}
+    }catch(e){console.warn('v143:',e);}
+  };
+  const oSC=saveCard;
+  saveCard=function(e,id){
+    const logo=readField();const before=db.cards.length;
+    oSC.apply(this,arguments);
+    if(logo===null)return;
+    const c=id?db.cards.find(x=>x.id==id):(db.cards.length>before?db.cards[db.cards.length-1]:null);
+    if(c&&(c.logo||'')!==logo){c.logo=logo;save();render();}
   };
 })();
 </script>
