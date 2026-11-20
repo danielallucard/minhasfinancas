@@ -3245,7 +3245,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v143</div>
+    <div class="sum114-ver">Ricas Finanças v144</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -5579,7 +5579,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#a5b4fc!import
       // gráficos logo abaixo dos 3 cartões principais
       const kpis=host.querySelector('.sum114');
       (kpis||ver).after(...box.childNodes);
-      if(ver)ver.textContent='Ricas Finanças v143';
+      if(ver)ver.textContent='Ricas Finanças v144';
     }catch(e){console.warn('v141:',e);}
   };
 })();
@@ -6339,6 +6339,76 @@ tr.paid-row{border-left:0!important}
     if(logo===null)return;
     const c=id?db.cards.find(x=>x.id==id):(db.cards.length>before?db.cards[db.cards.length-1]:null);
     if(c&&(c.logo||'')!==logo){c.logo=logo;save();render();}
+  };
+})();
+</script>
+<!-- ===== v144 — Ajustes: topo de Contas compacto, ícones centralizados, sem "chip" no cartão, lançamentos do cartão recolhíveis ===== -->
+<style id="fix-v144">
+/* Contas: o bloco roxo não estica mais para acompanhar a lista ao lado */
+.acc142-hero{align-items:start}
+.acc142-total{padding:16px 20px!important;min-height:0!important}
+.acc142-total b{font-size:clamp(24px,3.2vw,30px)!important;line-height:1.15}
+.acc142-split{padding:14px 16px!important;align-content:start!important}
+.acc142-leg{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));column-gap:18px}
+/* Ícones/logotipos centralizados */
+.acc142-av{display:inline-grid!important;place-items:center!important;vertical-align:middle;line-height:1;padding:0!important}
+.acc142-av.has-logo{font-size:0!important}
+.acc142-av:empty::before{content:attr(data-ini);font-size:15px;color:#fff}
+.acc142-av img,.cc142-logo img,.cc142-net img,.lg143 img,.lg143-prev img{display:block;margin:auto}
+.account-card h2{display:flex;align-items:center;gap:10px}
+.cc142-logo,.cc142-net{display:grid!important;place-items:center!important;line-height:0;padding:0 6px}
+.cc142-logo{padding:0}
+.cc142-top{align-items:center!important}
+.acc142-leg .lg143{display:grid;place-items:center}
+/* Cartão: o retângulo amarelo era só decorativo (imitava o chip) — removido */
+.cc142-chip{display:none!important}
+.cc142{min-height:0!important;gap:14px}
+/* Lançamentos do cartão recolhíveis */
+.cc144-tx{margin-top:12px;border:1px solid var(--border);border-radius:14px;background:#fff}
+.cc144-tx>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 14px;font-weight:750;font-size:14.5px;user-select:none;-webkit-user-select:none}
+.cc144-tx>summary::-webkit-details-marker{display:none}
+.cc144-tx>summary::after{content:'▾';margin-left:auto;color:var(--muted);transition:transform .15s}
+.cc144-tx:not([open])>summary::after{transform:rotate(-90deg)}
+.cc144-tx>summary .muted{font-weight:600;font-size:12.5px}
+.cc144-tx>summary .red{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cc144-body{padding:0 10px 10px}
+</style>
+<script>
+(function(){
+  window.cc144Open=window.cc144Open||{};
+  // Contas: guarda as iniciais para reaparecerem se o logotipo não carregar
+  const oAcc=accounts;
+  accounts=function(){
+    oAcc.apply(this,arguments);
+    try{document.querySelectorAll('#content .acc142-av.has-logo').forEach(av=>{
+      if(av.dataset.ini)return;
+      const txt=[...av.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim();
+      av.dataset.ini=txt;[...av.childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());
+    });}catch(e){console.warn('v144:',e);}
+  };
+  // Cartões: "Lançamentos do cartão" em bloco recolhível (começa fechado)
+  const oCards=cards;
+  cards=function(){
+    oCards.apply(this,arguments);
+    try{
+      const k=selectedMonthKey();
+      const list=[...db.cards].sort((a,b)=>(a.order??0)-(b.order??0));
+      const els=[...document.querySelectorAll('#content .grid.g2 > .card')].filter(el=>el.querySelector('.cc142'));
+      els.forEach((el,i)=>{
+        const c=list[i];const h=[...el.querySelectorAll(':scope > h3')].find(x=>/Lançamentos do cartão/.test(x.textContent));
+        if(!c||!h||el.querySelector('.cc144-tx'))return;
+        const body=h.nextElementSibling;
+        const n=body?Math.max(0,body.querySelectorAll('tr').length-1):0;
+        const tot=cardTransactions(c.id,k).reduce((s,t)=>s+Number(t.value||0),0);
+        const d=document.createElement('details');d.className='cc144-tx';
+        const key=c.id+'|'+k;if(cc144Open[key])d.open=true;
+        d.innerHTML=`<summary>🧾 Lançamentos do cartão <span class="muted">${n} compra${n===1?'':'s'}</span>${n?`<span class="red">${money(tot)}</span>`:''}</summary><div class="cc144-body"></div>`;
+        d.addEventListener('toggle',()=>{cc144Open[key]=d.open;});
+        const hr=h.previousElementSibling;if(hr&&hr.tagName==='HR')hr.remove();
+        h.before(d);h.remove();
+        if(body)d.querySelector('.cc144-body').appendChild(body);
+      });
+    }catch(e){console.warn('v144 cartões:',e);}
   };
 })();
 </script>
