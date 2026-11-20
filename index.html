@@ -3245,7 +3245,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v146</div>
+    <div class="sum114-ver">Ricas Finanças v147</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -5541,19 +5541,30 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#a5b4fc!import
         <linearGradient id="g141e" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fb7185"/><stop offset="1" stop-color="#ef4444"/></linearGradient>
       </defs>${g}</svg></div>`;
   }
+  let donutMode=(()=>{try{return localStorage.getItem('rf_donutMode')||'cat';}catch(e){return 'cat';}})();
+  window.ch141SetMode=function(m){donutMode=m;try{localStorage.setItem('rf_donutMode',m);}catch(e){}
+    const el=document.querySelector('#content .ch141[data-donut]');if(!el)return;
+    const w=document.createElement('div');w.innerHTML=donutChart(el.dataset.donut);el.replaceWith(w.firstElementChild);};
   function donutChart(month){
+    const isG=donutMode==='grp';
+    const groups=(()=>{try{return budgetGroups();}catch(e){return [];}})();
+    const gOf=id=>{const c=db.categories.find(c=>String(c.id)===id);const k=c?.budgetGroup||'';return groups.find(g=>g.key===k)||{key:'',name:'Sem grupo',icon:'❔',color:'#9ca3af'};};
+    const title=isG?'Despesas por grupo':'Despesas por categoria';
+    const tog=`<span class="ch141-seg"><button type="button" class="${isG?'':'on'}" onclick="ch141SetMode('cat')">Categoria</button><button type="button" class="${isG?'on':''}" onclick="ch141SetMode('grp')">Grupo</button></span>`;
     const rows=monthTotals(month).rows.filter(t=>t.type==='despesa');
-    const by={};rows.forEach(t=>{const id=String(t.categoryId||'');by[id]=(by[id]||0)+Number(t.value||0);});
+    const by={};rows.forEach(t=>{const cid=String(t.categoryId||'');const id=isG?('g:'+gOf(cid).key):cid;by[id]=(by[id]||0)+Number(t.value||0);});
     let arr=Object.entries(by).sort((a,b)=>b[1]-a[1]);
     const total=arr.reduce((s,x)=>s+x[1],0);
-    if(!total)return `<div class="ch141"><div class="ch141-h"><b>Despesas por categoria</b></div><div class="ch141-empty">Nenhuma despesa neste mês.</div></div>`;
+    if(!total)return `<div class="ch141" data-donut="${month}"><div class="ch141-h"><b>${title}</b>${tog}</div><div class="ch141-empty">Nenhuma despesa neste mês.</div></div>`;
     const pal=['#6366f1','#ec4899','#f59e0b','#10b981','#06b6d4','#8b5cf6','#f97316','#94a3b8'];
     if(arr.length>6){const rest=arr.slice(5).reduce((s,x)=>s+x[1],0);arr=arr.slice(0,5).concat([['__outros',rest]]);}
-    const items=arr.map(([id,v],i)=>({id,v,name:id==='__outros'?'Outras':catName(id),color:id==='__outros'?'#cbd5e1':(db.categories.find(c=>String(c.id)===id)?.color||pal[i%pal.length])}));
+    const items=arr.map(([id,v],i)=>{if(id==='__outros')return {id,v,name:'Outras',color:'#cbd5e1'};
+      if(isG){const k=id.slice(2);const g=groups.find(g=>g.key===k)||{name:'Sem grupo',icon:'❔',color:'#9ca3af'};return {id,v,name:`${g.icon||''} ${g.name}`.trim(),color:g.color||pal[i%pal.length]};}
+      return {id,v,name:catName(id),color:db.categories.find(c=>String(c.id)===id)?.color||pal[i%pal.length]};});
     const R=60,C=2*Math.PI*R;let off=0;
     const segs=items.map(it=>{const len=C*it.v/total;const s=`<circle r="${R}" cx="85" cy="85" fill="none" stroke="${it.color}" stroke-width="22" stroke-dasharray="${Math.max(len-2,0.1)} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 85 85)"><title>${esc(it.name)}: ${money(it.v)}</title></circle>`;off+=len;return s;}).join('');
     const list=items.map(it=>{const p=it.v/total*100;return `<div class="ch141-row"><span class="dot" style="background:${it.color}"></span><span class="nm">${esc(it.name)}</span><span class="vl">${p.toFixed(0)}%</span><span class="bar2"><i style="width:${p}%;background:${it.color}"></i></span></div>`;}).join('');
-    return `<div class="ch141"><div class="ch141-h"><b>Despesas por categoria</b><small>${monthLabel(month)}</small></div>
+    return `<div class="ch141" data-donut="${month}"><div class="ch141-h"><div><b>${title}</b><br><small>${monthLabel(month)}</small></div>${tog}</div>
       <div class="ch141-donut"><svg viewBox="0 0 170 170"><circle r="${R}" cx="85" cy="85" fill="none" stroke="#f1f5f9" stroke-width="22"/>${segs}
       <text x="85" y="80" text-anchor="middle" font-size="10.5" fill="#94a3b8" font-weight="600">Total</text>
       <text x="85" y="98" text-anchor="middle" font-size="14.5" fill="#0f172a" font-weight="800">${fmtK(total)}</text></svg>
@@ -5579,7 +5590,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#a5b4fc!import
       // gráficos logo abaixo dos 3 cartões principais
       const kpis=host.querySelector('.sum114');
       (kpis||ver).after(...box.childNodes);
-      if(ver)ver.textContent='Ricas Finanças v146';
+      if(ver)ver.textContent='Ricas Finanças v147';
     }catch(e){console.warn('v141:',e);}
   };
 })();
@@ -6519,5 +6530,10 @@ tr.paid-row{border-left:0!important}
   };
 })();
 </script>
+<style id="donut-mode-v147">
+.ch141-seg{display:inline-flex;background:#f1f5f9;border-radius:999px;padding:3px;gap:2px;flex-shrink:0}
+.ch141-seg button{border:0;background:transparent;padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:700;color:#64748b;cursor:pointer;font-family:inherit}
+.ch141-seg button.on{background:#fff;color:#4f46e5;box-shadow:0 1px 3px rgba(15,23,42,.12)}
+</style>
 </body>
 </html>
