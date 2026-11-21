@@ -2263,7 +2263,6 @@ function openRecurrence(id){
       ${[...db.cards].sort((a,b)=>(a.order??0)-(b.order??0)).map(c=>`<option value="${c.id}" ${sel(r?.cardId,c.id)}>💳 ${esc(c.name)}</option>`).join('')}
     </select></label>
     <label id="recHolderWrap" hidden>Titular<select name="cardHolder" id="recHolderSelect" data-current="${esc(r?.cardHolder||'')}"></select></label>
-    <label>Estabelecimento na fatura <span class="muted">(opcional)</span><input name="merchant" value="${esc(r?.merchant||'')}" placeholder="Ex.: SMARTFIT*MENSALIDADE" autocomplete="off" maxlength="80"></label>
     <p class="muted" id="recCardHint">Informe o valor de cada parcela ou cobrança mensal, não o valor total da compra. A data da primeira compra/cobrança determina a fatura conforme o fechamento do cartão. As parcelas/cobranças seguintes entram em faturas mensais consecutivas e não debitam diretamente a conta bancária.</p>
   </div>
   <div class="row rec-account-category-row" id="recAccountCategoryRow">
@@ -2272,6 +2271,8 @@ function openRecurrence(id){
       ${accounts.map(a=>`<option value="${a.id}" ${sel(r?.accountId,a.id)}>${esc(a.name)}</option>`).join('')}</select></label>
     ${recurrenceCategoryPickerHtml(r?.categoryId??'')}
   </div>
+  <label id="recMerchantWrap">Estabelecimento no extrato / fatura <span class="muted">(opcional)</span><input name="merchant" value="${esc(r?.merchant||'')}" placeholder="Ex.: SMARTFIT*MENSALIDADE" autocomplete="off" maxlength="80"></label>
+  <p class="muted" id="recMerchantHint">Se for recorrente, a notificação do banco com este nome (e valor parecido) é <b>ignorada</b> pelo atalho, para não lançar em dobro.</p>
   ${r?'':'<label id="recGenerateWrap"><input type="checkbox" name="generateNow" checked> Criar já todas as parcelas futuras</label>'}
   <p class="muted" id="recRecurringHint" style="display:none">Os lançamentos recorrentes ficam sempre ${RECURRING_AHEAD_MONTHS} meses lançados à frente e continuam sendo gerados até você usar <b>Encerrar</b> na lista.</p>
   ${r?'<p class="muted">Lançamentos já <b>confirmados</b> nunca são alterados. Ao salvar, você poderá escolher se as mudanças valem também para os lançamentos já gerados e ainda pendentes.</p>':''}
@@ -2350,6 +2351,8 @@ function toggleRecurrencePayment(){
     method.value='account';toast('Receitas são lançadas em conta; cartão é exclusivo para despesas.');
   }
   const useCard=method.value==='card';
+  const mw=document.getElementById('recMerchantWrap'),mh=document.getElementById('recMerchantHint');
+  if(mw)mw.hidden=type.value==='receita';if(mh)mh.hidden=type.value==='receita';
   const cs=document.getElementById('recCardSelect'),ac=document.getElementById('recAccountSelect');
   document.getElementById('recCardWrap').hidden=!useCard;
   document.getElementById('recAccountWrap').hidden=useCard;
@@ -2371,7 +2374,7 @@ function toggleRecurrencePayment(){
   }else holder.dataset.card='';
 }
 function recurrenceCardData(r){
-  if(!r.cardId)return {cardId:null,cardHolder:undefined,merchant:undefined,accountId:Number(r.accountId)||0};
+  if(!r.cardId)return {cardId:null,cardHolder:undefined,merchant:r.type==='despesa'?(String(r.merchant||'').trim()||undefined):undefined,accountId:Number(r.accountId)||0};
   const card=db.cards.find(c=>String(c.id)===String(r.cardId));
   if(!card)return null; // Nunca converter cartão excluído em débito bancário silenciosamente.
   return {cardId:card.id,cardHolder:r.cardHolder==='additional'&&(card.hasAdditional||card.additionalName)?'additional':'principal',merchant:String(r.merchant||'').trim()||undefined,accountId:Number(card.accountId)||0};
@@ -2418,7 +2421,7 @@ function saveRecurrence(e,id){
   const data={mode,type:f.get('type'),start:String(f.get('start')||''),description:String(f.get('description')||'').trim(),
     value:parseDecimalBR(f.get('value')),count:mode==='recurring'?null:+f.get('count'),
     startIdx:mode==='recurring'?null:Math.max(1,Math.floor(Number(f.get('startIdx'))||1)),
-    anchorFixed:true,accountId:card?(Number(card.accountId)||0):+f.get('accountId'),categoryId:+f.get('categoryId'),cardId:card?card.id:null,cardHolder:card?f.get('cardHolder'):undefined,merchant:card?(String(f.get('merchant')||'').trim()||undefined):undefined};
+    anchorFixed:true,accountId:card?(Number(card.accountId)||0):+f.get('accountId'),categoryId:+f.get('categoryId'),cardId:card?card.id:null,cardHolder:card?f.get('cardHolder'):undefined,merchant:f.get('type')==='despesa'?(String(f.get('merchant')||'').trim()||undefined):undefined};
   if(!data.start)return toast('Informe o primeiro vencimento.');
   if(!(data.value>0))return toast('Informe um valor maior que zero.');
   if(mode==='installments'&&!(data.count>=1))return toast('Informe o número total de parcelas.');
@@ -3249,7 +3252,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v150</div>
+    <div class="sum114-ver">Ricas Finanças v151</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -3454,7 +3457,7 @@ function transactions(){
         </tr>
         ${rows.map(t=>`<tr class="${t.virtualCardStatement?'pending-row':(txIsPaid(t)?'paid-row':'pending-row')}">
           <td>${fmtDate(t.date)}</td>
-            <td>${esc(t.description)}${merchantLabel(t)&&merchantLabel(t)!==String(t.description||'').trim()?`<br><span class="invoice-merchant">${esc(merchantLabel(t))}</span>`:''}${txAutomationKind(t)!=='single'?`<br><span class="pill tx-origin-pill">${esc(txAutomationLabel(t))}</span>`:''}</td>
+          <td>${esc(t.description)}${merchantLabel(t)&&merchantLabel(t)!==String(t.description||'').trim()?`<br><span class="invoice-merchant">${esc(merchantLabel(t))}</span>`:''}${txAutomationKind(t)!=='single'?`<br><span class="pill tx-origin-pill">${esc(txAutomationLabel(t))}</span>`:''}</td>
           <td>${esc(txAccountLabel(t))}</td>
           <td>${t.virtualCardStatement?'—':'<span class="cat-dot" style="background:'+categoryColor(t.categoryId)+'"></span><span class="category-icon">'+esc(categoryIcon(t.categoryId))+'</span>'+esc(catName(t.categoryId))}</td>
           <td>${t.type==='receita'?'Receita':'Despesa'}</td>
@@ -5595,7 +5598,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#a5b4fc!import
       // gráficos logo abaixo dos 3 cartões principais
       const kpis=host.querySelector('.sum114');
       (kpis||ver).after(...box.childNodes);
-      if(ver)ver.textContent='Ricas Finanças v150';
+      if(ver)ver.textContent='Ricas Finanças v151';
     }catch(e){console.warn('v141:',e);}
   };
 })();
