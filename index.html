@@ -1912,7 +1912,7 @@ function toggleCardAccountFields(){
   if(has)account.value=String(c.accountId||'');
   else account.disabled=false;
   const merchantWrap=document.getElementById('txMerchantWrap');
-  if(merchantWrap)merchantWrap.style.display=has?'block':'none';
+  if(merchantWrap){const tp=document.querySelector('#modalBody .tx-form select[name="type"]')?.value;merchantWrap.style.display=tp==='receita'?'none':'block';}
   if(wrap&&holder){
     wrap.style.display=has?'block':'none';
     if(has){
@@ -3249,7 +3249,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v148</div>
+    <div class="sum114-ver">Ricas Finanças v150</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -3454,7 +3454,7 @@ function transactions(){
         </tr>
         ${rows.map(t=>`<tr class="${t.virtualCardStatement?'pending-row':(txIsPaid(t)?'paid-row':'pending-row')}">
           <td>${fmtDate(t.date)}</td>
-          <td>${esc(t.description)}${txAutomationKind(t)!=='single'?`<br><span class="pill tx-origin-pill">${esc(txAutomationLabel(t))}</span>`:''}</td>
+            <td>${esc(t.description)}${merchantLabel(t)&&merchantLabel(t)!==String(t.description||'').trim()?`<br><span class="invoice-merchant">${esc(merchantLabel(t))}</span>`:''}${txAutomationKind(t)!=='single'?`<br><span class="pill tx-origin-pill">${esc(txAutomationLabel(t))}</span>`:''}</td>
           <td>${esc(txAccountLabel(t))}</td>
           <td>${t.virtualCardStatement?'—':'<span class="cat-dot" style="background:'+categoryColor(t.categoryId)+'"></span><span class="category-icon">'+esc(categoryIcon(t.categoryId))+'</span>'+esc(catName(t.categoryId))}</td>
           <td>${t.type==='receita'?'Receita':'Despesa'}</td>
@@ -3527,7 +3527,7 @@ function accounts(){
         </summary>
         <div style="margin-top:10px">
           ${pendingCount?`<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn primary" onclick="confirmAccountMonthPending(${a.id},'${k}')">✓ Confirmar todas as ${pendingCount} pendentes do mês</button></div>`:''}
-          ${tx.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th>Editar</th><th>Confirmar</th><th>Excluir</th></tr>${tx.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}</td><td><span class="cat-dot" style="background:${categoryColor(t.categoryId)}"></span><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td>${t.type==='receita'?'Receita':'Despesa'}</td><td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td><td><button class="btn" onclick="openTx(${t.id})">✎</button></td><td><input type="checkbox" class="confirm-check" ${t.confirmed?'checked':''} onchange="toggleTxConfirmed(${t.id})"></td><td><button class="btn danger" onclick="deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhum lançamento nesta conta neste mês.</div>'}
+          ${tx.length?`<div class="table-wrap"><table class="table"><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th>Editar</th><th>Confirmar</th><th>Excluir</th></tr>${tx.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${esc(t.description)}${merchantLabel(t)&&merchantLabel(t)!==String(t.description||'').trim()?`<br><span class="invoice-merchant">${esc(merchantLabel(t))}</span>`:''}</td><td><span class="cat-dot" style="background:${categoryColor(t.categoryId)}"></span><span class="category-icon">${esc(categoryIcon(t.categoryId))}</span>${esc(catName(t.categoryId))}</td><td>${t.type==='receita'?'Receita':'Despesa'}</td><td class="${t.type==='receita'?'blue':'red'}">${t.type==='receita'?'+':'−'} ${money(t.value)}</td><td><button class="btn" onclick="openTx(${t.id})">✎</button></td><td><input type="checkbox" class="confirm-check" ${t.confirmed?'checked':''} onchange="toggleTxConfirmed(${t.id})"></td><td><button class="btn danger" onclick="deleteTransaction(${t.id})">Excluir</button></td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhum lançamento nesta conta neste mês.</div>'}
         </div>
       </details>
       <div style="margin-top:10px"><button class="btn" onclick="openAccount(${a.id})">Editar conta</button></div>
@@ -4137,7 +4137,8 @@ function saveTransactionEdit(e,id){
   }
   t.cardHolder=newCardId?changed.cardHolder:'principal';
   // O estabelecimento só faz sentido em compras no cartão.
-  if(newCardId&&changed.merchant)t.merchant=changed.merchant; else delete t.merchant;
+  // v150: crédito e débito guardam o estabelecimento (como aparece no extrato/fatura).
+  if(changed.type==='despesa'&&changed.merchant)t.merchant=changed.merchant; else delete t.merchant;
 
   const dateChanged=newDate!==oldDate;
 
@@ -4409,14 +4410,14 @@ function openTx(id){
   const cardId=t?.cardId||'';
   openModal(title,`<form class="form tx-form" data-transaction-id="${t?.id||''}" onsubmit="${t?`saveTransactionEdit(event,${id})`:`addTx(event)`}">
     <div class="row">
-      <label>Tipo<select name="type" required><option value="" disabled ${t?'':'selected'}>Selecione…</option><option value="despesa" ${t?.type==='despesa'?'selected':''}>Despesa</option><option value="receita" ${t?.type==='receita'?'selected':''}>Receita</option></select></label>
+      <label>Tipo<select name="type" required onchange="toggleCardAccountFields()"><option value="" disabled ${t?'':'selected'}>Selecione…</option><option value="despesa" ${t?.type==='despesa'?'selected':''}>Despesa</option><option value="receita" ${t?.type==='receita'?'selected':''}>Receita</option></select></label>
       <label>Data da transação<input type="date" name="date" value="${today}" required oninput="updateTxDateHint()"></label>
     </div>
     <label>Descrição<input name="description" value="${esc(t?.description||'')}" required placeholder="Ex.: Supermercado"></label>
     <label>Valor<input inputmode="decimal" data-decimal="true" autocomplete="off" type="text" data-min="0.01" name="value" value="${decimalInputValue(t?.value||'')}" required placeholder="0,00"></label>
     <label>Cartão de crédito<select name="cardId" id="txCardSelect" onchange="toggleCardAccountFields()"><option value="">Não é compra no cartão</option>${[...db.cards].sort((a,b)=>(a.order??0)-(b.order??0)).map(c=>`<option value="${c.id}" ${String(cardId)===String(c.id)?'selected':''}>💳 ${esc(c.name)}</option>`).join('')}</select></label>
     <label id="txHolderWrap" style="display:${cardId?'block':'none'}">Titular da compra<select name="cardHolder" id="txHolderSelect"></select></label>
-    <label id="txMerchantWrap" style="display:${cardId?'block':'none'}">Estabelecimento na fatura <span class="muted">(opcional)</span><input name="merchant" value="${esc(t?.merchant||'')}" placeholder="Ex.: SMARTFIT*MENSALIDADE" autocomplete="off" maxlength="80"></label>
+    <label id="txMerchantWrap" style="display:${t?.type==='receita'?'none':'block'}">Estabelecimento no extrato / fatura <span class="muted">(opcional)</span><input name="merchant" value="${esc(t?.merchant||'')}" placeholder="Ex.: SMARTFIT*MENSALIDADE" autocomplete="off" maxlength="80"></label>
     <div class="row tx-account-category-row">
       <label class="tx-account-field">Conta<select name="accountId" id="txAccountSelectModal" required><option value="" ${t?'':'selected'}>Selecione uma conta</option>${[...db.accounts].sort((a,b)=>(a.order??0)-(b.order??0)).map(a=>`<option value="${a.id}" ${!cardId&&t?.accountId==a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>
       ${categoryPickerHtml(t?.categoryId??'')}
@@ -4441,7 +4442,7 @@ function addTx(e){
   if(!cardId&&!f.get('accountId'))return toast('Selecione a conta.');
   if(cardId && f.get('type')!=='despesa'){toast('Compras no cartão devem ser despesas.');return;}
   if(!(parseDecimalBR(f.get('value'))>0))return toast('Informe um valor válido maior que zero.');
-  const card=db.cards.find(c=>c.id===cardId); db.transactions.push({id:uid(),type:f.get('type'),date:f.get('date'),description:f.get('description'),value:parseDecimalBR(f.get('value')),accountId:cardId?Number(card?.accountId||0):+f.get('accountId'),cardId:cardId||undefined,cardHolder:cardId?(f.get('cardHolder')||'principal'):undefined,merchant:cardId?(String(f.get('merchant')||'').trim()||undefined):undefined,categoryId:+f.get('categoryId'),confirmed:f.get('confirmed')==='on'});
+  const card=db.cards.find(c=>c.id===cardId); db.transactions.push({id:uid(),type:f.get('type'),date:f.get('date'),description:f.get('description'),value:parseDecimalBR(f.get('value')),accountId:cardId?Number(card?.accountId||0):+f.get('accountId'),cardId:cardId||undefined,cardHolder:cardId?(f.get('cardHolder')||'principal'):undefined,merchant:f.get('type')==='despesa'?(String(f.get('merchant')||'').trim()||undefined):undefined,categoryId:+f.get('categoryId'),confirmed:f.get('confirmed')==='on'});
   save();closeModal();toast(cardId?'Compra lançada no cartão':'Movimentação cadastrada');render();
 }
 
@@ -5594,7 +5595,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#a5b4fc!import
       // gráficos logo abaixo dos 3 cartões principais
       const kpis=host.querySelector('.sum114');
       (kpis||ver).after(...box.childNodes);
-      if(ver)ver.textContent='Ricas Finanças v148';
+      if(ver)ver.textContent='Ricas Finanças v150';
     }catch(e){console.warn('v141:',e);}
   };
 })();
