@@ -3252,7 +3252,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v152</div>
+    <div class="sum114-ver">Ricas Finanças v153</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -5598,7 +5598,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#a5b4fc!import
       // gráficos logo abaixo dos 3 cartões principais
       const kpis=host.querySelector('.sum114');
       (kpis||ver).after(...box.childNodes);
-      if(ver)ver.textContent='Ricas Finanças v152';
+      if(ver)ver.textContent='Ricas Finanças v153';
     }catch(e){console.warn('v141:',e);}
   };
 })();
@@ -6666,6 +6666,10 @@ tr.paid-row{border-left:0!important}
 .cl152-actions .btn{flex:1 1 0;min-height:40px}
 .cl152-empty{text-align:center;padding:26px 10px;color:var(--muted)}
 @media(max-width:560px){.cl152-form{grid-template-columns:1fr}}
+.cl153-mode{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;padding:4px;border-radius:12px;background:#f1f5f9}
+.cl153-mode button{min-height:40px;border:0;border-radius:9px;background:transparent;font:inherit;font-weight:700;font-size:14.5px;color:#475569;cursor:pointer}
+.cl153-mode button.on{background:#fff;color:#4f46e5;box-shadow:0 1px 3px rgba(15,23,42,.15)}
+@media(max-width:560px){.cl152-form{grid-template-columns:1fr}}
 </style>
 <script>
 /* v152 — Reúne em um só lugar todas as despesas "A classificar" (de qualquer mês).
@@ -6680,6 +6684,12 @@ tr.paid-row{border-left:0!important}
       (pc&&String(t.categoryId)===String(pc.id))||!db.categories.some(c=>String(c.id)===String(t.categoryId))
     )).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   }
+  // v153 — cartão ligado ao lançamento (crédito: cardId; débito: conta vinculada ao cartão)
+  function cardOf(t){
+    if(t.cardId)return db.cards.find(c=>String(c.id)===String(t.cardId));
+    if(t.debitCardId)return db.cards.find(c=>String(c.id)===String(t.debitCardId));
+    return null;
+  }
   window.classifyPendingCount=()=>pendingList().length;
   const grpKey=c=>budgetGroupDef(c.budgetGroup)?c.budgetGroup:'';
   function catsFor(t,g){
@@ -6693,12 +6703,16 @@ tr.paid-row{border-left:0!important}
     return '<option value="">Escolha a categoria…</option>'+list.map(c=>`<option value="${c.id}">${esc(c.icon||defaultCategoryIcon(c.name))} ${esc(c.name)}</option>`).join('');
   }
   function itemHtml(t){
-    const where=t.cardId?`💳 ${esc(cardName(t.cardId))}`:`🏦 ${esc(accountName(t.accountId))}`;
+    const where=t.cardId?`💳 ${esc(cardName(t.cardId))} (crédito)`:(t.debitCardId?`🏦 ${esc(accountName(t.accountId))} (débito · ${esc(cardName(t.debitCardId))})`:`🏦 ${esc(accountName(t.accountId))}`);
     const merch=merchantLabel(t)&&merchantLabel(t)!==String(t.description||'').trim()?` · ${esc(merchantLabel(t))}`:'';
     const exp=t.type!=='receita';
     return `<div class="cl152-item" data-id="${t.id}">
       <div class="cl152-top"><b>${esc(t.description||'Sem descrição')}</b><span class="cl152-val" style="${exp?'':'color:var(--green)'}">${exp?'− ':'+ '}${money(t.value)}</span></div>
       <div class="cl152-meta">${fmtDate(t.date)} · ${where}${merch}</div>
+      ${exp&&cardOf(t)?`<div class="cl153-mode" data-mode="${t.cardId?'credito':'debito'}">
+        <button type="button" class="${t.cardId?'on':''}" onclick="classifyMode(${t.id},'credito')">💳 Crédito</button>
+        <button type="button" class="${t.cardId?'':'on'}" onclick="classifyMode(${t.id},'debito')">🏦 Débito</button>
+      </div>`:''}
       <div class="cl152-form">
         ${exp?`<select class="cl152-grp" onchange="classifyGroupChange(${t.id},this.value)"><option value="all">Todos os grupos</option>${budgetGroups().map(g=>`<option value="${g.key}">${g.icon} ${esc(g.name)}</option>`).join('')}<option value="none">❔ Sem grupo</option></select>`:''}
         <select class="cl152-cat" ${exp?'':'style="grid-column:1/-1"'}>${catOptions(t,'all')}</select>
@@ -6706,6 +6720,10 @@ tr.paid-row{border-left:0!important}
       <div class="cl152-actions"><button type="button" class="btn" onclick="closeModal();openTx(${t.id})">✎ Editar tudo</button><button type="button" class="btn primary" onclick="classifySave(${t.id})">Salvar</button></div>
     </div>`;
   }
+  window.classifyMode=function(id,m){
+    const box=document.querySelector(`#modalBody .cl152-item[data-id="${id}"] .cl153-mode`);if(!box)return;
+    box.dataset.mode=m;box.querySelectorAll('button').forEach((b,i)=>b.classList.toggle('on',(i===0)===(m==='credito')));
+  };
   window.classifyGroupChange=function(id,g){
     const t=db.transactions.find(x=>String(x.id)===String(id));const box=document.querySelector(`#modalBody .cl152-item[data-id="${id}"] .cl152-cat`);
     if(t&&box)box.innerHTML=catOptions(t,g);
@@ -6714,7 +6732,7 @@ tr.paid-row{border-left:0!important}
     const list=pendingList();
     const total=list.filter(t=>t.type!=='receita').reduce((s,t)=>s+Number(t.value||0),0);
     openModal(`🏷️ A classificar (${list.length})`,list.length
-      ?`<p class="muted" style="margin:0 0 12px">Todos os meses · ${money(total)} em despesas. Escolha o grupo e a categoria e toque em <b>Salvar</b>.</p><div class="cl152-list">${list.map(itemHtml).join('')}</div>`
+      ?`<p class="muted" style="margin:0 0 12px">Todos os meses · ${money(total)} em despesas. Confira crédito/débito, escolha grupo e categoria e toque em <b>Salvar</b>.</p><div class="cl152-list">${list.map(itemHtml).join('')}</div>`
       :'<div class="cl152-empty">✅ Nenhum lançamento aguardando categoria.</div>');
   };
   window.classifySave=async function(id){
@@ -6722,9 +6740,19 @@ tr.paid-row{border-left:0!important}
     const sel=document.querySelector(`#modalBody .cl152-item[data-id="${id}"] .cl152-cat`);
     const cat=db.categories.find(c=>String(c.id)===String(sel?.value));
     if(!cat)return toast('Escolha a categoria.');
+    const modeBox=document.querySelector(`#modalBody .cl152-item[data-id="${id}"] .cl153-mode`);
+    const card=cardOf(t);let modeTxt='';
+    if(modeBox&&card){
+      if(modeBox.dataset.mode==='debito'){
+        if(!card.accountId)return toast('Este cartão não tem conta vinculada para débito.');
+        t.cardId=undefined;t.debitCardId=card.id;t.accountId=Number(card.accountId);modeTxt=' · Débito';
+      }else{
+        t.cardId=card.id;delete t.debitCardId;t.accountId=Number(card.accountId||t.accountId||0);t.cardHolder=t.cardHolder||'principal';modeTxt=' · Crédito';
+      }
+    }
     t.categoryId=cat.id;
     await save();
-    toast(`Classificado em ${cat.name}.`);
+    toast(`Classificado em ${cat.name}${modeTxt}.`);
     const left=pendingList().length;
     if(left)openClassifyList();else{closeModal();}
     render();
