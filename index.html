@@ -3252,7 +3252,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v153</div>
+    <div class="sum114-ver">Ricas Finanças v155</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -5598,7 +5598,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#a5b4fc!import
       // gráficos logo abaixo dos 3 cartões principais
       const kpis=host.querySelector('.sum114');
       (kpis||ver).after(...box.childNodes);
-      if(ver)ver.textContent='Ricas Finanças v153';
+      if(ver)ver.textContent='Ricas Finanças v155';
     }catch(e){console.warn('v141:',e);}
   };
 })();
@@ -6681,7 +6681,7 @@ tr.paid-row{border-left:0!important}
   function pendingList(){
     const pc=pendCat();
     return (db.transactions||[]).filter(t=>t&&!t.transfer&&!t.virtualCardStatement&&(
-      (pc&&String(t.categoryId)===String(pc.id))||!db.categories.some(c=>String(c.id)===String(t.categoryId))
+      (pc&&String(t.categoryId)===String(pc.id))||!db.categories.some(c=>String(c.id)===String(t.categoryId))||modePending(t)
     )).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   }
   // v153 — cartão ligado ao lançamento (crédito: cardId; débito: conta vinculada ao cartão)
@@ -6689,6 +6689,14 @@ tr.paid-row{border-left:0!important}
     if(t.cardId)return db.cards.find(c=>String(c.id)===String(t.cardId));
     if(t.debitCardId)return db.cards.find(c=>String(c.id)===String(t.debitCardId));
     return null;
+  }
+  // v155 — compra do Wallet sem confirmação de crédito/débito
+  function modePending(t){
+    if(t.source!=='wallet'||t.modeChecked||t.type==='receita')return false;
+    if(!t.cardId&&!t.debitCardId)return false;
+    if(window.walletModeFromTx&&window.walletModeFromTx(t))return false;
+    const since=db.settings&&db.settings.walletModeCheckSince;
+    return !!since&&String(t.date)>=String(since);
   }
   window.classifyPendingCount=()=>pendingList().length;
   const grpKey=c=>budgetGroupDef(c.budgetGroup)?c.budgetGroup:'';
@@ -6700,7 +6708,7 @@ tr.paid-row{border-left:0!important}
   }
   function catOptions(t,g){
     const list=catsFor(t,g);
-    return '<option value="">Escolha a categoria…</option>'+list.map(c=>`<option value="${c.id}">${esc(c.icon||defaultCategoryIcon(c.name))} ${esc(c.name)}</option>`).join('');
+    return '<option value="">Escolha a categoria…</option>'+list.map(c=>`<option value="${c.id}" ${String(c.id)===String(t.categoryId)?'selected':''}>${esc(c.icon||defaultCategoryIcon(c.name))} ${esc(c.name)}</option>`).join('');
   }
   function itemHtml(t){
     const where=t.cardId?`💳 ${esc(cardName(t.cardId))} (crédito)`:(t.debitCardId?`🏦 ${esc(accountName(t.accountId))} (débito · ${esc(cardName(t.debitCardId))})`:`🏦 ${esc(accountName(t.accountId))}`);
@@ -6708,7 +6716,7 @@ tr.paid-row{border-left:0!important}
     const exp=t.type!=='receita';
     return `<div class="cl152-item" data-id="${t.id}">
       <div class="cl152-top"><b>${esc(t.description||'Sem descrição')}</b><span class="cl152-val" style="${exp?'':'color:var(--green)'}">${exp?'− ':'+ '}${money(t.value)}</span></div>
-      <div class="cl152-meta">${fmtDate(t.date)} · ${where}${merch}</div>
+      <div class="cl152-meta">${fmtDate(t.date)} · ${where}${merch}${modePending(t)?' · <b style="color:#b45309">confirme crédito ou débito</b>':''}</div>
       ${exp&&cardOf(t)?`<div class="cl153-mode" data-mode="${t.cardId?'credito':'debito'}">
         <button type="button" class="${t.cardId?'on':''}" onclick="classifyMode(${t.id},'credito')">💳 Crédito</button>
         <button type="button" class="${t.cardId?'':'on'}" onclick="classifyMode(${t.id},'debito')">🏦 Débito</button>
@@ -6751,6 +6759,7 @@ tr.paid-row{border-left:0!important}
       }
     }
     t.categoryId=cat.id;
+    if(card)t.modeChecked=true;
     await save();
     toast(`Classificado em ${cat.name}${modeTxt}.`);
     const left=pendingList().length;
@@ -6778,6 +6787,113 @@ tr.paid-row{border-left:0!important}
       if(/go\('classify'\)/.test(b.getAttribute('onclick')||''))b.innerHTML=`🏷️ &nbsp; A classificar${n?` <span class="cl152-n" style="display:inline-block;min-width:22px;padding:1px 7px;border-radius:999px;background:#f59e0b;color:#fff;font-size:11.5px;text-align:center;margin-left:4px">${n}</span>`:''}`;
     });
   };
+})();
+</script>
+<!-- ===== v154 — Crédito/Débito também em Nova/Editar movimentação ===== -->
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const cardById=id=>db.cards.find(c=>String(c.id)===String(id));
+  function modeWrapHtml(mode){
+    return `<label id="txPayModeWrap" style="display:none">Forma de pagamento<select name="payMode" id="txPayMode" onchange="toggleCardAccountFields()"><option value="credito" ${mode!=='debito'?'selected':''}>💳 Crédito (entra na fatura)</option><option value="debito" ${mode==='debito'?'selected':''}>🏦 Débito (sai da conta)</option></select></label>`;
+  }
+  const oOpen=openTx;
+  openTx=function(id){
+    oOpen.apply(this,arguments);
+    const t=id?db.transactions.find(x=>x.id==id):null;
+    const sel=$('txCardSelect');if(!sel)return;
+    // rótulos: o cartão pode ser usado no crédito ou no débito
+    const lab=sel.closest('label');if(lab&&lab.firstChild&&lab.firstChild.nodeType===3)lab.firstChild.textContent='Cartão';
+    const none=sel.querySelector('option[value=""]');if(none)none.textContent='Não usei cartão';
+    if(t&&!t.cardId&&t.debitCardId&&cardById(t.debitCardId))sel.value=String(t.debitCardId);
+    const anchor=$('txHolderWrap')||sel.closest('label');
+    anchor.insertAdjacentHTML('afterend',modeWrapHtml(t&&!t.cardId&&t.debitCardId?'debito':'credito'));
+    toggleCardAccountFields();
+  };
+  const oToggle=toggleCardAccountFields;
+  toggleCardAccountFields=function(){
+    oToggle.apply(this,arguments);
+    const sel=$('txCardSelect'),w=$('txPayModeWrap'),m=$('txPayMode');if(!sel||!w)return;
+    const has=!!cardById(sel.value);
+    w.style.display=has?'block':'none';
+    const hint=$('txDateHint');
+    if(has&&m?.value==='debito'){
+      const c=cardById(sel.value);
+      if(hint)hint.innerHTML=`<b>Compra no débito:</b> a despesa sai direto da conta <b>${esc(accountName(c?.accountId))}</b> e não entra na fatura.`;
+    }
+  };
+  function readForm(form){
+    const f=new FormData(form);
+    const card=cardById(f.get('cardId'));
+    return {card,debit:!!card&&f.get('payMode')==='debito'};
+  }
+  function toDebit(t,card){t.cardId=undefined;t.debitCardId=card.id;t.accountId=Number(card.accountId||0);}
+  const oAdd=addTx;
+  addTx=function(e){
+    const r=readForm(e.target);
+    if(r.debit&&!r.card.accountId){e.preventDefault();return toast('Este cartão não tem conta vinculada para débito.');}
+    const before=new Set(db.transactions.map(t=>t.id));
+    oAdd.apply(this,arguments);
+    if(!r.debit)return;
+    const t=db.transactions.find(x=>!before.has(x.id));
+    if(t){toDebit(t,r.card);save();toast('Compra lançada no débito');render();}
+  };
+  const oEdit=saveTransactionEdit;
+  saveTransactionEdit=function(e,id){
+    const r=readForm(e.target);
+    if(r.debit&&!r.card.accountId){e.preventDefault();return toast('Este cartão não tem conta vinculada para débito.');}
+    const res=oEdit.apply(this,arguments);
+    const t=db.transactions.find(x=>x.id==id);if(!t)return res;
+    let changed=false;
+    if(r.debit&&t.cardId){toDebit(t,r.card);changed=true;}
+    else if(!r.debit&&t.debitCardId){delete t.debitCardId;changed=true;}
+    if(r.card&&!t.modeChecked){t.modeChecked=true;changed=true;}
+    if(changed){save();render();}
+    return res;
+  };
+})();
+</script>
+<!-- ===== v155 — Automação (Wallet): entende crédito/débito vindo do Worker ===== -->
+<script>
+(function(){
+  const norm=v=>String(v==null?'':v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  // Lê a forma de pagamento em qualquer campo que o Worker possa ter gravado.
+  window.walletModeFromTx=function(t){
+    for(const k of ['modalidade','modality','payMode','paymentMode','formaPagamento','forma','metodo','method']){
+      const v=norm(t[k]);if(!v)continue;
+      if(v.startsWith('deb'))return 'debito';
+      if(v.startsWith('cred'))return 'credito';
+    }
+    return '';
+  };
+  // Converte compras do Wallet marcadas como débito para o formato do app (debitCardId + conta do cartão).
+  function fixWallet(){
+    if(typeof db==='undefined'||!db.transactions||!db.cards)return false;
+    let changed=false;
+    db.settings=db.settings||{};
+    if(!db.settings.walletModeCheckSince){db.settings.walletModeCheckSince=new Date().toISOString().slice(0,10);changed=true;}
+    for(const t of db.transactions){
+      if(!t||t.source!=='wallet')continue;
+      const m=walletModeFromTx(t);
+      if(m==='debito'&&t.cardId){
+        const c=db.cards.find(x=>String(x.id)===String(t.cardId));
+        if(c&&c.accountId){t.debitCardId=c.id;t.cardId=undefined;t.accountId=Number(c.accountId);t.modeChecked=true;changed=true;}
+      }else if(m==='debito'&&!t.cardId&&!t.debitCardId&&t.accountId){
+        const c=db.cards.find(x=>String(x.accountId)===String(t.accountId)&&norm(x.name).includes(norm(t.cartao||t.card||'')));
+        if(c&&(t.cartao||t.card)){t.debitCardId=c.id;t.modeChecked=true;changed=true;}
+      }else if(m==='credito'&&t.cardId&&!t.modeChecked){t.modeChecked=true;changed=true;}
+    }
+    return changed;
+  }
+  const oNorm=normalizeCardData;
+  normalizeCardData=function(){const r=oNorm.apply(this,arguments);try{fixWallet();}catch(e){console.warn('v155:',e);}return r;};
+  // Depois que a nuvem carrega, grava a conversão uma única vez.
+  let busy=false;
+  setInterval(async()=>{
+    if(busy||typeof storageConnected!=='function'||!storageConnected())return;
+    if(!fixWallet())return;
+    busy=true;try{await save();render();}finally{busy=false;}
+  },4000);
 })();
 </script>
 </body>
