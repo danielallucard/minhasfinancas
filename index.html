@@ -3252,7 +3252,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v151</div>
+    <div class="sum114-ver">Ricas Finanças v152</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -5598,7 +5598,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#a5b4fc!import
       // gráficos logo abaixo dos 3 cartões principais
       const kpis=host.querySelector('.sum114');
       (kpis||ver).after(...box.childNodes);
-      if(ver)ver.textContent='Ricas Finanças v151';
+      if(ver)ver.textContent='Ricas Finanças v152';
     }catch(e){console.warn('v141:',e);}
   };
 })();
@@ -6648,5 +6648,109 @@ tr.paid-row{border-left:0!important}
   .mobile-drawer .account-foot .logout-btn{background:#fff!important;color:#dc2626!important;border:1px solid #fecaca!important;font-weight:800!important;}
 }
 </style>
+<!-- ===== v152 — "A classificar": lista com todas as despesas pendentes de categoria ===== -->
+<style id="classify-v152">
+.cl152-bar{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 12px;padding:12px 14px;border:1px solid #fcd34d;border-radius:16px;background:#fffbeb;color:#92400e;font:inherit;font-weight:750;font-size:14.5px;text-align:left;cursor:pointer;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.cl152-bar:hover{background:#fef3c7}
+.cl152-bar .cl152-n{min-width:26px;padding:2px 9px;border-radius:999px;background:#f59e0b;color:#fff;font-size:12.5px;text-align:center}
+.cl152-bar .cl152-go{margin-left:auto;font-size:13px;color:#b45309;white-space:nowrap}
+.cl152-list{display:grid;gap:10px}
+.cl152-item{border:1px solid var(--border);border-left:4px solid #f59e0b;border-radius:14px;padding:12px;background:#fff}
+.cl152-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.cl152-top b{font-size:15px;overflow-wrap:anywhere}
+.cl152-top .cl152-val{color:var(--red);font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cl152-meta{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}
+.cl152-form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.cl152-form select{width:100%;min-height:42px;border:1px solid var(--border);border-radius:12px;padding:8px 10px;background:#f8fafc;font-size:15px}
+.cl152-actions{display:flex;gap:8px;margin-top:8px}
+.cl152-actions .btn{flex:1 1 0;min-height:40px}
+.cl152-empty{text-align:center;padding:26px 10px;color:var(--muted)}
+@media(max-width:560px){.cl152-form{grid-template-columns:1fr}}
+</style>
+<script>
+/* v152 — Reúne em um só lugar todas as despesas "A classificar" (de qualquer mês).
+   Aparece um aviso no Resumo e em Movimentações e um item no menu. Ao escolher grupo e
+   categoria e tocar em Salvar, só a categoria do lançamento muda. Nada mais é alterado. */
+(function(){
+  const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  const pendCat=()=>db.categories.find(c=>norm(c.name)==='a classificar');
+  function pendingList(){
+    const pc=pendCat();
+    return (db.transactions||[]).filter(t=>t&&!t.transfer&&!t.virtualCardStatement&&(
+      (pc&&String(t.categoryId)===String(pc.id))||!db.categories.some(c=>String(c.id)===String(t.categoryId))
+    )).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  }
+  window.classifyPendingCount=()=>pendingList().length;
+  const grpKey=c=>budgetGroupDef(c.budgetGroup)?c.budgetGroup:'';
+  function catsFor(t,g){
+    const pc=pendCat();
+    return db.categories.filter(c=>c.type===(t.type==='receita'?'receita':'despesa')&&(!pc||c.id!==pc.id))
+      .filter(c=>t.type==='receita'||g==='all'||grpKey(c)===(g==='none'?'':g))
+      .sort((a,b)=>String(a.name).localeCompare(String(b.name),'pt-BR',{sensitivity:'base'}));
+  }
+  function catOptions(t,g){
+    const list=catsFor(t,g);
+    return '<option value="">Escolha a categoria…</option>'+list.map(c=>`<option value="${c.id}">${esc(c.icon||defaultCategoryIcon(c.name))} ${esc(c.name)}</option>`).join('');
+  }
+  function itemHtml(t){
+    const where=t.cardId?`💳 ${esc(cardName(t.cardId))}`:`🏦 ${esc(accountName(t.accountId))}`;
+    const merch=merchantLabel(t)&&merchantLabel(t)!==String(t.description||'').trim()?` · ${esc(merchantLabel(t))}`:'';
+    const exp=t.type!=='receita';
+    return `<div class="cl152-item" data-id="${t.id}">
+      <div class="cl152-top"><b>${esc(t.description||'Sem descrição')}</b><span class="cl152-val" style="${exp?'':'color:var(--green)'}">${exp?'− ':'+ '}${money(t.value)}</span></div>
+      <div class="cl152-meta">${fmtDate(t.date)} · ${where}${merch}</div>
+      <div class="cl152-form">
+        ${exp?`<select class="cl152-grp" onchange="classifyGroupChange(${t.id},this.value)"><option value="all">Todos os grupos</option>${budgetGroups().map(g=>`<option value="${g.key}">${g.icon} ${esc(g.name)}</option>`).join('')}<option value="none">❔ Sem grupo</option></select>`:''}
+        <select class="cl152-cat" ${exp?'':'style="grid-column:1/-1"'}>${catOptions(t,'all')}</select>
+      </div>
+      <div class="cl152-actions"><button type="button" class="btn" onclick="closeModal();openTx(${t.id})">✎ Editar tudo</button><button type="button" class="btn primary" onclick="classifySave(${t.id})">Salvar</button></div>
+    </div>`;
+  }
+  window.classifyGroupChange=function(id,g){
+    const t=db.transactions.find(x=>String(x.id)===String(id));const box=document.querySelector(`#modalBody .cl152-item[data-id="${id}"] .cl152-cat`);
+    if(t&&box)box.innerHTML=catOptions(t,g);
+  };
+  window.openClassifyList=function(){
+    const list=pendingList();
+    const total=list.filter(t=>t.type!=='receita').reduce((s,t)=>s+Number(t.value||0),0);
+    openModal(`🏷️ A classificar (${list.length})`,list.length
+      ?`<p class="muted" style="margin:0 0 12px">Todos os meses · ${money(total)} em despesas. Escolha o grupo e a categoria e toque em <b>Salvar</b>.</p><div class="cl152-list">${list.map(itemHtml).join('')}</div>`
+      :'<div class="cl152-empty">✅ Nenhum lançamento aguardando categoria.</div>');
+  };
+  window.classifySave=async function(id){
+    const t=db.transactions.find(x=>String(x.id)===String(id));if(!t)return;
+    const sel=document.querySelector(`#modalBody .cl152-item[data-id="${id}"] .cl152-cat`);
+    const cat=db.categories.find(c=>String(c.id)===String(sel?.value));
+    if(!cat)return toast('Escolha a categoria.');
+    t.categoryId=cat.id;
+    await save();
+    toast(`Classificado em ${cat.name}.`);
+    const left=pendingList().length;
+    if(left)openClassifyList();else{closeModal();}
+    render();
+  };
+  function barHtml(){
+    const n=pendingList().length;if(!n)return '';
+    return `<button type="button" class="cl152-bar" onclick="openClassifyList()">🏷️ A classificar <span class="cl152-n">${n}</span><span class="cl152-go">Classificar →</span></button>`;
+  }
+  function addBar(){
+    const html=barHtml();if(!html)return;
+    const nav=document.querySelector('#content .month-nav');
+    if(nav)nav.insertAdjacentHTML('afterend',html);else document.getElementById('content').insertAdjacentHTML('afterbegin',html);
+  }
+  const oD=dashboard;dashboard=function(){oD.apply(this,arguments);try{addBar();}catch(e){console.warn('v152:',e);}};
+  const oT=transactions;transactions=function(){oT.apply(this,arguments);try{addBar();}catch(e){console.warn('v152:',e);}};
+  // Item no menu (lateral e "Mais"), com a quantidade
+  navItems.splice(2,0,['classify','🏷️','A classificar']);
+  const oGo=go;go=function(target){if(target==='classify'){openClassifyList();return;}return oGo.apply(this,arguments);};
+  const oNav=renderNav;renderNav=function(){
+    oNav.apply(this,arguments);
+    const n=pendingList().length;
+    document.querySelectorAll('#nav button,#mobileDrawerNav button').forEach(b=>{
+      if(/go\('classify'\)/.test(b.getAttribute('onclick')||''))b.innerHTML=`🏷️ &nbsp; A classificar${n?` <span class="cl152-n" style="display:inline-block;min-width:22px;padding:1px 7px;border-radius:999px;background:#f59e0b;color:#fff;font-size:11.5px;text-align:center;margin-left:4px">${n}</span>`:''}`;
+    });
+  };
+})();
+</script>
 </body>
 </html>
