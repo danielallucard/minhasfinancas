@@ -3252,7 +3252,7 @@ function dashboard(){
         ${accL.length?accL.map(x=>`<div class="s117-row"><span>${esc(x.name)}</span><span class="s117-v">${money(x.value)}${tag(x.open)}</span></div>`).join(''):'<div class="s117-empty">Nenhuma despesa em conta neste mês.</div>'}
       </div>`;
     })()}
-    <div class="sum114-ver">Ricas Finanças v155</div>
+    <div class="sum114-ver">Ricas Finanças v156</div>
   </div>`;
 }
 function filterSummaryCategory(categoryId){
@@ -5598,7 +5598,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#a5b4fc!import
       // gráficos logo abaixo dos 3 cartões principais
       const kpis=host.querySelector('.sum114');
       (kpis||ver).after(...box.childNodes);
-      if(ver)ver.textContent='Ricas Finanças v155';
+      if(ver)ver.textContent='Ricas Finanças v156';
     }catch(e){console.warn('v141:',e);}
   };
 })();
@@ -6894,6 +6894,138 @@ tr.paid-row{border-left:0!important}
     if(!fixWallet())return;
     busy=true;try{await save();render();}finally{busy=false;}
   },4000);
+})();
+</script>
+<!-- ===== v156 — "Ignoradas": notificações que o Worker ignorou, para você registrar ou descartar ===== -->
+<style id="ignored-v156">
+.ig156-bar{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 12px;padding:12px 14px;border:1px solid #cbd5e1;border-radius:16px;background:#f8fafc;color:#334155;font:inherit;font-weight:750;font-size:14.5px;text-align:left;cursor:pointer}
+.ig156-bar:hover{background:#f1f5f9}
+.ig156-n{display:inline-block;min-width:22px;padding:1px 8px;border-radius:999px;background:#64748b;color:#fff;font-size:12px;text-align:center}
+.ig156-bar .ig156-go{margin-left:auto;font-size:13px;color:#475569;white-space:nowrap}
+.ig156-list{display:grid;gap:10px}
+.ig156-item{border:1px solid var(--border);border-left:4px solid #94a3b8;border-radius:14px;padding:12px;background:#fff}
+.ig156-item.automacao{border-left-color:#6366f1}.ig156-item.duplicada{border-left-color:#f59e0b}.ig156-item.nao_transacao{border-left-color:#94a3b8}
+.ig156-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.ig156-top b{font-size:15px;overflow-wrap:anywhere}
+.ig156-val{font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--red)}
+.ig156-meta{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}
+.ig156-why{display:inline-block;margin-top:6px;padding:3px 9px;border-radius:999px;background:#f1f5f9;color:#334155;font-size:12px;font-weight:650;line-height:1.4}
+.ig156-txt{margin-top:6px;padding:8px 10px;border-radius:10px;background:#f8fafc;font-size:12px;color:#475569;overflow-wrap:anywhere}
+.ig156-actions{display:flex;gap:8px;margin-top:10px}
+.ig156-actions .btn{flex:1 1 0;min-height:40px}
+.ig156-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+.ig156-empty{text-align:center;padding:26px 10px;color:var(--muted)}
+</style>
+<script>
+/* v156 — Lista "Ignoradas". O Worker v19 guarda as notificações que ignorou (já em Automatizações,
+   possível duplicada ou que não parecem transação) em registros separados, que NÃO entram em saldo,
+   fatura nem relatório. Aqui você escolhe: ✅ Registrar (vira lançamento em "A classificar") ou 🗑️ Descartar. */
+(function(){
+  let list=[],unsub=null,curUid=null;
+  const isOpen=()=>document.getElementById('modal').classList.contains('show')&&!!document.querySelector('#modalBody .ig156-wrap');
+  function refresh(){
+    if(isOpen()){openIgnoredList();return;}
+    const busy=document.getElementById('modal').classList.contains('show')||document.querySelector('#content input:focus,#content select:focus,#content textarea:focus');
+    if(busy)renderNav();else render();
+  }
+  // Escuta os registros "ignored" da conta conectada (separado da base principal do app).
+  setInterval(()=>{
+    let uid=null;
+    try{uid=(cloudUser&&cloudInitialized&&cloudCollection)?cloudUser.uid:null;}catch(e){return;}
+    if(uid===curUid)return;
+    if(unsub){try{unsub();}catch(e){}unsub=null;}
+    curUid=uid;list=[];
+    if(!uid)return;
+    unsub=cloudCollection.where('collection','==','ignored').onSnapshot(snap=>{
+      const next=[];
+      snap.forEach(d=>{try{const v=JSON.parse(d.data().json);v._doc=d.id;next.push(v);}catch(e){}});
+      next.sort((a,b)=>(Number(b.capturedAt)||0)-(Number(a.capturedAt)||0));
+      const changed=JSON.stringify(next.map(x=>x._doc))!==JSON.stringify(list.map(x=>x._doc));
+      list=next;if(changed)refresh();
+    },e=>console.warn('v156:',e));
+  },1500);
+  const remove=docId=>cloudCollection.doc(docId).delete().catch(e=>toast(cloudError(e)));
+  const LBL={automacao:'🔁 Já está em Automatizações',duplicada:'↺ Possível duplicada',nao_transacao:'❔ Não parece transação'};
+  function itemHtml(r){
+    const rec=r.tipo==='receita';
+    const title=r.estabelecimento||r.descricao||'Notificação do banco';
+    const val=Number(r.valor);
+    return `<div class="ig156-item ${esc(r.tipoMotivo||'')}" data-doc="${esc(r._doc)}">
+      <div class="ig156-top"><b>${esc(title)}</b>${Number.isFinite(val)&&val>0?`<span class="ig156-val" style="${rec?'color:var(--green)':''}">${rec?'+ ':'− '}${money(val)}</span>`:''}</div>
+      <div class="ig156-meta">${r.date?fmtDate(r.date):''}${r.hora?' às '+esc(r.hora):''}${r.onde?' · '+esc(r.rotulo?r.rotulo+' · ':'')+esc(r.onde):''}</div>
+      <span class="ig156-why" title="${esc(LBL[r.tipoMotivo]||'')}">${esc(r.motivo||LBL[r.tipoMotivo]||'Ignorada')}</span>
+      ${r.texto?`<div class="ig156-txt">${esc(r.texto)}</div>`:''}
+      <div class="ig156-actions"><button type="button" class="btn" onclick="ignoredDiscard('${esc(r._doc)}')">🗑️ Descartar</button><button type="button" class="btn primary" onclick="ignoredRegister('${esc(r._doc)}')">✅ Registrar</button></div>
+    </div>`;
+  }
+  window.ignoredCount=()=>list.length;
+  window.openIgnoredList=function(){
+    openModal(`🚫 Ignoradas (${list.length})`,`<div class="ig156-wrap">${list.length
+      ?`<div class="ig156-head"><span class="muted">Não entraram no saldo nem na fatura. Registre o que for de verdade e descarte o resto.</span><button type="button" class="btn danger" onclick="ignoredDiscardAll()">Descartar todas</button></div><div class="ig156-list">${list.map(itemHtml).join('')}</div>`
+      :'<div class="ig156-empty">✅ Nenhuma notificação ignorada para revisar.</div>'}</div>`);
+  };
+  window.ignoredDiscard=async function(docId){
+    list=list.filter(x=>x._doc!==docId);await remove(docId);
+    toast('Descartada.');list.length?openIgnoredList():closeModal();renderNav();
+  };
+  window.ignoredDiscardAll=async function(){
+    if(!confirm(`Descartar as ${list.length} notificações ignoradas?\n\nNada é lançado; elas só saem da lista.`))return;
+    const ids=list.map(x=>x._doc);list=[];await Promise.all(ids.map(remove));
+    closeModal();render();toast('Lista de ignoradas limpa.');
+  };
+  let pendingDoc=null;
+  window.ignoredRegister=async function(docId){
+    const r=list.find(x=>x._doc===docId);if(!r)return;
+    if(r.tx&&typeof r.tx==='object'){
+      // O Worker já deixou o lançamento montado (cartão/conta, crédito/débito, estabelecimento).
+      const tx=JSON.parse(JSON.stringify(r.tx));
+      if(db.transactions.some(t=>String(t.id)===String(tx.id)))tx.id=uid();
+      const pc=db.categories.find(c=>String(c.name).trim().toLowerCase()==='a classificar'&&c.type===(tx.type==='receita'?'receita':'despesa'));
+      if(pc)tx.categoryId=pc.id;
+      db.transactions.push(tx);
+      if(!await save())return;
+      list=list.filter(x=>x._doc!==docId);await remove(docId);
+      toast('Registrada. Ela está em 🏷️ A classificar.');
+      list.length?openIgnoredList():closeModal();render();
+      return;
+    }
+    // Sem lançamento montado (não parecia transação): abre "Nova movimentação" já preenchida.
+    closeModal();openTx();pendingDoc=docId;
+    const f=document.querySelector('#modalBody .tx-form');if(!f)return;
+    const set=(n,v)=>{const el=f.querySelector(`[name="${n}"]`);if(el&&v!=null&&v!==''){el.value=v;el.dispatchEvent(new Event('change',{bubbles:true}));}};
+    set('type',r.tipo==='receita'?'receita':'despesa');
+    set('date',r.date);
+    set('description',r.estabelecimento||r.descricao||'');
+    if(Number(r.valor)>0)set('value',decimalInputValue(Number(r.valor)));
+    toast('Confira os dados e salve para registrar.');
+  };
+  const oAdd=addTx;
+  addTx=function(e){
+    const doc=pendingDoc;
+    const res=oAdd.apply(this,arguments);
+    if(doc&&!document.getElementById('modal').classList.contains('show')){pendingDoc=null;list=list.filter(x=>x._doc!==doc);remove(doc);renderNav();}
+    return res;
+  };
+  const oClose=closeModal;closeModal=function(){pendingDoc=null;return oClose.apply(this,arguments);};
+  // Aviso no Resumo e em Movimentações
+  function addBar(){
+    if(!list.length)return;
+    const html=`<button type="button" class="ig156-bar" onclick="openIgnoredList()">🚫 Ignoradas <span class="ig156-n">${list.length}</span><span class="ig156-go">Revisar →</span></button>`;
+    const after=document.querySelector('#content .cl152-bar')||document.querySelector('#content .month-nav');
+    if(after)after.insertAdjacentHTML('afterend',html);else document.getElementById('content').insertAdjacentHTML('afterbegin',html);
+  }
+  const oD=dashboard;dashboard=function(){oD.apply(this,arguments);try{addBar();const v=document.querySelector('#content .sum114-ver');if(v)v.textContent='Ricas Finanças v156';}catch(e){console.warn('v156:',e);}};
+  const oT=transactions;transactions=function(){oT.apply(this,arguments);try{addBar();}catch(e){console.warn('v156:',e);}};
+  // Item no menu, logo abaixo de "A classificar"
+  const i=navItems.findIndex(x=>x[0]==='classify');
+  navItems.splice(i>=0?i+1:2,0,['ignored','🚫','Ignoradas']);
+  const oGo=go;go=function(target){if(target==='ignored'){openIgnoredList();return;}return oGo.apply(this,arguments);};
+  const oNav=renderNav;renderNav=function(){
+    oNav.apply(this,arguments);
+    document.querySelectorAll('#nav button,#mobileDrawerNav button').forEach(b=>{
+      if(/go\('ignored'\)/.test(b.getAttribute('onclick')||''))b.innerHTML=`🚫 &nbsp; Ignoradas${list.length?` <span class="ig156-n" style="margin-left:4px">${list.length}</span>`:''}`;
+    });
+  };
 })();
 </script>
 </body>
